@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../../../core/widgets/device_image_picker.dart';
 import '../models/blog_post.dart';
 
 class CommunityScreen extends StatefulWidget {
@@ -79,7 +81,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
@@ -100,23 +102,28 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
+                        color: context.borderColor,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'Đăng Bài Viết Mới Mới Trên Diễn Đàn',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  SizedBox(height: 16),
+                  Text(
+                    'Đăng Bài Viết Mới Trên Diễn Đàn',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 24),
 
                   // Role selector
                   DropdownButtonFormField<String>(
                     initialValue: selectedRole,
-                    decoration: const InputDecoration(labelText: 'Vai trò của bạn', border: OutlineInputBorder()),
-                    items: const [
+                    decoration: InputDecoration(
+                      labelText: 'Vai trò của bạn',
+                      filled: true,
+                      fillColor: context.inputColor,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
+                    items: [
                       DropdownMenuItem(value: 'Nhiếp ảnh gia', child: Text('Nhiếp ảnh gia')),
                       DropdownMenuItem(value: 'Chuyên gia Nhiếp ảnh Film', child: Text('Chuyên gia Film')),
                       DropdownMenuItem(value: 'Nhà cung cấp Studio & Lab', child: Text('Nhà cung cấp')),
@@ -125,31 +132,64 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       if (val != null) setModalState(() => selectedRole = val);
                     },
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 16),
 
                   TextField(
                     controller: titleController,
-                    decoration: const InputDecoration(labelText: 'Tiêu đề bài viết', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: 'Tiêu đề bài viết',
+                      filled: true,
+                      fillColor: context.inputColor,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 16),
 
                   TextField(
                     controller: contentController,
                     maxLines: 4,
-                    decoration: const InputDecoration(labelText: 'Nội dung chia sẻ...', border: OutlineInputBorder()),
+                    decoration: InputDecoration(
+                      labelText: 'Nội dung chia sẻ...',
+                      filled: true,
+                      fillColor: context.inputColor,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                    ),
                   ),
-                  const SizedBox(height: 12),
+                  SizedBox(height: 16),
 
                   TextField(
                     controller: imageController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'URL hình ảnh (Tùy chọn)',
                       hintText: 'https://images.unsplash.com/...',
-                      border: OutlineInputBorder(),
+                      filled: true,
+                      fillColor: context.inputColor,
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
                       prefixIcon: Icon(Icons.image_outlined),
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 12),
+
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final url = await DeviceImagePicker.pickImageFromDevice(
+                        context,
+                        title: 'Chọn Ảnh Bài Viết Từ Thiết Bị',
+                      );
+                      if (url != null) {
+                        imageController.text = url;
+                      }
+                    },
+                    icon: Icon(Icons.photo_library_outlined, size: 20),
+                    label: Text('Chọn Ảnh Từ Thư Viện Máy', style: TextStyle(fontWeight: FontWeight.bold)),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primary,
+                      minimumSize: const Size(double.infinity, 52),
+                      side: BorderSide(color: AppColors.primary, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                  ),
+                  SizedBox(height: 24),
 
                   ElevatedButton(
                     onPressed: () {
@@ -176,8 +216,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         });
 
                         Navigator.pop(context);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('Đã đăng bài viết mới thành công!'), backgroundColor: Colors.green),
+
+                        NotificationService().triggerLocalNotification(
+                          context: context,
+                          title: 'Đăng Bài Viết Mới Thành Công! 💬',
+                          body: 'Bài viết "$title" của bạn đã được chia sẻ lên Diễn đàn Cộng đồng Film.',
+                          route: '/notifications',
                         );
                       } else {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -187,12 +231,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
-                      minimumSize: const Size(double.infinity, 48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      minimumSize: const Size(double.infinity, 56),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      elevation: 0,
                     ),
-                    child: const Text('Đăng Bài Viết', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                    child: Text('Đăng Bài Viết', style: TextStyle(color: context.cardColor, fontWeight: FontWeight.bold, fontSize: 16)),
                   ),
-                  const SizedBox(height: 20),
+                  SizedBox(height: 24),
                 ],
               ),
             ),
@@ -213,7 +258,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
@@ -225,7 +270,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
               top: 20,
             ),
             child: SizedBox(
-              height: MediaQuery.of(context).size.height * 0.6,
+              height: MediaQuery.of(context).size.height * 0.65,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -234,35 +279,36 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade300,
+                        color: context.borderColor,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 20),
                   Text(
                     'Bình Luận (${comments.length})',
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 20),
 
                   Expanded(
                     child: ListView.separated(
+                      physics: const BouncingScrollPhysics(),
                       itemCount: comments.length,
-                      separatorBuilder: (context, index) => const Divider(height: 1),
+                      separatorBuilder: (context, index) => Divider(color: context.inputColor),
                       itemBuilder: (context, index) {
                         final c = comments[index];
                         return Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10.0),
+                          padding: EdgeInsets.symmetric(vertical: 12.0),
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               CircleAvatar(
-                                radius: 18,
+                                radius: 20,
                                 backgroundColor: AppColors.primary.withValues(alpha: 0.15),
-                                child: Text(c['author']![0], style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
+                                child: Text(c['author']![0], style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary)),
                               ),
-                              const SizedBox(width: 10),
+                              SizedBox(width: 14),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -270,12 +316,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                     Row(
                                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                       children: [
-                                        Text(c['author']!, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                                        Text(c['time']!, style: const TextStyle(fontSize: 11, color: AppColors.textHint)),
+                                        Text(c['author']!, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: context.textColor)),
+                                        Text(c['time']!, style: TextStyle(fontSize: 12, color: AppColors.textHint)),
                                       ],
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(c['text']!, style: const TextStyle(fontSize: 13, color: AppColors.textPrimary)),
+                                    SizedBox(height: 6),
+                                    Text(c['text']!, style: TextStyle(fontSize: 14, color: context.textSecColor, height: 1.4)),
                                   ],
                                 ),
                               ),
@@ -287,7 +333,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   ),
 
                   Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12.0),
+                    padding: EdgeInsets.symmetric(vertical: 16.0),
                     child: Row(
                       children: [
                         Expanded(
@@ -295,18 +341,17 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             controller: commentController,
                             decoration: InputDecoration(
                               hintText: 'Viết bình luận...',
-                              hintStyle: const TextStyle(fontSize: 13),
+                              hintStyle: TextStyle(fontSize: 14, color: AppColors.textHint),
                               filled: true,
-                              fillColor: AppColors.inputFill,
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                              fillColor: context.inputColor,
+                              contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                              border: OutlineInputBorder(borderRadius: BorderRadius.circular(24), borderSide: BorderSide.none),
                             ),
                           ),
                         ),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          icon: const Icon(Icons.send_rounded, color: AppColors.primary),
-                          onPressed: () {
+                        SizedBox(width: 12),
+                        GestureDetector(
+                          onTap: () {
                             if (commentController.text.trim().isNotEmpty) {
                               setModalState(() {
                                 comments.add({
@@ -321,6 +366,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
                               commentController.clear();
                             }
                           },
+                          child: Container(
+                            padding: EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.send_rounded, color: context.cardColor, size: 20),
+                          ),
                         ),
                       ],
                     ),
@@ -338,10 +391,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -351,20 +404,21 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.borderColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
+            SizedBox(height: 20),
+            Text(
               'Chia Sẻ Bài Viết',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: 24),
             ListTile(
-              leading: const CircleAvatar(backgroundColor: AppColors.inputFill, child: Icon(Icons.copy_rounded, color: AppColors.primary)),
-              title: const Text('Sao chép liên kết', style: TextStyle(fontWeight: FontWeight.bold)),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              leading: CircleAvatar(radius: 24, backgroundColor: context.inputColor, child: Icon(Icons.copy_rounded, color: AppColors.primary)),
+              title: Text('Sao chép liên kết', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               onTap: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -373,21 +427,24 @@ class _CommunityScreenState extends State<CommunityScreen> {
               },
             ),
             ListTile(
-              leading: const CircleAvatar(backgroundColor: Color(0xFF1877F2), child: Icon(Icons.facebook, color: Colors.white)),
-              title: const Text('Chia sẻ lên Facebook', style: TextStyle(fontWeight: FontWeight.bold)),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              leading: CircleAvatar(radius: 24, backgroundColor: Color(0xFF1877F2), child: Icon(Icons.facebook, color: context.cardColor)),
+              title: Text('Chia sẻ lên Facebook', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               onTap: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đang mở ứng dụng Facebook...')));
               },
             ),
             ListTile(
-              leading: const CircleAvatar(backgroundColor: Color(0xFF0088CC), child: Icon(Icons.send, color: Colors.white)),
-              title: const Text('Chia sẻ qua Zalo / Telegram', style: TextStyle(fontWeight: FontWeight.bold)),
+              contentPadding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              leading: CircleAvatar(radius: 24, backgroundColor: Color(0xFF0088CC), child: Icon(Icons.send, color: context.cardColor)),
+              title: Text('Chia sẻ qua Zalo / Telegram', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
               onTap: () {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã chọn chia sẻ tin nhắn!')));
               },
             ),
+            SizedBox(height: 16),
           ],
         ),
       ),
@@ -397,12 +454,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
-        title: const Text('Diễn Đàn Cộng Đồng Film'),
+        title: Text('Diễn Đàn Cộng Đồng Film'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 28),
+            icon: Icon(Icons.edit_note_rounded, color: AppColors.primary, size: 28),
             tooltip: 'Đăng bài viết mới',
             onPressed: _showCreatePostModal,
           ),
@@ -413,12 +470,20 @@ class _CommunityScreenState extends State<CommunityScreen> {
           children: [
             // Search Input
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 6.0),
+              padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.inputFill,
-                  borderRadius: BorderRadius.circular(16),
+                  color: context.cardColor,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: context.borderColor),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.02),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: TextField(
                   controller: _searchController,
@@ -429,12 +494,12 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   },
                   decoration: InputDecoration(
                     hintText: 'Tìm bài viết, chuyên gia, thảo luận...',
-                    hintStyle: const TextStyle(color: AppColors.textHint, fontSize: 13),
+                    hintStyle: TextStyle(color: AppColors.textHint, fontSize: 14),
                     border: InputBorder.none,
-                    icon: const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 20),
+                    icon: Icon(Icons.search_rounded, color: context.textSecColor, size: 22),
                     suffixIcon: _searchQuery.isNotEmpty
                         ? IconButton(
-                            icon: const Icon(Icons.clear, size: 18),
+                            icon: Icon(Icons.clear, size: 18),
                             onPressed: () {
                               _searchController.clear();
                               setState(() {
@@ -450,22 +515,24 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
             // Filter Categories Row
             SizedBox(
-              height: 48,
+              height: 44,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+                padding: EdgeInsets.symmetric(horizontal: 20),
                 itemCount: _filters.length,
                 itemBuilder: (context, index) {
                   final isSelected = _selectedFilterIndex == index;
                   return Padding(
-                    padding: const EdgeInsets.only(right: 8.0),
+                    padding: EdgeInsets.only(right: 8.0),
                     child: ChoiceChip(
                       label: Text(_filters[index]),
                       selected: isSelected,
                       selectedColor: AppColors.primary,
-                      backgroundColor: AppColors.inputFill,
+                      backgroundColor: context.cardColor,
+                      side: BorderSide(color: isSelected ? Colors.transparent : context.borderColor),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                        color: isSelected ? context.cardColor : context.textColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
@@ -481,15 +548,24 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 },
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 12),
 
             // Posts List
             Expanded(
               child: _filteredPosts.isEmpty
-                  ? const Center(child: Text('Không tìm thấy bài viết phù hợp'))
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.search_off_rounded, size: 56, color: AppColors.textHint),
+                          SizedBox(height: 16),
+                          Text('Không tìm thấy bài viết phù hợp', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500, color: context.textSecColor)),
+                        ],
+                      ),
+                    )
                   : ListView.builder(
                       physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                       itemCount: _filteredPosts.length,
                       itemBuilder: (context, index) {
                         final post = _filteredPosts[index];
@@ -508,16 +584,17 @@ class _CommunityScreenState extends State<CommunityScreen> {
     final isDisliked = post.userReaction == 'dislike';
 
     return Container(
-      margin: const EdgeInsets.only(bottom: 20),
-      padding: const EdgeInsets.all(16),
+      margin: EdgeInsets.only(bottom: 24),
+      padding: EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(20),
+        color: context.cardColor,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: context.borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 16,
+            offset: const Offset(0, 6),
           ),
         ],
       ),
@@ -528,99 +605,97 @@ class _CommunityScreenState extends State<CommunityScreen> {
           Row(
             children: [
               CircleAvatar(
-                radius: 22,
+                radius: 24,
                 backgroundImage: NetworkImage(post.authorAvatar),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(
+                      post.authorName,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: context.textColor,
+                      ),
+                    ),
+                    SizedBox(height: 4),
                     Row(
                       children: [
-                        Flexible(
-                          child: Text(
-                            post.authorName,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(6),
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(8),
                           ),
                           child: Text(
                             post.authorRole,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
                               color: AppColors.primary,
                             ),
                           ),
                         ),
+                        SizedBox(width: 8),
+                        Text(
+                          post.timeAgo,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textHint,
+                          ),
+                        ),
                       ],
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      post.timeAgo,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textSecondary,
-                      ),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 18),
 
           // Post Title
           Text(
             post.title,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-              height: 1.3,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              color: context.textColor,
+              height: 1.4,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 10),
 
           // Post Content
           Text(
             post.content,
-            maxLines: 3,
+            maxLines: 4,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
-              color: AppColors.textSecondary,
-              height: 1.4,
+              color: context.textSecColor,
+              height: 1.5,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 16),
 
           // Optional Image
           if (post.imageUrl != null) ...[
             SafeNetworkImage(
               url: post.imageUrl!,
               width: double.infinity,
-              height: 200,
-              borderRadius: BorderRadius.circular(14),
+              height: 220,
+              borderRadius: BorderRadius.circular(16),
             ),
-            const SizedBox(height: 14),
+            SizedBox(height: 20),
           ],
 
-          const Divider(height: 1),
-          const SizedBox(height: 10),
+          Divider(height: 1, color: context.inputColor),
+          SizedBox(height: 12),
 
           // Interaction Toolbar (+ Like, - Dislike, Comment, Share)
           Row(
@@ -629,30 +704,30 @@ class _CommunityScreenState extends State<CommunityScreen> {
               // Like Button (Dấu +)
               InkWell(
                 onTap: () => _handleLike(post),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: isLiked ? AppColors.primary : AppColors.inputFill,
+                          color: isLiked ? AppColors.primary : context.inputColor,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.add_rounded,
                           size: 16,
-                          color: isLiked ? Colors.white : AppColors.textPrimary,
+                          color: isLiked ? context.cardColor : context.textColor,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      SizedBox(width: 8),
                       Text(
                         '${post.likes}',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: isLiked ? AppColors.primary : AppColors.textSecondary,
+                          color: isLiked ? AppColors.primary : context.textSecColor,
                         ),
                       ),
                     ],
@@ -663,30 +738,30 @@ class _CommunityScreenState extends State<CommunityScreen> {
               // Dislike Button (Dấu -)
               InkWell(
                 onTap: () => _handleDislike(post),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   child: Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.all(4),
+                        padding: EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: isDisliked ? Colors.redAccent : AppColors.inputFill,
+                          color: isDisliked ? Colors.redAccent : context.inputColor,
                           shape: BoxShape.circle,
                         ),
                         child: Icon(
                           Icons.remove_rounded,
                           size: 16,
-                          color: isDisliked ? Colors.white : AppColors.textPrimary,
+                          color: isDisliked ? context.cardColor : context.textColor,
                         ),
                       ),
-                      const SizedBox(width: 6),
+                      SizedBox(width: 8),
                       Text(
                         '${post.dislikes}',
                         style: TextStyle(
-                          fontSize: 13,
+                          fontSize: 14,
                           fontWeight: FontWeight.bold,
-                          color: isDisliked ? Colors.redAccent : AppColors.textSecondary,
+                          color: isDisliked ? Colors.redAccent : context.textSecColor,
                         ),
                       ),
                     ],
@@ -697,16 +772,16 @@ class _CommunityScreenState extends State<CommunityScreen> {
               // Comment Button
               InkWell(
                 onTap: () => _showCommentsModal(post),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.mode_comment_outlined, size: 18, color: AppColors.textSecondary),
-                      const SizedBox(width: 6),
+                      Icon(Icons.mode_comment_outlined, size: 20, color: context.textSecColor),
+                      SizedBox(width: 8),
                       Text(
                         '${post.commentsCount}',
-                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textSecColor),
                       ),
                     ],
                   ),
@@ -716,16 +791,16 @@ class _CommunityScreenState extends State<CommunityScreen> {
               // Share Button
               InkWell(
                 onTap: () => _showShareModal(post),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
                   child: Row(
                     children: [
-                      const Icon(Icons.share_outlined, size: 18, color: AppColors.textSecondary),
-                      const SizedBox(width: 6),
+                      Icon(Icons.share_outlined, size: 20, color: context.textSecColor),
+                      SizedBox(width: 8),
                       Text(
                         '${post.sharesCount}',
-                        style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textSecColor),
                       ),
                     ],
                   ),
@@ -738,3 +813,5 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 }
+
+

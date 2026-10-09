@@ -1,7 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../booking/models/booking_item.dart';
+import '../../notifications/models/notification_item.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,7 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   // Filter Modal State
   double _maxPriceFilter = 500000;
   double _minRatingFilter = 0.0;
-  String _sortBy = 'default'; // 'default', 'price_asc', 'price_desc', 'rating_desc'
+  String _sortBy = 'default';
 
   final List<String> _locations = [
     'Hồ Chí Minh, Việt Nam',
@@ -35,28 +36,9 @@ class _HomeScreenState extends State<HomeScreen> {
     '🎥 Thiết bị',
   ];
 
-  final List<Map<String, String>> _notifications = [
-    {
-      'title': 'Lịch đặt đã được xác nhận!',
-      'body': 'Vintage Film Studio Saigon đã xác nhận lịch đặt của bạn vào ngày mai 09:00.',
-      'time': '5 phút trước',
-    },
-    {
-      'title': 'Bài viết mới từ Chuyên gia',
-      'body': 'Master Lộc Film vừa chia sẻ bài viết "Kỹ thuật tráng film Kodak Tri-X 400".',
-      'time': '1 giờ trước',
-    },
-    {
-      'title': 'Ưu đãi Phòng Tối 20%',
-      'body': 'Nhập mã ANALOG20 để nhận ưu đãi 20% khi đặt Silver Halide Darkroom.',
-      'time': '3 giờ trước',
-    },
-  ];
-
   List<BookingItem> get _filteredItems {
     List<BookingItem> list = List.from(BookingItem.sampleItems);
 
-    // Filter by Category
     if (_selectedCategoryIndex == 1) {
       list = list.where((e) => e.category == BookingCategory.studio).toList();
     } else if (_selectedCategoryIndex == 2) {
@@ -65,17 +47,14 @@ class _HomeScreenState extends State<HomeScreen> {
       list = list.where((e) => e.category == BookingCategory.equipment).toList();
     }
 
-    // Filter by Max Price & Min Rating
     list = list.where((e) => e.pricePerHour <= _maxPriceFilter && e.rating >= _minRatingFilter).toList();
 
-    // Filter by Search Query
     if (_searchQuery.isNotEmpty) {
       list = list.where((e) =>
           e.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
           e.location.toLowerCase().contains(_searchQuery.toLowerCase())).toList();
     }
 
-    // Sorting
     if (_sortBy == 'price_asc') {
       list.sort((a, b) => a.pricePerHour.compareTo(b.pricePerHour));
     } else if (_sortBy == 'price_desc') {
@@ -97,7 +76,7 @@ class _HomeScreenState extends State<HomeScreen> {
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) {
           return Container(
-            padding: const EdgeInsets.all(24),
+            padding: EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -107,18 +86,18 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: Colors.grey.shade300,
+                      color: context.borderColor,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Text(
+                    Text(
                       'Bộ Lọc Tìm Kiếm Nâng Cao',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textColor),
                     ),
                     TextButton(
                       onPressed: () {
@@ -129,16 +108,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         });
                         setState(() {});
                       },
-                      child: const Text('Đặt lại', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                      child: Text('Đặt lại', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
 
-                // Price Filter
                 Text(
                   'Giá tối đa: ${_maxPriceFilter.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ / giờ',
-                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 Slider(
                   value: _maxPriceFilter,
@@ -154,25 +132,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     setState(() {});
                   },
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
 
-                // Rating Filter
-                const Text('Đánh giá tối thiểu:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(height: 8),
+                Text('Đánh giá tối thiểu:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                SizedBox(height: 8),
                 Row(
                   children: [
                     _buildRatingChip('Tất cả', 0.0, setModalState),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     _buildRatingChip('4.5+ ⭐', 4.5, setModalState),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     _buildRatingChip('4.8+ ⭐', 4.8, setModalState),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
 
-                // Sort By Filter
-                const Text('Sắp xếp theo:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                const SizedBox(height: 8),
+                Text('Sắp xếp theo:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                SizedBox(height: 8),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -183,7 +159,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     _buildSortChip('Đánh giá cao nhất', 'rating_desc', setModalState),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
 
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
@@ -194,10 +170,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   child: Text(
                     'Áp Dụng (${_filteredItems.length} Kết quả)',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15),
+                    style: TextStyle(color: context.cardColor, fontWeight: FontWeight.bold, fontSize: 15),
                   ),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
               ],
             ),
           );
@@ -212,17 +188,15 @@ class _HomeScreenState extends State<HomeScreen> {
       label: Text(label),
       selected: isSelected,
       selectedColor: AppColors.primary,
-      backgroundColor: AppColors.inputFill,
+      backgroundColor: context.inputColor,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : AppColors.textPrimary,
+        color: isSelected ? context.cardColor : context.textColor,
         fontWeight: FontWeight.bold,
         fontSize: 12,
       ),
       onSelected: (selected) {
         if (selected) {
-          setModalState(() {
-            _minRatingFilter = rating;
-          });
+          setModalState(() => _minRatingFilter = rating);
           setState(() {});
         }
       },
@@ -235,17 +209,15 @@ class _HomeScreenState extends State<HomeScreen> {
       label: Text(label),
       selected: isSelected,
       selectedColor: AppColors.primary,
-      backgroundColor: AppColors.inputFill,
+      backgroundColor: context.inputColor,
       labelStyle: TextStyle(
-        color: isSelected ? Colors.white : AppColors.textPrimary,
+        color: isSelected ? context.cardColor : context.textColor,
         fontWeight: FontWeight.bold,
         fontSize: 12,
       ),
       onSelected: (selected) {
         if (selected) {
-          setModalState(() {
-            _sortBy = value;
-          });
+          setModalState(() => _sortBy = value);
           setState(() {});
         }
       },
@@ -259,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
       builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -268,41 +240,18 @@ class _HomeScreenState extends State<HomeScreen> {
               child: Container(
                 width: 40,
                 height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+                decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Chọn Tỉnh / Thành Phố',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
+            Text('Chọn Tỉnh / Thành Phố', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textColor)),
+            SizedBox(height: 16),
             ..._locations.map((loc) => ListTile(
-                  leading: Icon(
-                    Icons.location_on_rounded,
-                    color: _currentLocation == loc ? AppColors.primary : AppColors.textSecondary,
-                  ),
-                  title: Text(
-                    loc,
-                    style: TextStyle(
-                      fontWeight: _currentLocation == loc ? FontWeight.bold : FontWeight.normal,
-                      color: _currentLocation == loc ? AppColors.primary : AppColors.textPrimary,
-                    ),
-                  ),
-                  trailing: _currentLocation == loc
-                      ? const Icon(Icons.check_circle_rounded, color: AppColors.primary)
-                      : null,
+                  leading: Icon(Icons.location_on_rounded, color: _currentLocation == loc ? AppColors.primary : context.textSecColor),
+                  title: Text(loc, style: TextStyle(fontWeight: _currentLocation == loc ? FontWeight.bold : FontWeight.normal, color: _currentLocation == loc ? AppColors.primary : context.textColor)),
+                  trailing: _currentLocation == loc ? Icon(Icons.check_circle_rounded, color: AppColors.primary) : null,
                   onTap: () {
-                    setState(() {
-                      _currentLocation = loc;
-                    });
+                    setState(() => _currentLocation = loc);
                     Navigator.pop(context);
                   },
                 )),
@@ -312,119 +261,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  void _showNotifications() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Text(
-                  'Thông Báo Mới',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                Text(
-                  'Đánh dấu đã đọc',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            Expanded(
-              child: ListView.separated(
-                itemCount: _notifications.length,
-                separatorBuilder: (context, index) => const Divider(height: 1),
-                itemBuilder: (context, index) {
-                  final item = _notifications[index];
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 12.0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.all(10),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.12),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.notifications_active_rounded, color: AppColors.primary, size: 20),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                item['title']!,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                item['body']!,
-                                style: const TextStyle(
-                                  fontSize: 13,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                item['time']!,
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textHint,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
+    final unreadNotifs = NotificationItem.sampleNotifications.where((n) => !n.isRead).length;
+
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       body: SafeArea(
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -432,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
             // Top Location Bar & Notifications Button
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
+                padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 16.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -441,36 +283,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text(
-                            'Vị trí hiện tại',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
+                          Text('Vị trí hiện tại', style: TextStyle(fontSize: 12, color: context.textSecColor, fontWeight: FontWeight.w500)),
+                          SizedBox(height: 4),
                           Row(
                             children: [
-                              const Icon(
-                                Icons.location_on_rounded,
-                                color: AppColors.primary,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                _currentLocation,
-                                style: const TextStyle(
-                                  fontSize: 15,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.textPrimary,
-                                ),
-                              ),
-                              const Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: AppColors.textPrimary,
-                                size: 20,
-                              ),
+                              Icon(Icons.location_on_rounded, color: AppColors.primary, size: 18),
+                              SizedBox(width: 4),
+                              Text(_currentLocation, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: context.textColor)),
+                              Icon(Icons.keyboard_arrow_down_rounded, color: context.textColor, size: 20),
                             ],
                           ),
                         ],
@@ -479,7 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
                     // Notification Bell Button
                     GestureDetector(
-                      onTap: _showNotifications,
+                      onTap: () => Navigator.pushNamed(context, '/notifications'),
                       child: Stack(
                         children: [
                           Container(
@@ -489,7 +309,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: AppColors.cardBg,
                               shape: BoxShape.circle,
                               border: Border.all(
-                                color: AppColors.inputFill,
+                                color: context.inputColor,
                                 width: 1,
                               ),
                               boxShadow: [
@@ -500,24 +320,28 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ],
                             ),
-                            child: const Icon(
+                            child: Icon(
                               Icons.notifications_none_rounded,
-                              color: AppColors.textPrimary,
+                              color: context.textColor,
                               size: 24,
                             ),
                           ),
-                          Positioned(
-                            top: 10,
-                            right: 12,
-                            child: Container(
-                              width: 8,
-                              height: 8,
-                              decoration: const BoxDecoration(
-                                color: AppColors.primary,
-                                shape: BoxShape.circle,
+                          if (unreadNotifs > 0)
+                            Positioned(
+                              top: 8,
+                              right: 8,
+                              child: Container(
+                                padding: EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Text(
+                                  '$unreadNotifs',
+                                  style: TextStyle(color: context.cardColor, fontSize: 9, fontWeight: FontWeight.bold),
+                                ),
                               ),
                             ),
-                          ),
                         ],
                       ),
                     ),
@@ -529,25 +353,21 @@ class _HomeScreenState extends State<HomeScreen> {
             // Search Bar Input & Filter Button
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 6.0),
+                padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.inputFill,
+                    color: context.inputColor,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Row(
                     children: [
-                      const Icon(Icons.search_rounded, color: AppColors.textSecondary, size: 22),
-                      const SizedBox(width: 8),
+                      Icon(Icons.search_rounded, color: context.textSecColor, size: 22),
+                      SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _searchController,
-                          onChanged: (val) {
-                            setState(() {
-                              _searchQuery = val.trim();
-                            });
-                          },
+                          onChanged: (val) => setState(() => _searchQuery = val.trim()),
                           decoration: const InputDecoration(
                             hintText: 'Tìm kiếm Studio, Phòng tối, Thiết bị...',
                             hintStyle: TextStyle(
@@ -561,12 +381,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       GestureDetector(
                         onTap: _showFilterModal,
                         child: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.tune_rounded, color: Colors.white, size: 18),
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(color: AppColors.primary, borderRadius: BorderRadius.circular(10)),
+                          child: Icon(Icons.tune_rounded, color: context.cardColor, size: 18),
                         ),
                       ),
                     ],
@@ -575,55 +392,98 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Category Chips Row
+            // Quick AI Tools & Features Shortcut Banners (FE-03, FE-08, FE-13, FE-14)
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 14.0),
-                child: SizedBox(
-                  height: 40,
-                  child: ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _categories.length,
-                    itemBuilder: (context, index) {
-                      final isSelected = _selectedCategoryIndex == index;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10.0),
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() {
-                              _selectedCategoryIndex = index;
-                            });
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: isSelected ? AppColors.primary : AppColors.inputFill,
-                              borderRadius: BorderRadius.circular(20),
-                              boxShadow: isSelected
-                                  ? [
-                                      BoxShadow(
-                                        color: AppColors.primary.withValues(alpha: 0.3),
-                                        blurRadius: 8,
-                                        offset: const Offset(0, 4),
-                                      ),
-                                    ]
-                                  : [],
-                            ),
-                            child: Text(
-                              _categories[index],
-                              style: TextStyle(
-                                color: isSelected ? Colors.white : AppColors.textPrimary,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
-                                fontSize: 13,
-                              ),
+                padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
+                child: Column(
+                  children: [
+                    // AI Features Row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildFeatureTile(
+                            title: 'Trợ Lý AI Film',
+                            subtitle: 'Hỏi đáp kỹ thuật 24/7',
+                            icon: Icons.auto_awesome,
+                            gradient: AppColors.aiGradient,
+                            onTap: () => Navigator.pushNamed(context, '/ai-assistant'),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: _buildFeatureTile(
+                            title: 'AI Phục Chế 4K',
+                            subtitle: 'Khôi phục ảnh film cũ',
+                            icon: Icons.photo_filter_rounded,
+                            gradient: AppColors.goldGradient,
+                            onTap: () => Navigator.pushNamed(context, '/ai-restoration'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildFeatureTile(
+                            title: 'Gói Combo Bundle',
+                            subtitle: 'Tiết kiệm tới 30%',
+                            icon: Icons.card_giftcard_rounded,
+                            gradient: AppColors.primaryGradient,
+                            onTap: () => Navigator.pushNamed(context, '/service-packages'),
+                          ),
+                        ),
+                        SizedBox(width: 12),
+                        Expanded(
+                          child: _buildFeatureTile(
+                            title: 'So Sánh Studio',
+                            subtitle: 'Đối chiếu thông số',
+                            icon: Icons.compare_arrows_rounded,
+                            gradient: const LinearGradient(colors: [Color(0xFF2C3E50), Color(0xFF4CA1AF)]),
+                            onTap: () => Navigator.pushNamed(context, '/studio-comparison'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Category Chips Row
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: 40,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: _categories.length,
+                  itemBuilder: (context, index) {
+                    final isSelected = _selectedCategoryIndex == index;
+                    return Padding(
+                      padding: EdgeInsets.only(right: 10.0),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedCategoryIndex = index),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: isSelected ? AppColors.primary : context.inputColor,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            _categories[index],
+                            style: TextStyle(
+                              color: isSelected ? context.cardColor : context.textColor,
+                              fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                              fontSize: 13,
                             ),
                           ),
                         ),
-                      );
-                    },
-                  ),
+                      ),
+                    );
+                  },
                 ),
               ),
             ),
@@ -631,17 +491,13 @@ class _HomeScreenState extends State<HomeScreen> {
             // Section 1: Near Location Header
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+                padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
                       'Gần vị trí của bạn (${_filteredItems.length})',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textColor),
                     ),
                     GestureDetector(
                       onTap: () {
@@ -654,14 +510,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _sortBy = 'default';
                         });
                       },
-                      child: const Text(
-                        'Xóa bộ lọc',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: AppColors.primary,
-                        ),
-                      ),
+                      child: Text('Xóa bộ lọc', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
                     ),
                   ],
                 ),
@@ -671,17 +520,13 @@ class _HomeScreenState extends State<HomeScreen> {
             // Section 1 Horizontal Cards List
             SliverToBoxAdapter(
               child: _filteredItems.isEmpty
-                  ? Container(
-                      height: 120,
-                      alignment: Alignment.center,
-                      child: const Text('Không tìm thấy kết quả phù hợp'),
-                    )
+                  ? Container(height: 100, alignment: Alignment.center, child: Text('Không tìm thấy kết quả phù hợp'))
                   : SizedBox(
                       height: 260,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                         itemCount: _filteredItems.length,
                         itemBuilder: (context, index) {
                           final item = _filteredItems[index];
@@ -694,26 +539,12 @@ class _HomeScreenState extends State<HomeScreen> {
             // Section 2: Popular Header
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text(
-                      'Phổ biến & Được yêu thích',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      'Tất cả',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
+                  children: [
+                    Text('Phổ biến & Được yêu thích', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textColor)),
+                    Text('Tất cả', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
                   ],
                 ),
               ),
@@ -721,7 +552,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Section 2 Vertical List
             SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 8.0),
+              padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
               sliver: _filteredItems.isEmpty
                   ? const SliverToBoxAdapter(child: SizedBox())
                   : SliverList(
@@ -741,23 +572,58 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildNearCard(BuildContext context, BookingItem item) {
+  Widget _buildFeatureTile({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required Gradient gradient,
+    required VoidCallback onTap,
+  }) {
     return GestureDetector(
-      onTap: () {
-        Navigator.pushNamed(context, '/detail', arguments: item);
-      },
+      onTap: onTap,
       child: Container(
-        width: 230,
-        margin: const EdgeInsets.only(right: 16),
+        padding: EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
+          gradient: gradient,
+          borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 3),
             ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: context.cardColor, size: 24),
+            SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: context.cardColor, fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text(subtitle, style: TextStyle(color: Colors.white70, fontSize: 10)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNearCard(BuildContext context, BookingItem item) {
+    return GestureDetector(
+      onTap: () => Navigator.pushNamed(context, '/detail', arguments: item),
+      child: Container(
+        width: 230,
+        margin: EdgeInsets.only(right: 16),
+        decoration: BoxDecoration(
+          color: context.cardColor,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 12, offset: const Offset(0, 4)),
           ],
         ),
         child: Column(
@@ -775,21 +641,14 @@ class _HomeScreenState extends State<HomeScreen> {
                   top: 10,
                   right: 10,
                   child: GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        item.isFavorite = !item.isFavorite;
-                      });
-                    },
+                    onTap: () => setState(() => item.isFavorite = !item.isFavorite),
                     child: Container(
                       width: 34,
                       height: 34,
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
+                      decoration: BoxDecoration(color: context.cardColor, shape: BoxShape.circle),
                       child: Icon(
                         item.isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: item.isFavorite ? Colors.red : AppColors.textSecondary,
+                        color: item.isFavorite ? Colors.red : context.textSecColor,
                         size: 18,
                       ),
                     ),
@@ -798,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
             Padding(
-              padding: const EdgeInsets.all(12.0),
+              padding: EdgeInsets.all(12.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -806,62 +665,23 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Expanded(
-                        child: Text(
-                          item.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
+                        child: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textColor)),
                       ),
                       Row(
                         children: [
-                          const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                          const SizedBox(width: 2),
-                          Text(
-                            item.rating.toString(),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
+                          Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                          SizedBox(width: 2),
+                          Text(item.rating.toString(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textColor)),
                         ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
+                  SizedBox(height: 4),
+                  Text(item.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: context.textSecColor)),
+                  SizedBox(height: 8),
                   Text(
-                    item.location,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Text(
-                        '${item.pricePerHour.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ',
-                        style: const TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                      const Text(
-                        ' / giờ',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
+                    '${item.pricePerHour.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ / giờ',
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primary),
                   ),
                 ],
               ),
@@ -874,32 +694,21 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildPopularCard(BuildContext context, BookingItem item) {
     return GestureDetector(
-      onTap: () {
-        Navigator.pushNamed(context, '/detail', arguments: item);
-      },
+      onTap: () => Navigator.pushNamed(context, '/detail', arguments: item),
       child: Container(
-        margin: const EdgeInsets.only(bottom: 14),
-        padding: const EdgeInsets.all(10),
+        margin: EdgeInsets.only(bottom: 14),
+        padding: EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
-            ),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3)),
           ],
         ),
         child: Row(
           children: [
-            SafeNetworkImage(
-              url: item.imageUrl,
-              width: 80,
-              height: 80,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            const SizedBox(width: 14),
+            SafeNetworkImage(url: item.imageUrl, width: 80, height: 80, borderRadius: BorderRadius.circular(12)),
+            SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -907,52 +716,22 @@ class _HomeScreenState extends State<HomeScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Expanded(
-                        child: Text(
-                          item.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                      ),
+                      Expanded(child: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: context.textColor))),
                       Row(
                         children: [
-                          const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                          const SizedBox(width: 2),
-                          Text(
-                            item.rating.toString(),
-                            style: const TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
+                          Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                          SizedBox(width: 2),
+                          Text(item.rating.toString(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textColor)),
                         ],
                       ),
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    item.location,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 4),
+                  Text(item.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: context.textSecColor)),
+                  SizedBox(height: 8),
                   Text(
                     '${item.pricePerHour.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ / giờ',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.primary,
-                    ),
+                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
                   ),
                 ],
               ),
@@ -963,3 +742,5 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 }
+
+

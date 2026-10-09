@@ -77,11 +77,11 @@ class SocialLoginRow extends StatelessWidget {
           tooltip: 'Google',
           onTap: onGoogleTap,
           icon: Image.network(
-            'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg',
-            height: 22,
-            width: 22,
+            'https://developers.google.com/identity/images/g-logo.png',
+            height: 24,
+            width: 24,
             errorBuilder: (context, error, stackTrace) =>
-                const Icon(Icons.g_mobiledata, size: 28, color: Colors.red),
+                const Icon(Icons.g_mobiledata_rounded, size: 36, color: Color(0xFFDB4437)),
           ),
         ),
         const SizedBox(width: 16),

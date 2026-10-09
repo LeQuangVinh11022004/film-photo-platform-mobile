@@ -1,7 +1,10 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
+import 'dart:io';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/widgets/device_image_picker.dart';
 import '../../booking/models/booking_item.dart';
 import '../../booking/models/booking_schedule.dart';
+import '../../../app/main.dart'; // Import themeNotifier
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -17,98 +20,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _bio = 'Nhiếp ảnh gia chuyên nghiệp đam mê chất phim Analog 35mm & Medium Format.';
   String _avatarUrl = 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
 
-  final List<String> _sampleAvatars = [
-    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
-    'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=300&auto=format&fit=crop&q=80',
-  ];
-
-  void _showChangeAvatarModal() {
-    final urlController = TextEditingController(text: _avatarUrl);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              'Thay Đổi Ảnh Đại Diện',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
-            ),
-            const SizedBox(height: 16),
-            const Text('Chọn từ ảnh mẫu:', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppColors.textSecondary)),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: _sampleAvatars.map((url) => GestureDetector(
-                onTap: () {
-                  setState(() {
-                    _avatarUrl = url;
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã đổi ảnh đại diện!'), backgroundColor: Colors.green),
-                  );
-                },
-                child: CircleAvatar(
-                  radius: 28,
-                  backgroundImage: NetworkImage(url),
-                ),
-              )).toList(),
-            ),
-            const SizedBox(height: 18),
-            TextField(
-              controller: urlController,
-              decoration: const InputDecoration(
-                labelText: 'Hoặc dán URL ảnh khác',
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.link),
-              ),
-            ),
-            const SizedBox(height: 18),
-            ElevatedButton(
-              onPressed: () {
-                if (urlController.text.trim().isNotEmpty) {
-                  setState(() {
-                    _avatarUrl = urlController.text.trim();
-                  });
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Đã cập nhật ảnh đại diện mới!'), backgroundColor: Colors.green),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                minimumSize: const Size(double.infinity, 46),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: const Text('Cập Nhật Ảnh', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-            ),
-            const SizedBox(height: 12),
-          ],
-        ),
-      ),
+  void _showChangeAvatarModal() async {
+    final pickedUrl = await DeviceImagePicker.pickImageFromDevice(
+      context,
+      title: 'Chọn Ảnh Đại Diện Từ Thiết Bị',
     );
+
+    if (!mounted) return;
+
+    if (pickedUrl != null && pickedUrl.isNotEmpty) {
+      setState(() {
+        _avatarUrl = pickedUrl;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đã cập nhật ảnh đại diện mới từ thiết bị!'), backgroundColor: Colors.green),
+      );
+    }
   }
 
   void _showEditProfileModal() {
@@ -120,7 +47,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Padding(
         padding: EdgeInsets.only(
@@ -139,34 +66,57 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   width: 40,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
+                    color: context.borderColor,
                     borderRadius: BorderRadius.circular(2),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text(
+              SizedBox(height: 20),
+              Text(
                 'Chỉnh Sửa Thông Tin Cá Nhân',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 24),
 
+              _buildInputLabel('Họ và tên'),
               TextField(
                 controller: nameController,
-                decoration: const InputDecoration(labelText: 'Họ và tên', border: OutlineInputBorder()),
+                decoration: InputDecoration(
+                  hintText: 'Nhập họ tên',
+                  filled: true,
+                  fillColor: context.inputColor,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 16),
+              
+              _buildInputLabel('Số điện thoại'),
               TextField(
                 controller: phoneController,
-                decoration: const InputDecoration(labelText: 'Số điện thoại', border: OutlineInputBorder()),
+                decoration: InputDecoration(
+                  hintText: 'Nhập số điện thoại',
+                  filled: true,
+                  fillColor: context.inputColor,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 16),
+              
+              _buildInputLabel('Giới thiệu bản thân (Bio)'),
               TextField(
                 controller: bioController,
-                maxLines: 2,
-                decoration: const InputDecoration(labelText: 'Giới thiệu bản thân (Bio)', border: OutlineInputBorder()),
+                maxLines: 3,
+                decoration: InputDecoration(
+                  hintText: 'Viết vài dòng giới thiệu...',
+                  filled: true,
+                  fillColor: context.inputColor,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+                ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 32),
 
               ElevatedButton(
                 onPressed: () {
@@ -182,15 +132,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
-                  minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  minimumSize: const Size(double.infinity, 56),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  elevation: 0,
                 ),
-                child: const Text('Lưu Thay Đổi', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                child: Text('Lưu Thay Đổi', style: TextStyle(color: context.cardColor, fontWeight: FontWeight.bold, fontSize: 16)),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 24),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildInputLabel(String label) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.0, left: 4.0),
+      child: Text(
+        label,
+        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: context.textColor),
       ),
     );
   }
@@ -200,11 +161,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
-        padding: const EdgeInsets.all(24),
+        height: MediaQuery.of(context).size.height * 0.8,
+        padding: EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -213,28 +174,31 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.borderColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
+            SizedBox(height: 20),
+            Text(
               'Lịch Sử Đặt Phòng & Thiết Bị',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 20),
             Expanded(
               child: ListView.builder(
+                physics: const BouncingScrollPhysics(),
                 itemCount: BookingSchedule.sampleSchedules.length,
                 itemBuilder: (context, index) {
                   final s = BookingSchedule.sampleSchedules[index];
                   return Container(
-                    margin: const EdgeInsets.only(bottom: 10),
-                    padding: const EdgeInsets.all(12),
+                    margin: EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.inputFill,
-                      borderRadius: BorderRadius.circular(12),
+                      color: context.cardColor,
+                      border: Border.all(color: context.borderColor),
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2))],
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -243,15 +207,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(s.item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                              const SizedBox(height: 4),
-                              Text('${s.bookingDate.day}/${s.bookingDate.month}/${s.bookingDate.year} • ${s.timeSlot}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                              Text(s.item.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: context.textColor)),
+                              SizedBox(height: 6),
+                              Row(
+                                children: [
+                                  Icon(Icons.calendar_month_rounded, size: 14, color: context.textSecColor),
+                                  SizedBox(width: 4),
+                                  Text('${s.bookingDate.day}/${s.bookingDate.month}/${s.bookingDate.year} • ${s.timeSlot}', style: TextStyle(fontSize: 13, color: context.textSecColor)),
+                                ],
+                              ),
                             ],
                           ),
                         ),
-                        Text(
-                          '${s.totalPrice.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ',
-                          style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary),
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          children: [
+                            Text(
+                              '${s.totalPrice.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ',
+                              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15, color: AppColors.primary),
+                            ),
+                            SizedBox(height: 4),
+                            Text(s.statusText, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: s.status == BookingStatus.confirmed ? Colors.green : AppColors.primary)),
+                          ],
                         ),
                       ],
                     ),
@@ -270,11 +247,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        padding: const EdgeInsets.all(24),
+        height: MediaQuery.of(context).size.height * 0.7,
+        padding: EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -283,27 +260,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.borderColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
+            SizedBox(height: 20),
+            Text(
               'Bài Viết Của Tôi (12)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Expanded(
-              child: ListView.separated(
+              child: ListView.builder(
+                physics: const BouncingScrollPhysics(),
                 itemCount: 3,
-                separatorBuilder: (context, index) => const Divider(),
                 itemBuilder: (context, index) {
-                  return ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('Bài viết #${index + 1}: Kỹ thuật chụp film ngoài trời', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    subtitle: const Text('128 lượt thích • 24 bình luận'),
-                    trailing: const Icon(Icons.chevron_right),
+                  return Container(
+                    margin: EdgeInsets.only(bottom: 12),
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: context.cardColor,
+                      border: Border.all(color: context.borderColor),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Bài viết #${index + 1}: Kỹ thuật chụp film ngoài trời', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: context.textColor)),
+                        SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.favorite_rounded, size: 14, color: Colors.redAccent),
+                            SizedBox(width: 4),
+                            Text('128 lượt thích', style: TextStyle(fontSize: 12, color: context.textSecColor)),
+                            SizedBox(width: 16),
+                            Icon(Icons.mode_comment_rounded, size: 14, color: AppColors.primary),
+                            SizedBox(width: 4),
+                            Text('24 bình luận', style: TextStyle(fontSize: 12, color: context.textSecColor)),
+                          ],
+                        ),
+                      ],
+                    ),
                   );
                 },
               ),
@@ -319,11 +317,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Container(
         height: MediaQuery.of(context).size.height * 0.5,
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -332,22 +330,48 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.borderColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'Đánh Giá Nhận Được (4.9 ⭐)',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+            SizedBox(height: 20),
+            Text(
+              'Đánh Giá Nhận Được',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
             ),
-            const SizedBox(height: 16),
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: const CircleAvatar(backgroundColor: AppColors.primary, child: Icon(Icons.star, color: Colors.white, size: 20)),
-              title: const Text('Nhiếp ảnh gia uy tín', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('15 nhận xét tích cực từ các chủ Studio & Khách hàng'),
+            SizedBox(height: 20),
+            Container(
+              padding: EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: context.inputColor,
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: context.cardColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Text('4.9', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                  ),
+                  SizedBox(width: 20),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: List.generate(5, (index) => Icon(Icons.star_rounded, color: Colors.amber, size: 20)),
+                        ),
+                        SizedBox(height: 6),
+                        Text('Dựa trên 15 lượt đánh giá từ khách hàng & đối tác.', style: TextStyle(fontSize: 13, color: context.textSecColor, height: 1.4)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
@@ -362,11 +386,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.6,
-        padding: const EdgeInsets.all(24),
+        height: MediaQuery.of(context).size.height * 0.75,
+        padding: EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -375,43 +399,62 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.borderColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 20),
             Text(
               'Danh Sách Đã Lưu (${favorites.length})',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 20),
             Expanded(
               child: favorites.isEmpty
-                  ? const Center(child: Text('Chưa có mục nào được lưu'))
+                  ? Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.favorite_border_rounded, size: 48, color: AppColors.textHint),
+                          SizedBox(height: 12),
+                          Text('Chưa có mục nào được lưu', style: TextStyle(color: context.textSecColor, fontWeight: FontWeight.bold)),
+                        ],
+                      ),
+                    )
                   : ListView.builder(
+                      physics: const BouncingScrollPhysics(),
                       itemCount: favorites.length,
                       itemBuilder: (context, index) {
                         final item = favorites[index];
                         return Container(
-                          margin: const EdgeInsets.only(bottom: 10),
-                          padding: const EdgeInsets.all(12),
+                          margin: EdgeInsets.only(bottom: 12),
+                          padding: EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.inputFill,
-                            borderRadius: BorderRadius.circular(12),
+                            color: context.cardColor,
+                            border: Border.all(color: context.borderColor),
+                            borderRadius: BorderRadius.circular(16),
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 8, offset: const Offset(0, 2))],
                           ),
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                                  const SizedBox(height: 4),
-                                  Text(item.location, style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                                ],
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.network(item.imageUrl, width: 70, height: 70, fit: BoxFit.cover),
                               ),
-                              const Icon(Icons.favorite, color: Colors.red),
+                              SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: context.textColor)),
+                                    SizedBox(height: 4),
+                                    Text(item.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: context.textSecColor)),
+                                  ],
+                                ),
+                              ),
+                              SizedBox(width: 8),
+                              Icon(Icons.favorite_rounded, color: Colors.red),
                             ],
                           ),
                         );
@@ -428,10 +471,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     showModalBottomSheet(
       context: context,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
+        padding: EdgeInsets.all(24),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -441,39 +484,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
+                  color: context.borderColor,
                   borderRadius: BorderRadius.circular(2),
                 ),
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
+            SizedBox(height: 20),
+            Text(
               'Cài Đặt Tài Khoản',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
             ),
-            const SizedBox(height: 16),
-            SwitchListTile(
-              title: const Text('Thông báo ứng dụng', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Nhận thông báo lịch đặt & bài viết mới'),
-              value: true,
-              activeTrackColor: AppColors.primary,
-              onChanged: (val) {},
+            SizedBox(height: 20),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: themeNotifier,
+              builder: (context, currentMode, child) {
+                final isDark = currentMode == ThemeMode.dark;
+                return Container(
+                  decoration: BoxDecoration(
+                    color: context.cardColor,
+                    border: Border.all(color: context.borderColor),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Column(
+                    children: [
+                      SwitchListTile(
+                        title: Text('Thông báo ứng dụng', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        subtitle: Text('Nhận thông báo lịch đặt & bài viết', style: TextStyle(fontSize: 12)),
+                        value: true,
+                        activeColor: context.cardColor,
+                        activeTrackColor: AppColors.primary,
+                        onChanged: (val) {},
+                      ),
+                      Divider(height: 1, indent: 16, endIndent: 16),
+                      SwitchListTile(
+                        title: Text('Giao diện tối (Dark Mode)', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        subtitle: Text('Đổi giao diện sang nền đen', style: TextStyle(fontSize: 12)),
+                        value: isDark,
+                        activeColor: context.cardColor,
+                        activeTrackColor: AppColors.primary,
+                        onChanged: (val) {
+                          themeNotifier.value = val ? ThemeMode.dark : ThemeMode.light;
+                        },
+                      ),
+                      Divider(height: 1, indent: 16, endIndent: 16),
+                      ListTile(
+                        title: Text('Đổi mật khẩu bảo mật', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                        trailing: Icon(Icons.chevron_right),
+                        onTap: () {
+                          Navigator.pop(context);
+                          Navigator.pushNamed(context, '/forgot-password');
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              }
             ),
-            SwitchListTile(
-              title: const Text('Giao diện tối (Dark Mode)', style: TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: const Text('Tự động đổi theo hệ thống'),
-              value: false,
-              activeTrackColor: AppColors.primary,
-              onChanged: (val) {},
-            ),
-            ListTile(
-              title: const Text('Đổi mật khẩu', style: TextStyle(fontWeight: FontWeight.bold)),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.pop(context);
-                Navigator.pushNamed(context, '/forgot-password');
-              },
-            ),
+            SizedBox(height: 24),
           ],
         ),
       ),
@@ -483,27 +550,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
-        title: const Text('Trang Cá Nhân'),
+        title: Text('Trang Cá Nhân'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.all(20.0),
+          padding: EdgeInsets.all(20.0),
           child: Column(
             children: [
               // Avatar & Name Card
               Container(
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  color: context.cardColor,
+                  borderRadius: BorderRadius.circular(28),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
                     ),
                   ],
                 ),
@@ -511,107 +578,135 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     Stack(
                       children: [
-                        CircleAvatar(
-                          radius: 46,
-                          backgroundImage: NetworkImage(_avatarUrl),
+                        Container(
+                          padding: EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.2), width: 2),
+                          ),
+                          child: CircleAvatar(
+                            radius: 52,
+                            backgroundColor: context.inputColor,
+                            backgroundImage: _avatarUrl.startsWith('http') 
+                                ? NetworkImage(_avatarUrl) as ImageProvider
+                                : FileImage(File(_avatarUrl)),
+                          ),
                         ),
                         Positioned(
-                          bottom: 0,
-                          right: 0,
+                          bottom: 4,
+                          right: 4,
                           child: GestureDetector(
                             onTap: _showChangeAvatarModal,
                             child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
+                              padding: EdgeInsets.all(8),
+                              decoration: BoxDecoration(
                                 color: AppColors.primary,
                                 shape: BoxShape.circle,
+                                border: Border.all(color: context.cardColor, width: 3),
                               ),
-                              child: const Icon(Icons.camera_alt_rounded, size: 14, color: Colors.white),
+                              child: Icon(Icons.camera_alt_rounded, size: 16, color: context.cardColor),
                             ),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 16),
                     Text(
                       _name,
-                      style: const TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.textPrimary,
+                      style: TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
+                        color: context.textColor,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       _email,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textSecondary,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: context.textSecColor,
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 12),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                       decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(12),
+                        color: AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      child: const Text(
+                      child: Text(
                         'Nhiếp ảnh gia (Photographer)',
                         style: TextStyle(
-                          fontSize: 12,
+                          fontSize: 13,
                           fontWeight: FontWeight.bold,
                           color: AppColors.primary,
                         ),
                       ),
                     ),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 12),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12.0),
+                      padding: EdgeInsets.symmetric(horizontal: 16.0),
                       child: Text(
                         _bio,
                         textAlign: TextAlign.center,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textHint, fontStyle: FontStyle.italic),
+                        style: TextStyle(fontSize: 13, color: context.textSecColor, height: 1.4),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    SizedBox(height: 28),
 
                     // Interactive Stats Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
-                      children: [
-                        _StatItem(
-                          value: '${BookingSchedule.sampleSchedules.length}',
-                          label: 'Lịch đặt',
-                          onTap: _showBookingHistoryModal,
-                        ),
-                        _StatItem(
-                          value: '12',
-                          label: 'Bài viết',
-                          onTap: _showMyPostsModal,
-                        ),
-                        _StatItem(
-                          value: '4.9 ⭐',
-                          label: 'Đánh giá',
-                          onTap: _showMyReviewsModal,
-                        ),
-                      ],
+                    Container(
+                      padding: EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: context.inputColor,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _StatItem(
+                            value: '${BookingSchedule.sampleSchedules.length}',
+                            label: 'Lịch đặt',
+                            onTap: _showBookingHistoryModal,
+                          ),
+                          Container(width: 1, height: 32, color: context.borderColor),
+                          _StatItem(
+                            value: '12',
+                            label: 'Bài viết',
+                            onTap: _showMyPostsModal,
+                          ),
+                          Container(width: 1, height: 32, color: context.borderColor),
+                          _StatItem(
+                            value: '4.9',
+                            label: 'Đánh giá',
+                            isStar: true,
+                            onTap: _showMyReviewsModal,
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 24),
 
               // Sleek Modern Settings List Card
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Padding(
+                  padding: EdgeInsets.only(left: 8.0, bottom: 12.0),
+                  child: Text('Tùy Chọn & Cài Đặt', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: context.textColor)),
+                ),
+              ),
               Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(20),
+                  color: context.cardColor,
+                  borderRadius: BorderRadius.circular(24),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.04),
-                      blurRadius: 12,
-                      offset: const Offset(0, 4),
+                      color: Colors.black.withValues(alpha: 0.03),
+                      blurRadius: 16,
+                      offset: const Offset(0, 6),
                     ),
                   ],
                 ),
@@ -622,30 +717,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Thông tin cá nhân',
                       onTap: _showEditProfileModal,
                     ),
-                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    Divider(height: 1, indent: 60, endIndent: 20, color: context.inputColor),
                     _ProfileTile(
                       icon: Icons.history_rounded,
                       title: 'Lịch sử đặt phòng & thiết bị',
                       onTap: _showBookingHistoryModal,
                     ),
-                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    Divider(height: 1, indent: 60, endIndent: 20, color: context.inputColor),
                     _ProfileTile(
                       icon: Icons.favorite_border_rounded,
-                      title: 'Danh sách đã lưu',
+                      title: 'Danh sách Studio đã lưu',
                       onTap: _showSavedListModal,
                     ),
-                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    Divider(height: 1, indent: 60, endIndent: 20, color: context.inputColor),
+                    _ProfileTile(
+                      icon: Icons.photo_album_outlined,
+                      title: 'Album ảnh Film số hóa',
+                      onTap: () => Navigator.pushNamed(context, '/digital-collections'),
+                    ),
+                    Divider(height: 1, indent: 60, endIndent: 20, color: context.inputColor),
                     _ProfileTile(
                       icon: Icons.settings_outlined,
-                      title: 'Cài đặt tài khoản',
+                      title: 'Cài đặt ứng dụng',
                       onTap: _showAccountSettingsModal,
                     ),
-                    const Divider(height: 1, indent: 16, endIndent: 16),
+                    Divider(height: 1, indent: 60, endIndent: 20, color: context.inputColor),
 
                     // Logout Tile at the bottom of settings list
                     _ProfileTile(
                       icon: Icons.logout_rounded,
-                      title: 'Đăng xuất',
+                      title: 'Đăng xuất tài khoản',
                       isDestructive: true,
                       onTap: () {
                         Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
@@ -654,6 +755,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ],
                 ),
               ),
+              SizedBox(height: 100), // Spacing for floating navbar
             ],
           ),
         ),
@@ -665,11 +767,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class _StatItem extends StatelessWidget {
   final String value;
   final String label;
+  final bool isStar;
   final VoidCallback onTap;
 
   const _StatItem({
     required this.value,
     required this.label,
+    this.isStar = false,
     required this.onTap,
   });
 
@@ -677,33 +781,36 @@ class _StatItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.inputFill,
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Column(
-          children: [
-            Text(
-              value,
-              style: const TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.w800,
-                color: AppColors.primary,
+      behavior: HitTestBehavior.opaque,
+      child: Column(
+        children: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: context.textColor,
+                ),
               ),
+              if (isStar) ...[
+                SizedBox(width: 2),
+                Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+              ],
+            ],
+          ),
+          SizedBox(height: 4),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: context.textSecColor,
             ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -725,25 +832,27 @@ class _ProfileTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 6),
       leading: Container(
-        padding: const EdgeInsets.all(8),
+        padding: EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: isDestructive ? Colors.red.shade50 : AppColors.inputFill,
-          borderRadius: BorderRadius.circular(10),
+          color: isDestructive ? Colors.red.shade50 : AppColors.primary.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Icon(icon, color: isDestructive ? Colors.red : AppColors.primary, size: 20),
+        child: Icon(icon, color: isDestructive ? Colors.red : AppColors.primary, size: 22),
       ),
       title: Text(
         title,
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w600,
-          color: isDestructive ? Colors.red : AppColors.textPrimary,
+          color: isDestructive ? Colors.red : context.textColor,
         ),
       ),
-      trailing: isDestructive ? null : const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+      trailing: isDestructive ? null : Icon(Icons.chevron_right_rounded, color: AppColors.textHint, size: 24),
       onTap: onTap,
     );
   }
 }
+
+

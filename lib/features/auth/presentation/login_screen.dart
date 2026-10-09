@@ -103,15 +103,15 @@ class _LoginScreenState extends State<LoginScreen> {
                   // App Branding / Icon
                   Center(
                     child: Container(
-                      width: 76,
-                      height: 76,
+                      width: 80,
+                      height: 80,
                       decoration: BoxDecoration(
                         color: AppColors.primary.withValues(alpha: 0.12),
                         shape: BoxShape.circle,
                       ),
                       child: const Icon(
                         Icons.camera_roll_rounded,
-                        size: 42,
+                        size: 46,
                         color: AppColors.primary,
                       ),
                     ),
@@ -123,9 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     'Đăng Nhập',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 30,
+                      fontSize: 32,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
+                      color: AppColors.textPrimary,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -135,9 +135,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      height: 1.3,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
                     ),
                   ),
                   const SizedBox(height: 36),
@@ -145,7 +145,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Email Input
                   CustomTextField(
                     controller: _emailController,
-                    hintText: 'Email',
+                    hintText: 'Nhập địa chỉ Email',
                     prefixIcon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                     validator: (value) {
@@ -164,7 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Password Input
                   CustomTextField(
                     controller: _passwordController,
-                    hintText: 'Mật khẩu',
+                    hintText: 'Nhập mật khẩu',
                     prefixIcon: Icons.lock_outline,
                     isPassword: true,
                     validator: (value) {
@@ -201,7 +201,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 32),
 
                   // Sign In Primary Button
                   PrimaryButton(
@@ -212,16 +212,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 32),
 
                   // Or continue with text
-                  const Text(
-                    'Hoặc tiếp tục với',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Hoặc tiếp tục với',
+                          style: TextStyle(
+                            color: AppColors.textHint,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+                    ],
                   ),
-                  const SizedBox(height: 18),
+                  const SizedBox(height: 24),
 
                   // Social Media Row
                   SocialLoginRow(
