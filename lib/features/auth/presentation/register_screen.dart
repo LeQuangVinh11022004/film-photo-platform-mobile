@@ -112,7 +112,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
               height: 40,
               decoration: BoxDecoration(
                 color: AppColors.inputFill,
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(12),
               ),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, size: 20),
@@ -139,9 +139,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     'Tạo Tài Khoản',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 30,
+                      fontSize: 32,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.primary,
+                      color: AppColors.textPrimary,
                       letterSpacing: -0.5,
                     ),
                   ),
@@ -151,12 +151,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      height: 1.3,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                      height: 1.4,
                     ),
                   ),
-                  const SizedBox(height: 32),
+                  const SizedBox(height: 36),
 
                   // Full Name Field
                   CustomTextField(
@@ -225,7 +225,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 32),
 
                   // Register Button
                   PrimaryButton(
@@ -233,19 +233,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     isLoading: _isLoading,
                     onPressed: _handleRegister,
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 32),
 
                   // Or continue with
-                  const Text(
-                    'Hoặc tiếp tục với',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  Row(
+                    children: [
+                      Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          'Hoặc đăng ký bằng',
+                          style: TextStyle(
+                            color: AppColors.textHint,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+                    ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 24),
 
                   // Social Row
                   SocialLoginRow(

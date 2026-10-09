@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/primary_button.dart';
@@ -218,11 +219,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     BookingSchedule.sampleSchedules.insert(0, newSchedule);
 
                     Navigator.pop(context); // Close bottom sheet
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Đặt chỗ thành công! Đã thêm vào mục Lịch đặt của bạn.'),
-                        backgroundColor: Colors.green,
-                      ),
+
+                    // Trigger local pop-up notification on device
+                    NotificationService().triggerLocalNotification(
+                      context: context,
+                      title: 'Lịch Đặt Chỗ Thành Công! 🎉',
+                      body: 'Xác nhận đặt ${_item.name} vào ngày ${_selectedDate.day}/${_selectedDate.month}. Bấm để xem chi tiết.',
+                      route: '/notifications',
+                      routeArgs: newSchedule,
                     );
                   },
                 ),
