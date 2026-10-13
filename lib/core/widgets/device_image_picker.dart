@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import '../theme/app_colors.dart';
 
 class DeviceImagePicker {
   /// Opens the actual REAL device photo gallery using image_picker package

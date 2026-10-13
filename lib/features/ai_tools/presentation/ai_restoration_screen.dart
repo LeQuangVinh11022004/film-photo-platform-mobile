@@ -251,7 +251,7 @@ class _AIRestorationScreenState extends State<AIRestorationScreen> {
           Expanded(child: Text(title, style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: context.textColor))),
           Switch(
             value: value,
-            activeColor: context.cardColor,
+            activeThumbColor: context.cardColor,
             activeTrackColor: AppColors.primary,
             inactiveTrackColor: context.inputColor,
             onChanged: onChanged,

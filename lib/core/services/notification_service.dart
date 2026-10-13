@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../features/notifications/models/notification_item.dart';
-import '../theme/app_colors.dart';
 
 class NotificationService {
   static final NotificationService _instance = NotificationService._internal();
