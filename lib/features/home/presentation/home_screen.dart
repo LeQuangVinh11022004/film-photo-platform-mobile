@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../booking/models/booking_item.dart';
@@ -14,8 +15,45 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   String _currentLocation = 'Hồ Chí Minh, Việt Nam';
   int _selectedCategoryIndex = 0;
+  int _currentBannerIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  // Quick Banners Slider Data
+  final List<Map<String, dynamic>> _quickBanners = [
+    {
+      'title': 'Trợ Lý AI Film 24/7',
+      'subtitle': 'Hỏi đáp kỹ thuật chọn film, tráng rửa & phơi sáng',
+      'icon': Icons.auto_awesome_rounded,
+      'gradient': AppColors.aiGradient,
+      'route': '/ai-assistant',
+      'badge': 'HOT AI',
+    },
+    {
+      'title': 'AI Phục Chế Ảnh 4K',
+      'subtitle': 'Tự động làm nét, khử xước & phục hồi màu phim cổ',
+      'icon': Icons.auto_fix_high_rounded,
+      'gradient': AppColors.goldGradient,
+      'route': '/ai-restoration',
+      'badge': 'NEW',
+    },
+    {
+      'title': 'Gói Combo Bundle',
+      'subtitle': 'Tiết kiệm tới 30% khi đặt trọn gói Studio & Máy',
+      'icon': Icons.card_giftcard_rounded,
+      'gradient': AppColors.primaryGradient,
+      'route': '/service-packages',
+      'badge': 'PROMO',
+    },
+    {
+      'title': 'So Sánh Studio & Lab',
+      'subtitle': 'Đối chiếu thông số phòng, thiết bị & mức giá',
+      'icon': Icons.compare_arrows_rounded,
+      'gradient': const LinearGradient(colors: [Color(0xFF2C3E50), Color(0xFF4CA1AF)]),
+      'route': '/studio-comparison',
+      'badge': 'COMPARE',
+    },
+  ];
 
   // Filter Modal State
   double _maxPriceFilter = 500000;
@@ -392,62 +430,134 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Quick AI Tools & Features Shortcut Banners (FE-03, FE-08, FE-13, FE-14)
+            // Auto-sliding Banner Slider (AI Assistant, Restoration, Bundles, Studio Comparison)
             SliverToBoxAdapter(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
-                child: Column(
-                  children: [
-                    // AI Features Row
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildFeatureTile(
-                            title: 'Trợ Lý AI Film',
-                            subtitle: 'Hỏi đáp kỹ thuật 24/7',
-                            icon: Icons.auto_awesome,
-                            gradient: AppColors.aiGradient,
-                            onTap: () => Navigator.pushNamed(context, '/ai-assistant'),
-                          ),
-                        ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: _buildFeatureTile(
-                            title: 'AI Phục Chế 4K',
-                            subtitle: 'Khôi phục ảnh film cũ',
-                            icon: Icons.photo_filter_rounded,
-                            gradient: AppColors.goldGradient,
-                            onTap: () => Navigator.pushNamed(context, '/ai-restoration'),
-                          ),
-                        ),
-                      ],
+              child: Column(
+                children: [
+                  const SizedBox(height: 12),
+                  CarouselSlider(
+                    options: CarouselOptions(
+                      height: 110,
+                      viewportFraction: 0.92,
+                      enlargeCenterPage: true,
+                      autoPlay: true,
+                      autoPlayInterval: const Duration(seconds: 4),
+                      autoPlayAnimationDuration: const Duration(milliseconds: 800),
+                      autoPlayCurve: Curves.fastOutSlowIn,
+                      onPageChanged: (index, reason) {
+                        setState(() {
+                          _currentBannerIndex = index;
+                        });
+                      },
                     ),
-                    SizedBox(height: 10),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: _buildFeatureTile(
-                            title: 'Gói Combo Bundle',
-                            subtitle: 'Tiết kiệm tới 30%',
-                            icon: Icons.card_giftcard_rounded,
-                            gradient: AppColors.primaryGradient,
-                            onTap: () => Navigator.pushNamed(context, '/service-packages'),
-                          ),
+                    items: _quickBanners.map((banner) {
+                      return Builder(
+                        builder: (BuildContext context) {
+                          return GestureDetector(
+                            onTap: () => Navigator.pushNamed(context, banner['route']),
+                            child: Container(
+                              width: MediaQuery.of(context).size.width,
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                              decoration: BoxDecoration(
+                                gradient: banner['gradient'] as Gradient,
+                                borderRadius: BorderRadius.circular(20),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.12),
+                                    blurRadius: 10,
+                                    offset: const Offset(0, 4),
+                                  ),
+                                ],
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withValues(alpha: 0.2),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(banner['icon'] as IconData, color: Colors.white, size: 28),
+                                  ),
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Column(
+                                      mainAxisAlignment: MainAxisAlignment.center,
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              banner['title'],
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w800,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 8),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: Colors.white.withValues(alpha: 0.3),
+                                                borderRadius: BorderRadius.circular(8),
+                                              ),
+                                              child: Text(
+                                                banner['badge'],
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 9,
+                                                  fontWeight: FontWeight.w900,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          banner['subtitle'],
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            color: Colors.white.withValues(alpha: 0.85),
+                                            fontSize: 12,
+                                            height: 1.3,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 10),
+                  // Dots Indicator
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: _quickBanners.asMap().entries.map((entry) {
+                      return AnimatedContainer(
+                        duration: const Duration(milliseconds: 300),
+                        width: _currentBannerIndex == entry.key ? 20.0 : 6.0,
+                        height: 6.0,
+                        margin: const EdgeInsets.symmetric(horizontal: 3.0),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(3),
+                          color: _currentBannerIndex == entry.key
+                              ? AppColors.primary
+                              : AppColors.textHint.withValues(alpha: 0.3),
                         ),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: _buildFeatureTile(
-                            title: 'So Sánh Studio',
-                            subtitle: 'Đối chiếu thông số',
-                            icon: Icons.compare_arrows_rounded,
-                            gradient: const LinearGradient(colors: [Color(0xFF2C3E50), Color(0xFF4CA1AF)]),
-                            onTap: () => Navigator.pushNamed(context, '/studio-comparison'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 14),
+                ],
               ),
             ),
 
@@ -572,47 +682,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildFeatureTile({
-    required String title,
-    required String subtitle,
-    required IconData icon,
-    required Gradient gradient,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          gradient: gradient,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.1),
-              blurRadius: 8,
-              offset: const Offset(0, 3),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Icon(icon, color: context.cardColor, size: 24),
-            SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: TextStyle(color: context.cardColor, fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text(subtitle, style: TextStyle(color: Colors.white70, fontSize: 10)),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildNearCard(BuildContext context, BookingItem item) {
     return GestureDetector(
       onTap: () => Navigator.pushNamed(context, '/detail', arguments: item),
@@ -631,11 +700,14 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             Stack(
               children: [
-                SafeNetworkImage(
-                  url: item.imageUrl,
-                  height: 135,
-                  width: double.infinity,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                Hero(
+                  tag: 'image_${item.id}',
+                  child: SafeNetworkImage(
+                    url: item.imageUrl,
+                    height: 135,
+                    width: double.infinity,
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  ),
                 ),
                 Positioned(
                   top: 10,
@@ -707,7 +779,10 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         child: Row(
           children: [
-            SafeNetworkImage(url: item.imageUrl, width: 80, height: 80, borderRadius: BorderRadius.circular(12)),
+            Hero(
+              tag: 'image_${item.id}',
+              child: SafeNetworkImage(url: item.imageUrl, width: 80, height: 80, borderRadius: BorderRadius.circular(12)),
+            ),
             SizedBox(width: 14),
             Expanded(
               child: Column(

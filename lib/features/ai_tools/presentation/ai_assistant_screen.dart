@@ -81,6 +81,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
+      appBar: AppBar(
+        title: const Text('Trợ Lý AI Film'),
+      ),
       body: Column(
         children: [
           // Suggested Questions Chips Row

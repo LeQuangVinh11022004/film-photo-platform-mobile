@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../theme/app_colors.dart';
 
 class SafeNetworkImage extends StatelessWidget {
@@ -24,29 +25,24 @@ class SafeNetworkImage extends StatelessWidget {
 
     // Check if the URL is a local file path (from image_picker) or a network URL
     if (url.startsWith('http://') || url.startsWith('https://')) {
-      imageWidget = Image.network(
-        url,
+      imageWidget = CachedNetworkImage(
+        imageUrl: url,
         width: width,
         height: height,
         fit: fit,
-        loadingBuilder: (context, child, loadingProgress) {
-          if (loadingProgress == null) return child;
-          return Container(
-            width: width,
-            height: height,
-            color: AppColors.inputFill,
-            child: const Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
-              ),
+        placeholder: (context, url) => Container(
+          width: width,
+          height: height,
+          color: AppColors.inputFill,
+          child: const Center(
+            child: SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
             ),
-          );
-        },
-        errorBuilder: (context, error, stackTrace) {
-          return _buildErrorPlaceholder();
-        },
+          ),
+        ),
+        errorWidget: (context, url, error) => _buildErrorPlaceholder(),
       );
     } else if (url.isNotEmpty) {
       // Load local file image (picked from device gallery)

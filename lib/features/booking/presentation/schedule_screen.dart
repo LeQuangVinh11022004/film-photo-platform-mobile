@@ -1,4 +1,5 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../models/booking_schedule.dart';
@@ -345,22 +346,30 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Calendar Card Container
-              Container(
-                padding: EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: context.cardColor,
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.03),
-                      blurRadius: 20,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  children: [
-                    // Month Selector Header
+              GestureDetector(
+                onHorizontalDragEnd: (details) {
+                  if (details.primaryVelocity! > 0) {
+                    _changeMonth(-1);
+                  } else if (details.primaryVelocity! < 0) {
+                    _changeMonth(1);
+                  }
+                },
+                child: Container(
+                  padding: EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: context.cardColor,
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.03),
+                        blurRadius: 20,
+                        offset: const Offset(0, 8),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      // Month Selector Header
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
@@ -422,6 +431,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
                     // Days Numbers Grid
                     GridView.builder(
+                      key: ValueKey('month_${_currentMonth.year}_${_currentMonth.month}'),
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -433,12 +443,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       itemBuilder: (context, index) {
                         final dayNumber = index + 1;
                         final isSelected = _selectedDayIndex == index;
+                        final cellDate = DateTime(_currentMonth.year, _currentMonth.month, dayNumber);
+                        final isPast = cellDate.isBefore(DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day));
 
                         // Check if any schedule matches this day
-                        final hasBooking = BookingSchedule.sampleSchedules.any((s) => s.bookingDate.day == dayNumber);
+                        final hasBooking = BookingSchedule.sampleSchedules.any((s) => s.bookingDate.day == dayNumber && s.bookingDate.month == _currentMonth.month && s.bookingDate.year == _currentMonth.year);
 
                         return GestureDetector(
-                          onTap: () {
+                          onTap: isPast ? null : () {
                             setState(() {
                               _selectedDayIndex = index;
                             });
@@ -470,19 +482,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   fontWeight: isSelected || hasBooking ? FontWeight.bold : FontWeight.w500,
                                   color: isSelected
                                       ? context.cardColor
-                                      : (hasBooking ? AppColors.primaryDark : context.textColor),
+                                      : (isPast ? AppColors.textHint.withValues(alpha: 0.5) : (hasBooking ? AppColors.primaryDark : context.textColor)),
                                 ),
                               ),
                             ),
                           ),
                         );
                       },
-                    ),
+                    ).animate(key: ValueKey('month_${_currentMonth.year}_${_currentMonth.month}')).fadeIn(duration: 300.ms).slideX(begin: 0.05),
                   ],
                 ),
               ),
+        ),
               SizedBox(height: 32),
-
               // Section Header: My Schedule
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -513,17 +525,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               // Schedules Cards List
               BookingSchedule.sampleSchedules.isEmpty
                   ? Container(
-                      padding: EdgeInsets.all(32),
+                      padding: const EdgeInsets.all(32),
                       alignment: Alignment.center,
                       child: Column(
                         children: [
-                          Icon(Icons.event_busy_rounded, size: 48, color: AppColors.textHint),
-                          SizedBox(height: 12),
+                          const Icon(Icons.event_busy_rounded, size: 48, color: AppColors.textHint),
+                          const SizedBox(height: 12),
                           Text('Ngày này chưa có lịch đặt', style: TextStyle(color: context.textSecColor, fontSize: 15, fontWeight: FontWeight.w500)),
                         ],
                       ),
                     )
                   : ListView.builder(
+                      key: ValueKey('day_${_selectedDayIndex}_${_currentMonth.month}'),
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
                       itemCount: BookingSchedule.sampleSchedules.length,
@@ -534,10 +547,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           child: _buildScheduleCard(schedule),
                         );
                       },
-                    ),
+                    ).animate(key: ValueKey('day_${_selectedDayIndex}_${_currentMonth.month}')).fadeIn(duration: 300.ms).slideY(begin: 0.08),
               
               SizedBox(height: 120), // Bottom padding for navbar
-            ],
+              ],
           ),
         ),
       ),
