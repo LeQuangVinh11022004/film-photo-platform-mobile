@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../community/presentation/community_screen.dart';
 import './schedules/expert_schedule_screen.dart';
+import './qa/expert_qa_screen.dart';
 import '../../profile/presentation/profile_screen.dart';
 import 'expert_home_screen.dart';
 
@@ -26,11 +27,7 @@ class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
 
     const CommunityScreen(),
 
-    const _ExpertPlaceholderScreen(
-      title: 'Hỏi đáp',
-      description: 'Giải đáp thắc mắc cùng cộng đồng.',
-      icon: Icons.forum_outlined,
-    ),
+    const ExpertQaScreen(),
 
     ProfileScreen(),
   ];
