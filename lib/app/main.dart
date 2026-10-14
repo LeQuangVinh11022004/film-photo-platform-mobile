@@ -17,6 +17,9 @@ import '../features/home/presentation/main_navigation_screen.dart';
 import '../features/notifications/presentation/notifications_screen.dart';
 import '../features/profile/presentation/digital_collections_screen.dart';
 
+import '../features/expert/presentation/expert_navigation_screen.dart';
+import '../features/expert/presentation/expert_application_screen.dart';
+
 // Global notifier for Theme Mode
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
@@ -66,6 +69,9 @@ class FilmPhotographyApp extends StatelessWidget {
             '/ai-assistant': (context) => const AIAssistantScreen(),
             '/digital-collections': (context) => const DigitalCollectionsScreen(),
             '/notifications': (context) => const NotificationsScreen(),
+
+            '/expert-workspace': (context) => const ExpertNavigationScreen(),
+            '/expert-application': (context) => const ExpertApplicationScreen(),
           },
         ),
       );
