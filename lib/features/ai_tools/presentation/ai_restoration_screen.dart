@@ -25,6 +25,9 @@ class _AIRestorationScreenState extends State<AIRestorationScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
+      appBar: AppBar(
+        title: const Text('AI Phục Chế 4K'),
+      ),
       body: SingleChildScrollView(
         padding: EdgeInsets.all(20),
         physics: const BouncingScrollPhysics(),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../theme/app_colors.dart';
 
 class SocialButton extends StatefulWidget {
@@ -76,12 +77,10 @@ class SocialLoginRow extends StatelessWidget {
         SocialButton(
           tooltip: 'Google',
           onTap: onGoogleTap,
-          icon: Image.network(
-            'https://developers.google.com/identity/images/g-logo.png',
-            height: 24,
+          icon: SvgPicture.asset(
+            'assets/icons/google.svg',
             width: 24,
-            errorBuilder: (context, error, stackTrace) =>
-                const Icon(Icons.g_mobiledata_rounded, size: 36, color: Color(0xFFDB4437)),
+            height: 24,
           ),
         ),
         const SizedBox(width: 16),

@@ -13,39 +13,67 @@ class NotificationService {
   Future<void> init() async {
     if (_isInitialized) return;
 
-    // Khởi tạo thông báo cho Android
-    const AndroidInitializationSettings initSettingsAndroid = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const InitializationSettings initSettings = InitializationSettings(android: initSettingsAndroid);
+    // Khởi tạo thông báo cho Android dùng launcher_icon chuẩn
+    const AndroidInitializationSettings initSettingsAndroid = AndroidInitializationSettings('@mipmap/launcher_icon');
+    const InitializationSettings initSettings = InitializationSettings(
+      android: initSettingsAndroid,
+      iOS: DarwinInitializationSettings(),
+    );
 
-    await _localNotifications.initialize(initSettings);
+    await _localNotifications.initialize(
+      initSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse details) {
+        // Handle notification click if needed
+      },
+    );
     _isInitialized = true;
   }
 
-  /// Request permission on Android 13+
-  Future<void> requestPermission() async {
+  /// Request permission on Android 13+ & iOS
+  Future<bool?> requestPermission() async {
     await init();
     final AndroidFlutterLocalNotificationsPlugin? androidImplementation =
         _localNotifications.resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-    await androidImplementation?.requestNotificationsPermission();
+    
+    final bool? grantedAndroid = await androidImplementation?.requestNotificationsPermission();
+    
+    final bool? grantedIOS = await _localNotifications
+        .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+        ?.requestPermissions(alert: true, badge: true, sound: true);
+
+    return grantedAndroid ?? grantedIOS;
   }
 
-  /// Show REAL Native Android Notification using flutter_local_notifications
+  /// Show REAL Native Android & iOS Notification
   Future<void> showNativeNotification({required String title, required String body}) async {
     await init();
 
+    // Ensure permission is granted before showing
+    await requestPermission();
+
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'film_platform_booking_channel',
+      'film_platform_booking_channel_v2',
       'Lịch Đặt Chỗ Film Platform',
       channelDescription: 'Thông báo hệ thống cho lịch đặt studio, phòng tối và thiết bị',
       importance: Importance.max,
       priority: Priority.high,
+      ticker: 'Lịch đặt chỗ mới',
+      playSound: true,
       enableVibration: true,
+      visibility: NotificationVisibility.public,
+      styleInformation: BigTextStyleInformation(''),
     );
 
-    const NotificationDetails platformChannelSpecifics = NotificationDetails(android: androidDetails);
+    const NotificationDetails platformChannelSpecifics = NotificationDetails(
+      android: androidDetails,
+      iOS: DarwinNotificationDetails(presentAlert: true, presentSound: true, presentBadge: true),
+    );
+
+    // Unique notification ID per second
+    final int notifId = (DateTime.now().millisecondsSinceEpoch / 1000).floor().remainder(100000);
 
     await _localNotifications.show(
-      DateTime.now().millisecond,
+      notifId,
       title,
       body,
       platformChannelSpecifics,
