@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
@@ -136,12 +135,16 @@ class ExpertHomeScreen extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        gradient: AppColors.primaryGradient,
+        gradient: const LinearGradient(
+          colors: [Color(0xFF7C5CFC), Color(0xFF5A3BEA)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.18),
-            blurRadius: 20,
+            color: const Color(0xFF7C5CFC),
+            blurRadius: 5,
             offset: const Offset(0, 8),
           ),
         ],
@@ -150,10 +153,7 @@ class ExpertHomeScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 10,
-              vertical: 6,
-            ),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.white.withValues(alpha: 0.18),
               borderRadius: BorderRadius.circular(20),
@@ -161,11 +161,7 @@ class ExpertHomeScreen extends StatelessWidget {
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.verified_rounded,
-                  color: Colors.white,
-                  size: 16,
-                ),
+                Icon(Icons.verified_rounded, color: Colors.white, size: 16),
                 SizedBox(width: 6),
                 Text(
                   'VERIFIED EXPERT',
@@ -222,10 +218,7 @@ class ExpertHomeScreen extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: TextStyle(
-            fontSize: 12,
-            color: context.textSecColor,
-          ),
+          style: TextStyle(fontSize: 12, color: context.textSecColor),
         ),
       ],
     );
@@ -268,7 +261,7 @@ class _MetricCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Icon(icon, color: AppColors.primary, size: 20),
+              Icon(icon, color: const Color(0xFF7C5CFC), size: 20),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
@@ -296,10 +289,7 @@ class _MetricCard extends StatelessWidget {
             subtitle,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: context.textSecColor,
-              fontSize: 10,
-            ),
+            style: TextStyle(color: context.textSecColor, fontSize: 10),
           ),
         ],
       ),
@@ -335,7 +325,7 @@ class _QuestionCard extends StatelessWidget {
           Text(
             category,
             style: const TextStyle(
-              color: AppColors.primary,
+              color: Color(0xFF7C5CFC),
               fontSize: 12,
               fontWeight: FontWeight.bold,
             ),
@@ -362,10 +352,7 @@ class _QuestionCard extends StatelessWidget {
               Expanded(
                 child: Text(
                   author,
-                  style: TextStyle(
-                    color: context.textSecColor,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: context.textSecColor, fontSize: 12),
                 ),
               ),
               Icon(
@@ -376,10 +363,7 @@ class _QuestionCard extends StatelessWidget {
               const SizedBox(width: 4),
               Text(
                 '$replies trả lời',
-                style: TextStyle(
-                  color: context.textSecColor,
-                  fontSize: 12,
-                ),
+                style: TextStyle(color: context.textSecColor, fontSize: 12),
               ),
             ],
           ),
@@ -417,10 +401,10 @@ class _QuickAction extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.10),
+                  color: const Color(0xFF7C5CFC).withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: AppColors.primary),
+                child: Icon(icon, color: const Color(0xFF7C5CFC)),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -446,10 +430,7 @@ class _QuickAction extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: context.textSecColor,
-              ),
+              Icon(Icons.chevron_right_rounded, color: context.textSecColor),
             ],
           ),
         ),

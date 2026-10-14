@@ -1,86 +1,157 @@
-
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../community/presentation/community_screen.dart';
+import './schedules/expert_schedule_screen.dart';
+import '../../profile/presentation/profile_screen.dart';
 import 'expert_home_screen.dart';
 
 class ExpertNavigationScreen extends StatefulWidget {
   const ExpertNavigationScreen({super.key});
 
   @override
-  State<ExpertNavigationScreen> createState() =>
-      _ExpertNavigationScreenState();
+  State<ExpertNavigationScreen> createState() => _ExpertNavigationScreenState();
 }
 
-class _ExpertNavigationScreenState
-    extends State<ExpertNavigationScreen> {
+class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
   int _currentIndex = 0;
+
+  // Màu nhận diện riêng của Expert.
+  static const Color _expertAccent = Color(0xFF7C5CFC);
 
   late final List<Widget> _screens = [
     const ExpertHomeScreen(),
-    const _ExpertPlaceholderScreen(
-      title: 'Lịch trình',
-      description: 'Quản lý lịch tư vấn và các lịch hẹn của bạn.',
-      icon: Icons.calendar_month_rounded,
-    ),
-    const _ExpertPlaceholderScreen(
-      title: 'Bài viết',
-      description: 'Tạo và quản lý các bài chia sẻ kiến thức nhiếp ảnh film.',
-      icon: Icons.article_outlined,
-    ),
+
+    const ExpertScheduleScreen(),
+
+    const CommunityScreen(),
+
     const _ExpertPlaceholderScreen(
       title: 'Hỏi đáp',
-      description: 'Xem câu hỏi và chia sẻ kiến thức chuyên môn.',
+      description: 'Giải đáp thắc mắc cùng cộng đồng.',
       icon: Icons.forum_outlined,
     ),
-    const _ExpertPlaceholderScreen(
-      title: 'Hồ sơ',
-      description: 'Quản lý hồ sơ và thông tin chuyên gia của bạn.',
-      icon: Icons.person_outline_rounded,
-    ),
+
+    ProfileScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
+      // Nội dung có thể chạy phía dưới thanh điều hướng nổi.
+      extendBody: true,
+
+      body: IndexedStack(index: _currentIndex, children: _screens),
+
+      bottomNavigationBar: SafeArea(
+        child: Container(
+          margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          decoration: BoxDecoration(
+            color: context.cardColor,
+            borderRadius: BorderRadius.circular(32),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.08),
+                blurRadius: 24,
+                offset: const Offset(0, 8),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: [
+              _buildNavItem(
+                index: 0,
+                icon: Icons.home_outlined,
+                activeIcon: Icons.home_rounded,
+                label: 'Home',
+              ),
+              _buildNavItem(
+                index: 1,
+                icon: Icons.calendar_today_outlined,
+                activeIcon: Icons.calendar_month_rounded,
+                label: 'Lịch trình',
+              ),
+              _buildNavItem(
+                index: 2,
+                icon: Icons.article_outlined,
+                activeIcon: Icons.article_rounded,
+                label: 'Bài viết',
+              ),
+              _buildNavItem(
+                index: 3,
+                icon: Icons.forum_outlined,
+                activeIcon: Icons.forum_rounded,
+                label: 'Hỏi đáp',
+              ),
+              _buildNavItem(
+                index: 4,
+                icon: Icons.person_outline_rounded,
+                activeIcon: Icons.person_rounded,
+                label: 'Hồ sơ',
+              ),
+            ],
+          ),
+        ),
       ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month_rounded),
-            label: 'Lịch trình',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.article_outlined),
-            selectedIcon: Icon(Icons.article_rounded),
-            label: 'Bài viết',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.forum_outlined),
-            selectedIcon: Icon(Icons.forum_rounded),
-            label: 'Hỏi đáp',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.person_outline_rounded),
-            selectedIcon: Icon(Icons.person_rounded),
-            label: 'Hồ sơ',
-          ),
-        ],
+    );
+  }
+
+  Widget _buildNavItem({
+    required int index,
+    required IconData icon,
+    required IconData activeIcon,
+    required String label,
+  }) {
+    final isSelected = _currentIndex == index;
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _currentIndex = index;
+        });
+      },
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOutQuint,
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? _expertAccent.withValues(alpha: 0.12)
+              : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              isSelected ? activeIcon : icon,
+              color: isSelected ? _expertAccent : context.textSecColor,
+              size: 24,
+            ),
+
+            // Mở rộng nhãn bằng animation khi chọn tab.
+            AnimatedSize(
+              duration: const Duration(milliseconds: 250),
+              curve: Curves.easeOutQuint,
+              child: isSelected
+                  ? Padding(
+                      padding: const EdgeInsets.only(left: 6),
+                      child: Text(
+                        label,
+                        style: const TextStyle(
+                          color: _expertAccent,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 13,
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -101,9 +172,7 @@ class _ExpertPlaceholderScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: context.bgColor,
-      appBar: AppBar(
-        title: Text(title),
-      ),
+      appBar: AppBar(title: Text(title)),
       body: Center(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -113,7 +182,7 @@ class _ExpertPlaceholderScreen extends StatelessWidget {
               Icon(
                 icon,
                 size: 64,
-                color: AppColors.primary,
+                color: _ExpertNavigationScreenState._expertAccent,
               ),
               const SizedBox(height: 16),
               Text(
