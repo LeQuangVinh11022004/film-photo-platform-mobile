@@ -4,6 +4,7 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/social_button.dart';
+import '../models/auth_models.dart';
 import '../services/auth_service.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -33,7 +34,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
     setState(() => _isLoading = true);
 
-    final success = await _authService.login(
+    final LoginResponse res = await _authService.login(
       _emailController.text.trim(),
       _passwordController.text,
     );
@@ -42,24 +43,36 @@ class _LoginScreenState extends State<LoginScreen> {
 
     if (!mounted) return;
 
-    if (success) {
+    if (res.success) {
       toastification.show(
         context: context,
         type: ToastificationType.success,
         style: ToastificationStyle.flatColored,
-        title: const Text('Đăng nhập thành công!'),
+        title: Text(res.message),
+        description: res.user != null ? Text('Xin chào ${res.user!.fullName}') : null,
         alignment: Alignment.topCenter,
         autoCloseDuration: const Duration(seconds: 3),
         showProgressBar: false,
       );
-      Navigator.pushReplacementNamed(context, '/home');
+
+      // Điều hướng dựa trên vai trò (Role) trả về từ Backend
+      final role = res.user?.role.toLowerCase() ?? '';
+      debugPrint('Login Role: $role');
+      
+      if (role.contains('expert') || role.contains('provider') || role.contains('chuyên gia')) {
+        Navigator.pushReplacementNamed(context, '/expert-workspace');
+      } else {
+        // Mặc định Photographer / Customer vào Home
+        Navigator.pushReplacementNamed(context, '/home');
+      }
+      
     } else {
       toastification.show(
         context: context,
         type: ToastificationType.error,
         style: ToastificationStyle.flatColored,
         title: const Text('Đăng nhập thất bại'),
-        description: const Text('Vui lòng kiểm tra lại thông tin.'),
+        description: Text(res.message),
         alignment: Alignment.topCenter,
         autoCloseDuration: const Duration(seconds: 4),
         showProgressBar: false,
@@ -175,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (value == null || value.trim().isEmpty) {
                         return 'Vui lòng nhập Email';
                       }
-                      if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
+                      if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,10}$')
                           .hasMatch(value.trim())) {
                         return 'Email không hợp lệ';
                       }
