@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../../../core/widgets/social_button.dart';
+import '../models/auth_models.dart';
 import '../services/auth_service.dart';
 
 class RegisterScreen extends StatefulWidget {
@@ -36,7 +38,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     setState(() => _isLoading = true);
 
-    final success = await _authService.register(
+    final RegisterResponse res = await _authService.register(
       name: _nameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
@@ -46,20 +48,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!mounted) return;
 
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đăng ký tài khoản thành công! Vui lòng đăng nhập.'),
-          backgroundColor: Colors.green,
-        ),
+    if (res.success == true) {
+      toastification.show(
+        context: context,
+        type: ToastificationType.success,
+        style: ToastificationStyle.flatColored,
+        title: Text(res.message),
+        alignment: Alignment.topCenter,
+        autoCloseDuration: const Duration(seconds: 3),
+        showProgressBar: false,
       );
       Navigator.pushReplacementNamed(context, '/login');
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đăng ký thất bại. Vui lòng thử lại.'),
-          backgroundColor: Colors.red,
-        ),
+      toastification.show(
+        context: context,
+        type: ToastificationType.error,
+        style: ToastificationStyle.flatColored,
+        title: const Text('Đăng ký thất bại'),
+        description: Text(res.message),
+        alignment: Alignment.topCenter,
+        autoCloseDuration: const Duration(seconds: 4),
+        showProgressBar: false,
       );
     }
   }
@@ -182,7 +191,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (value == null || value.trim().isEmpty) {
                         return 'Vui lòng nhập Email';
                       }
-                      if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$')
+                      if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,10}$')
                           .hasMatch(value.trim())) {
                         return 'Email không hợp lệ';
                       }
