@@ -2,20 +2,44 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:http/io_client.dart';
 
 /// Lớp Generic API Client xử lý mọi request cho ứng dụng
 class ApiClient {
   // Singleton pattern để dùng chung 1 instance trên toàn app
   static final ApiClient _instance = ApiClient._internal();
   factory ApiClient() => _instance;
-  ApiClient._internal();
+
+  http.Client? _client;
+
+  ApiClient._internal() {
+    _initClient();
+  }
+
+  void _initClient() {
+    // Vượt qua lỗi SSL trên Android Emulator khi gọi localhost ASP.NET Core HTTPS
+    bool trustSelfSigned = true;
+    HttpClient httpClient = HttpClient()
+      ..badCertificateCallback = ((X509Certificate cert, String host, int port) => trustSelfSigned);
+    _client = IOClient(httpClient);
+  }
+
+  /// Lấy instance http.Client (đảm bảo luôn được khởi tạo)
+  http.Client get client {
+    if (_client == null) {
+      _initClient();
+    }
+    return _client!;
+  }
 
   /// Địa chỉ Base URL mặc định (Tự động đổi IP cho Android Emulator)
   static String get defaultBaseUrl {
     if (!kIsWeb && Platform.isAndroid) {
-      return 'http://10.0.2.2:5038'; // Kết nối localhost từ Android Emulator
+      // 10.0.2.2 là địa chỉ map tới localhost của máy chủ từ Android Emulator
+      // Vì đang dùng IIS Express, nên dùng HTTPS port thay vì HTTP bị chặn 307
+      return 'https://10.0.2.2:7104'; 
     }
-    return 'http://localhost:5038'; // Kết nối localhost từ Web/iOS/Windows
+    return 'https://localhost:7104'; 
   }
 
   String baseUrl = defaultBaseUrl;
@@ -49,14 +73,14 @@ class ApiClient {
   Future<http.Response> get(String endpoint) async {
     final url = Uri.parse('$baseUrl$endpoint');
     if (kDebugMode) print('GET: $url');
-    return await http.get(url, headers: _headers).timeout(const Duration(seconds: 15));
+    return await client.get(url, headers: _headers).timeout(const Duration(seconds: 15));
   }
 
   /// Generic POST Request
   Future<http.Response> post(String endpoint, {Map<String, dynamic>? body}) async {
     final url = Uri.parse('$baseUrl$endpoint');
     if (kDebugMode) print('POST: $url');
-    return await http
+    return await client
         .post(
           url,
           headers: _headers,
@@ -69,8 +93,21 @@ class ApiClient {
   Future<http.Response> put(String endpoint, {Map<String, dynamic>? body}) async {
     final url = Uri.parse('$baseUrl$endpoint');
     if (kDebugMode) print('PUT: $url');
-    return await http
+    return await client
         .put(
+          url,
+          headers: _headers,
+          body: body != null ? jsonEncode(body) : null,
+        )
+        .timeout(const Duration(seconds: 15));
+  }
+
+  /// Generic PATCH Request
+  Future<http.Response> patch(String endpoint, {Map<String, dynamic>? body}) async {
+    final url = Uri.parse('$baseUrl$endpoint');
+    if (kDebugMode) print('PATCH: $url');
+    return await client
+        .patch(
           url,
           headers: _headers,
           body: body != null ? jsonEncode(body) : null,
@@ -82,6 +119,6 @@ class ApiClient {
   Future<http.Response> delete(String endpoint) async {
     final url = Uri.parse('$baseUrl$endpoint');
     if (kDebugMode) print('DELETE: $url');
-    return await http.delete(url, headers: _headers).timeout(const Duration(seconds: 15));
+    return await client.delete(url, headers: _headers).timeout(const Duration(seconds: 15));
   }
 }
