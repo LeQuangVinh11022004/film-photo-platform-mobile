@@ -60,7 +60,7 @@ class AuthService {
         );
         return LoginResponse(
           success: true,
-          message: 'Đăng nhập thành công (Thử nghiệm)',
+          message: 'Đăng nhập thành công (Thử nghiệm offline)',
           token: _apiClient.authToken,
           user: currentUser,
         );
