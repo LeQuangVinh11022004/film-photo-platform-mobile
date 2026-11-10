@@ -659,7 +659,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           ),
                         ),
                         SizedBox(width: 8),
-                        Text(post.timeAgo, style: TextStyle(fontSize: 12, color: context.textSecColor)),
+                        Expanded(
+                          child: Text(
+                            post.timeAgo,
+                            style: TextStyle(fontSize: 12, color: context.textSecColor),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
                       ],
                     ),
                   ],
