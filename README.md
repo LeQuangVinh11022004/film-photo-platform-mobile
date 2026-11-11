@@ -86,7 +86,7 @@ lib/
 
 4. **Run the App:**
    ```bash
-   flutter run
+   flutter run -t lib/app/main.dart
    ```
 
 ### Default Test Accounts
