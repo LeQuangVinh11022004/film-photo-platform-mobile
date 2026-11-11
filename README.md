@@ -81,7 +81,7 @@ lib/
    ```
 
 3. **Configure Backend URL (Optional):**
-   The app is pre-configured to connect to `http://10.0.2.2:5038` (Android Emulator to local ASP.NET Core). If your backend runs on a different IP/Port, update the `baseUrl` inside:
+   The app defaults to `https://10.0.2.2:7104` on Android (the emulator's host-machine alias) and `https://localhost:7104` on other platforms. For a physical device or a backend using a different address, update `defaultBaseUrl` in:
    `lib/core/network/api_client.dart`
 
 4. **Run the App:**
