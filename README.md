@@ -63,7 +63,7 @@ lib/
 ## 🚀 Getting Started
 
 ### Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (Version >= 3.13)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) with bundled Dart >= 3.13.2 and < 4.0.0 (as required by `pubspec.yaml`)
 - [Android Studio](https://developer.android.com/studio) or VS Code
 - Android Emulator or a Physical Device
 - Backend Server running locally (Clone from the [Backend Repository](https://github.com/GFA26SE169_FA26SE091_CapstoneProject))
