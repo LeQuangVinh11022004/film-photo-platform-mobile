@@ -1,6 +1,6 @@
 <div align="center">
   <img src="assets/images/logo.png" alt="AnalogAI Logo" width="150"/>
-  <h1>AnalogAI</h1>
+  <h1># Film Photo Platform — Mobile app</h1>
   <h3>The Ultimate Hub for Film Photography Enthusiasts</h3>
 
   <p>
