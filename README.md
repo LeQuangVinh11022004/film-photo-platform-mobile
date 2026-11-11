@@ -23,7 +23,7 @@ Whether you need to book a darkroom, rent vintage equipment, seek expert advice 
 *   **Expert Q&A & Scheduling:** Connect with Film Experts to schedule 1-on-1 consultations or attend exclusive workshops.
 *   **AI Tools Hub:** Enhance and restore old, damaged film scans using integrated AI restoration tools.
 *   **Community Forum:** Share knowledge, film recipes (like Push/Pull processing), and showcase your analog portfolio.
-*   **Smart Notifications:** Real-time local and push notifications for booking confirmations and application statuses.
+*   **Notifications:** Locally triggered device notifications and an in-app notification list; remote push notifications are not yet integrated.
 
 ## 📱 App Screenshots
 *(Add screenshots of your App here: Login, Home, Booking Flow, Community)*
