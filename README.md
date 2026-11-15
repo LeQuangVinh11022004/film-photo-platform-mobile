@@ -23,7 +23,7 @@ Whether you need to book a darkroom, rent vintage equipment, seek expert advice 
 *   **Expert Q&A & Scheduling:** Connect with Film Experts to schedule 1-on-1 consultations or attend exclusive workshops.
 *   **AI Tools Hub:** Enhance and restore old, damaged film scans using integrated AI restoration tools.
 *   **Community Forum:** Share knowledge, film recipes (like Push/Pull processing), and showcase your analog portfolio.
-*   **Smart Notifications:** Real-time local and push notifications for booking confirmations and application statuses.
+*   **Notifications:** Locally triggered device notifications and an in-app notification list; remote push notifications are not yet integrated.
 
 ## 📱 App Screenshots
 *(Add screenshots of your App here: Login, Home, Booking Flow, Community)*
@@ -63,7 +63,7 @@ lib/
 ## 🚀 Getting Started
 
 ### Prerequisites
-- [Flutter SDK](https://docs.flutter.dev/get-started/install) (Version >= 3.13)
+- [Flutter SDK](https://docs.flutter.dev/get-started/install) with bundled Dart >= 3.13.2 and < 4.0.0 (as required by `pubspec.yaml`)
 - [Android Studio](https://developer.android.com/studio) or VS Code
 - Android Emulator or a Physical Device
 - Backend Server running locally (Clone from the [Backend Repository](https://github.com/GFA26SE169_FA26SE091_CapstoneProject))
@@ -81,12 +81,12 @@ lib/
    ```
 
 3. **Configure Backend URL (Optional):**
-   The app is pre-configured to connect to `http://10.0.2.2:5038` (Android Emulator to local ASP.NET Core). If your backend runs on a different IP/Port, update the `baseUrl` inside:
+   The app defaults to `https://10.0.2.2:7104` on Android (the emulator's host-machine alias) and `https://localhost:7104` on other platforms. For a physical device or a backend using a different address, update `defaultBaseUrl` in:
    `lib/core/network/api_client.dart`
 
 4. **Run the App:**
    ```bash
-   flutter run
+   flutter run -t lib/app/main.dart
    ```
 
 ### Default Test Accounts
