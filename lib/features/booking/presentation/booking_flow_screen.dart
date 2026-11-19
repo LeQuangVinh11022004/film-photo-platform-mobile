@@ -9,6 +9,7 @@ import '../models/booking_schedule.dart';
 import '../models/booking_api_models.dart';
 import '../services/booking_api_service.dart';
 import 'package:intl/intl.dart';
+import 'payment_screen.dart';
 
 class BookingFlowScreen extends StatefulWidget {
   final BookingItem item;
@@ -98,7 +99,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     // 1. Tạo request DTO gửi cho C# API
     // Gắn GUID có sẵn trong CSDL từ Swagger
     final request = BookingCreateRequestDTO(
-      availabilityId: '55d5d130-5b00-487a-b8f4-7fae91a60d62'
+      availabilityId: '55d5d130-5b00-487a-b8f4-7fae91a60d62',
     );
 
     // 2. Gọi API POST thực tế thông qua BookingApiService
@@ -109,9 +110,11 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
 
     // 3. Xử lý kết quả trả về từ Backend
     if (result['success'] == true) {
-      // Add fake/local schedule to mock UI 
+      final bookingId = (result['booking'] as BookingResponseDTO?)?.bookingId ??
+          'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+
       final newSchedule = BookingSchedule(
-        id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        id: bookingId,
         item: widget.item,
         bookingDate: _selectedDate,
         timeSlot: '${slot['slot']} ($hours giờ)',
@@ -120,15 +123,18 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       );
       BookingSchedule.sampleSchedules.insert(0, newSchedule);
 
-      Navigator.pop(context); // close booking flow
-
-      // Bắn native notification
-      NotificationService().triggerLocalNotification(
-        context: context,
-        title: 'Đặt Lịch Thành Công! 🎉',
-        body: 'Đã xác nhận đặt ${newSchedule.item.name} vào ngày ${_selectedDate.day}/${_selectedDate.month}. Bấm để xem chi tiết.',
-        route: '/notifications',
-        routeArgs: newSchedule,
+      // Chuyển sang màn hình thanh toán
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentScreen(
+            bookingId: bookingId,
+            item: widget.item,
+            totalAmount: totalPrice,
+            bookingDate: _selectedDate,
+            timeSlot: '${slot['slot']} ($hours giờ)',
+          ),
+        ),
       );
     } else {
       // Báo lỗi từ API (VD: Lỗi Conflict 409, Lỗi NotFound,...)
@@ -144,9 +150,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       );
 
       // (TÙY CHỌN CHO BẠN DEMO KHI KHÔNG BẬT BACKEND SERVER HOẶC TRUYỀN SAI GUID)
-      // Tự động bỏ qua lỗi và thêm local để bạn vẫn Test UI được:
+      // Tự động chuyển sang PaymentScreen với đơn mẫu offline để bạn vẫn test được:
+      final mockBookingId = 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
       final newSchedule = BookingSchedule(
-        id: 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}',
+        id: mockBookingId,
         item: widget.item,
         bookingDate: _selectedDate,
         timeSlot: '${slot['slot']} ($hours giờ)',
@@ -154,11 +161,18 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         status: BookingStatus.confirmed,
       );
       BookingSchedule.sampleSchedules.insert(0, newSchedule);
-      Navigator.pop(context);
-      NotificationService().triggerLocalNotification(
-        context: context,
-        title: 'Đặt Lịch Tạm (Offline Mode) 🎉',
-        body: 'Hệ thống đang chạy giả lập vì API báo lỗi: ${result['message']}',
+
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(
+          builder: (context) => PaymentScreen(
+            bookingId: mockBookingId,
+            item: widget.item,
+            totalAmount: totalPrice,
+            bookingDate: _selectedDate,
+            timeSlot: '${slot['slot']} ($hours giờ)',
+          ),
+        ),
       );
     }
   }
@@ -517,7 +531,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       ),
       child: SafeArea(
         child: PrimaryButton(
-          text: _currentStep < 2 ? 'Tiếp tục' : 'Xác nhận & Thanh toán',
+          text: _currentStep < 2 ? 'Tiếp tục' : 'Xác nhận & Sang thanh toán',
           isLoading: _isSubmitting,
           onPressed: _nextStep,
         ),
