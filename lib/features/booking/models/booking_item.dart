@@ -13,6 +13,21 @@ class BookingItem {
   final List<String> previewImages;
   bool isFavorite;
 
+  // Chi tiết kỹ thuật & tiện ích từ API
+  final int capacity;
+  final String providerName;
+  final double lengthM;
+  final double widthM;
+  final double heightM;
+  final String artisticStyle;
+  final String supportedProcesses;
+  final String lightingConditions;
+  final String ventilationDetails;
+  final String acousticDetails;
+  final String operatingHours;
+  final String usagePolicies;
+  final List<Map<String, dynamic>> availableSlots;
+
   BookingItem({
     required this.id,
     required this.name,
@@ -25,6 +40,19 @@ class BookingItem {
     required this.amenities,
     required this.previewImages,
     this.isFavorite = false,
+    this.capacity = 1,
+    this.providerName = '',
+    this.lengthM = 0,
+    this.widthM = 0,
+    this.heightM = 0,
+    this.artisticStyle = '',
+    this.supportedProcesses = '',
+    this.lightingConditions = '',
+    this.ventilationDetails = '',
+    this.acousticDetails = '',
+    this.operatingHours = '',
+    this.usagePolicies = '',
+    this.availableSlots = const [],
   });
 
   String get categoryName {
@@ -38,6 +66,102 @@ class BookingItem {
     }
   }
 
+  /// Factory parse trực tiếp từ JSON API (GET /api/photographer/studios hoặc darkrooms)
+  factory BookingItem.fromJson(Map<String, dynamic> json) {
+    final typeStr = (json['resourceType'] ?? '').toString().toLowerCase();
+    final isDarkroom = typeStr.contains('darkroom');
+
+    final defaultImg = isDarkroom
+        ? 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80'
+        : 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop&q=80';
+
+    final imagesList = (json['images'] as List<dynamic>?) ?? [];
+    String mainImage = defaultImg;
+    List<String> previews = [];
+
+    if (imagesList.isNotEmpty) {
+      for (var img in imagesList) {
+        if (img is Map<String, dynamic> && img['imageUrl'] != null && img['imageUrl'].toString().isNotEmpty) {
+          previews.add(img['imageUrl'].toString());
+        }
+      }
+      if (previews.isNotEmpty) {
+        mainImage = previews.first;
+      }
+    }
+
+    if (previews.isEmpty) {
+      previews.add(defaultImg);
+    }
+
+    // Amenities parsing từ details
+    List<String> parsedAmenities = [];
+    final details = json['details'] as Map<String, dynamic>?;
+    if (details != null && details['amenities'] != null) {
+      final aVal = details['amenities'];
+      if (aVal is List) {
+        parsedAmenities = aVal.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
+      } else {
+        final aStr = aVal.toString();
+        if (aStr.isNotEmpty) {
+          parsedAmenities = aStr.split(RegExp(r'[,;]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
+        }
+      }
+    }
+
+    if (parsedAmenities.isEmpty) {
+      parsedAmenities = isDarkroom
+          ? ['Máy rọi Enlarger', 'Hóa chất chuẩn', 'Đèn an toàn']
+          : ['Đèn Studio chuyên dụng', 'Điều hòa', 'Wifi tốc độ cao'];
+    }
+
+    // Available slots parsing
+    final slotsList = (json['availableSlots'] as List<dynamic>?) ?? [];
+    double calculatedHourlyRate = (json['hourlyRate'] as num?)?.toDouble() ?? 0.0;
+    if (calculatedHourlyRate == 0 && slotsList.isNotEmpty) {
+      final firstSlot = slotsList.first;
+      if (firstSlot is Map<String, dynamic> && firstSlot['price'] != null) {
+        calculatedHourlyRate = (firstSlot['price'] as num).toDouble();
+      }
+    }
+
+    final String address = json['address'] ?? '';
+    final String name = json['name'] ?? '';
+    final String description = json['description'] ?? '';
+
+    return BookingItem(
+      id: json['resourceId'] ?? '',
+      name: name.isNotEmpty ? name : (isDarkroom ? 'Phòng tối Film' : 'Studio Chụp Ảnh'),
+      category: isDarkroom ? BookingCategory.darkroom : BookingCategory.studio,
+      location: address.isNotEmpty ? address : 'Hồ Chí Minh, Việt Nam',
+      pricePerHour: calculatedHourlyRate > 0 ? calculatedHourlyRate : (isDarkroom ? 180000 : 250000),
+      rating: 4.9,
+      imageUrl: mainImage,
+      description: description.isNotEmpty
+          ? description
+          : (details != null && details['artisticStyle'] != null && details['artisticStyle'].toString().isNotEmpty
+              ? 'Phong cách: ${details['artisticStyle']}. ${details['usagePolicies'] ?? ''}'
+              : 'Không gian chuyên nghiệp dành cho nghệ sĩ nhiếp ảnh film.'),
+      amenities: parsedAmenities,
+      previewImages: previews,
+      isFavorite: false,
+      capacity: (json['capacity'] as num?)?.toInt() ?? 1,
+      providerName: json['providerName'] ?? '',
+      lengthM: (details?['lengthM'] as num?)?.toDouble() ?? 0,
+      widthM: (details?['widthM'] as num?)?.toDouble() ?? 0,
+      heightM: (details?['heightM'] as num?)?.toDouble() ?? 0,
+      artisticStyle: details?['artisticStyle']?.toString() ?? '',
+      supportedProcesses: details?['supportedProcesses']?.toString() ?? '',
+      lightingConditions: details?['lightingConditions']?.toString() ?? '',
+      ventilationDetails: details?['ventilationDetails']?.toString() ?? '',
+      acousticDetails: details?['acousticDetails']?.toString() ?? '',
+      operatingHours: details?['operatingHours']?.toString() ?? '',
+      usagePolicies: details?['usagePolicies']?.toString() ?? '',
+      availableSlots: slotsList.whereType<Map<String, dynamic>>().toList(),
+    );
+  }
+
+  /// Danh sách item mẫu dự phòng (fallback khi chưa khởi động server Backend hoặc offline)
   static List<BookingItem> sampleItems = [
     BookingItem(
       id: '1',

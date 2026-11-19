@@ -11,6 +11,78 @@ class BookingApiService {
 
   final ApiClient _apiClient = ApiClient();
 
+  /// Lấy danh sách Studios (/api/photographer/studios)
+  Future<List<ResourceItemResponseDTO>> getStudios({
+    String? fromDate,
+    String? toDate,
+  }) async {
+    try {
+      String queryParams = '';
+      if (fromDate != null && toDate != null) {
+        queryParams = '?fromDate=$fromDate&toDate=$toDate';
+      }
+
+      final response = await _apiClient.get('/api/photographer/studios$queryParams');
+      if (kDebugMode) {
+        print('getStudios status: ${response.statusCode}');
+        print('getStudios body: ${response.body}');
+      }
+
+      if (response.statusCode == 200) {
+        dynamic decoded = jsonDecode(response.body);
+        List<dynamic> jsonList = [];
+        if (decoded is List) {
+          jsonList = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          jsonList = decoded['items'] ?? decoded['data'] ?? [];
+        }
+        return jsonList.map((e) => ResourceItemResponseDTO.fromJson(e as Map<String, dynamic>)).toList();
+      } else {
+        if (kDebugMode) print('Failed to get studios (${response.statusCode}): ${response.body}');
+        return [];
+      }
+    } catch (e, stack) {
+      if (kDebugMode) print('getStudios API Error: $e\n$stack');
+      return [];
+    }
+  }
+
+  /// Lấy danh sách Darkrooms (/api/photographer/darkrooms)
+  Future<List<ResourceItemResponseDTO>> getDarkrooms({
+    String? fromDate,
+    String? toDate,
+  }) async {
+    try {
+      String queryParams = '';
+      if (fromDate != null && toDate != null) {
+        queryParams = '?fromDate=$fromDate&toDate=$toDate';
+      }
+
+      final response = await _apiClient.get('/api/photographer/darkrooms$queryParams');
+      if (kDebugMode) {
+        print('getDarkrooms status: ${response.statusCode}');
+        print('getDarkrooms body: ${response.body}');
+      }
+
+      if (response.statusCode == 200) {
+        dynamic decoded = jsonDecode(response.body);
+        List<dynamic> jsonList = [];
+        if (decoded is List) {
+          jsonList = decoded;
+        } else if (decoded is Map<String, dynamic>) {
+          jsonList = decoded['items'] ?? decoded['data'] ?? [];
+        }
+        return jsonList.map((e) => ResourceItemResponseDTO.fromJson(e as Map<String, dynamic>)).toList();
+      } else {
+        if (kDebugMode) print('Failed to get darkrooms (${response.statusCode}): ${response.body}');
+        return [];
+      }
+    } catch (e, stack) {
+      if (kDebugMode) print('getDarkrooms API Error: $e\n$stack');
+      return [];
+    }
+  }
+
   /// Lấy danh sách khung giờ trống của một Space (Studio/Darkroom)
   /// `fromDate` và `toDate` có định dạng 'YYYY-MM-DD'
   Future<List<ProviderSpaceAvailabilityResponseDTO>> getAvailableSlots({

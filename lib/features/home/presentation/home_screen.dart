@@ -3,6 +3,7 @@ import 'package:carousel_slider/carousel_slider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../booking/models/booking_item.dart';
+import '../../booking/services/booking_api_service.dart';
 import '../../notifications/models/notification_item.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,6 +19,44 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentBannerIndex = 0;
   final TextEditingController _searchController = TextEditingController();
   String _searchQuery = '';
+
+  // API Data state
+  final BookingApiService _bookingApiService = BookingApiService();
+  List<BookingItem> _apiItems = [];
+  bool _isLoadingItems = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchApiResources();
+  }
+
+  Future<void> _fetchApiResources() async {
+    setState(() => _isLoadingItems = true);
+    try {
+      final results = await Future.wait([
+        _bookingApiService.getStudios(),
+        _bookingApiService.getDarkrooms(),
+      ]);
+
+      final studios = results[0].map((e) => e.toBookingItem()).toList();
+      final darkrooms = results[1].map((e) => e.toBookingItem()).toList();
+      final combined = [...studios, ...darkrooms];
+
+      if (mounted) {
+        setState(() {
+          _apiItems = combined;
+          _isLoadingItems = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoadingItems = false;
+        });
+      }
+    }
+  }
 
   // Quick Banners Slider Data
   final List<Map<String, dynamic>> _quickBanners = [
@@ -56,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   // Filter Modal State
-  double _maxPriceFilter = 500000;
+  double _maxPriceFilter = 5000000;
   double _minRatingFilter = 0.0;
   String _sortBy = 'default';
 
@@ -75,7 +114,7 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   List<BookingItem> get _filteredItems {
-    List<BookingItem> list = List.from(BookingItem.sampleItems);
+    List<BookingItem> list = List.from(_apiItems);
 
     if (_selectedCategoryIndex == 1) {
       list = list.where((e) => e.category == BookingCategory.studio).toList();
@@ -85,7 +124,12 @@ class _HomeScreenState extends State<HomeScreen> {
       list = list.where((e) => e.category == BookingCategory.equipment).toList();
     }
 
-    list = list.where((e) => e.pricePerHour <= _maxPriceFilter && e.rating >= _minRatingFilter).toList();
+    if (_maxPriceFilter < 5000000) {
+      list = list.where((e) => e.pricePerHour <= _maxPriceFilter).toList();
+    }
+    if (_minRatingFilter > 0) {
+      list = list.where((e) => e.rating >= _minRatingFilter).toList();
+    }
 
     if (_searchQuery.isNotEmpty) {
       list = list.where((e) =>
@@ -306,9 +350,12 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       backgroundColor: context.bgColor,
       body: SafeArea(
-        child: CustomScrollView(
-          physics: const BouncingScrollPhysics(),
-          slivers: [
+        child: RefreshIndicator(
+          color: AppColors.primary,
+          onRefresh: _fetchApiResources,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            slivers: [
             // Top Location Bar & Notifications Button
             SliverToBoxAdapter(
               child: Padding(
@@ -649,12 +696,17 @@ class _HomeScreenState extends State<HomeScreen> {
             // Section 2: Popular Header
             SliverToBoxAdapter(
               child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 14.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text('Phổ biến & Được yêu thích', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textColor)),
-                    Text('Tất cả', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    GestureDetector(
+                      onTap: () {
+                        Navigator.pushNamed(context, '/item-list');
+                      },
+                      child: const Text('Tất cả', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
+                    ),
                   ],
                 ),
               ),
@@ -679,8 +731,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 
   Widget _buildNearCard(BuildContext context, BookingItem item) {
     return GestureDetector(

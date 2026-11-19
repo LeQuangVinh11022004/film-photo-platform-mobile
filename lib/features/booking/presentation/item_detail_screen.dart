@@ -393,18 +393,114 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             ],
                           ),
                         ),
+                        if (_item.providerName.isNotEmpty) ...[
+                          const SizedBox(width: 12),
+                          Text('•', style: TextStyle(color: context.textSecColor)),
+                          const SizedBox(width: 12),
+                          Flexible(
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.storefront_rounded, size: 16, color: AppColors.primary),
+                                const SizedBox(width: 4),
+                                Flexible(
+                                  child: Text(
+                                    _item.providerName,
+                                    style: TextStyle(fontWeight: FontWeight.w600, color: context.textSecColor),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
                         const SizedBox(width: 12),
                         Text('•', style: TextStyle(color: context.textSecColor)),
                         const SizedBox(width: 12),
-                        Text('128 lượt đặt', style: TextStyle(fontWeight: FontWeight.w600, color: context.textSecColor)),
-                        const SizedBox(width: 12),
-                        Text('•', style: TextStyle(color: context.textSecColor)),
-                        const SizedBox(width: 12),
-                        Text('48 đánh giá', style: TextStyle(fontWeight: FontWeight.w600, color: context.textSecColor)),
+                        Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.people_alt_outlined, size: 16, color: AppColors.textSecondary),
+                            const SizedBox(width: 4),
+                            Text('Tối đa ${_item.capacity} người', style: TextStyle(fontWeight: FontWeight.w600, color: context.textSecColor)),
+                          ],
+                        ),
                       ],
                     ).animate().fadeIn(delay: 100.ms).slideX(begin: 0.1),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 28),
+
+                    // Technical Specifications Grid (Kích thước, Chiều cao, Giờ mở cửa)
+                    if (_item.lengthM > 0 || _item.operatingHours.isNotEmpty || _item.artisticStyle.isNotEmpty) ...[
+                      Text(
+                        'Thông số & Đặc điểm không gian',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: context.textColor,
+                        ),
+                      ).animate().fadeIn(delay: 150.ms),
+                      const SizedBox(height: 14),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: context.cardColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        child: Column(
+                          children: [
+                            if (_item.lengthM > 0 && _item.widthM > 0) ...[
+                              _buildSpecRow(
+                                context,
+                                icon: Icons.straighten_rounded,
+                                label: 'Kích thước',
+                                value: '${_item.lengthM}m × ${_item.widthM}m (Trần cao ${_item.heightM}m)',
+                              ),
+                              const Divider(height: 20),
+                            ],
+                            if (_item.operatingHours.isNotEmpty) ...[
+                              _buildSpecRow(
+                                context,
+                                icon: Icons.schedule_rounded,
+                                label: 'Giờ hoạt động',
+                                value: _item.operatingHours,
+                              ),
+                              const Divider(height: 20),
+                            ],
+                            if (_item.artisticStyle.isNotEmpty) ...[
+                              _buildSpecRow(
+                                context,
+                                icon: Icons.palette_outlined,
+                                label: 'Phong cách',
+                                value: _item.artisticStyle,
+                              ),
+                              if (_item.supportedProcesses.isNotEmpty || _item.lightingConditions.isNotEmpty)
+                                const Divider(height: 20),
+                            ],
+                            if (_item.supportedProcesses.isNotEmpty) ...[
+                              _buildSpecRow(
+                                context,
+                                icon: Icons.science_outlined,
+                                label: 'Quy trình tráng rọi',
+                                value: _item.supportedProcesses,
+                              ),
+                              if (_item.lightingConditions.isNotEmpty) const Divider(height: 20),
+                            ],
+                            if (_item.lightingConditions.isNotEmpty) ...[
+                              _buildSpecRow(
+                                context,
+                                icon: Icons.lightbulb_outline_rounded,
+                                label: 'Ánh sáng',
+                                value: _item.lightingConditions,
+                              ),
+                            ],
+                          ],
+                        ),
+                      ).animate().fadeIn(delay: 180.ms).slideY(begin: 0.1),
+                      const SizedBox(height: 28),
+                    ],
 
                     // Amenities / Facilities
                     Text(
@@ -469,6 +565,45 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         height: 1.6,
                       ),
                     ).animate().fadeIn(delay: 500.ms),
+
+                    // Usage Policies Section
+                    if (_item.usagePolicies.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      Text(
+                        'Quy định & Chính sách sử dụng',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: context.textColor,
+                        ),
+                      ).animate().fadeIn(delay: 550.ms),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                        ),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 20),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                _item.usagePolicies,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: context.textColor,
+                                  height: 1.5,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ).animate().fadeIn(delay: 600.ms),
+                    ],
                     
                     const SizedBox(height: 40),
                     Divider(color: context.borderColor),
@@ -603,6 +738,39 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildSpecRow(BuildContext context, {required IconData icon, required String label, required String value}) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(icon, color: AppColors.primary, size: 18),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(fontSize: 12, color: context.textSecColor, fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textColor, height: 1.3),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
