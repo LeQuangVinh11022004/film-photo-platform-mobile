@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:toastification/toastification.dart';
@@ -10,6 +11,7 @@ import '../features/auth/presentation/forgot_password_screen.dart';
 import '../features/auth/presentation/reset_password_screen.dart';
 import '../features/booking/presentation/booking_checkin_screen.dart';
 import '../features/booking/presentation/item_detail_screen.dart';
+import '../features/booking/presentation/item_list_screen.dart';
 import '../features/booking/presentation/payment_screen.dart';
 import '../features/booking/presentation/service_packages_screen.dart';
 import '../features/booking/presentation/studio_comparison_screen.dart';
@@ -23,7 +25,17 @@ import '../features/expert/presentation/expert_application_screen.dart';
 // Global notifier for Theme Mode
 final ValueNotifier<ThemeMode> themeNotifier = ValueNotifier(ThemeMode.system);
 
+/// Custom HttpOverrides để vượt qua lỗi chứng chỉ SSL tự ký của localhost ASP.NET Core trên Image / Network
+class MyHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context)
+      ..badCertificateCallback = (X509Certificate cert, String host, int port) => true;
+  }
+}
+
 void main() {
+  HttpOverrides.global = MyHttpOverrides();
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(
@@ -61,6 +73,7 @@ class FilmPhotographyApp extends StatelessWidget {
             '/reset-password': (context) => const ResetPasswordScreen(),
             '/home': (context) => const MainNavigationScreen(),
             '/detail': (context) => const ItemDetailScreen(),
+            '/item-list': (context) => const ItemListScreen(),
             '/service-packages': (context) => const ServicePackagesScreen(),
             '/studio-comparison': (context) => const StudioComparisonScreen(),
             '/booking-checkin': (context) => const BookingCheckinScreen(),

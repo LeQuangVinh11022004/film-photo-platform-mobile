@@ -1,7 +1,37 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:http/io_client.dart';
+import '../network/api_client.dart';
 import '../theme/app_colors.dart';
+
+class _DevFriendlyCacheManager extends CacheManager with ImageCacheManager {
+  static const key = 'filmPhotoDevCacheKey';
+  static final _DevFriendlyCacheManager _instance = _DevFriendlyCacheManager._();
+
+  factory _DevFriendlyCacheManager() => _instance;
+
+  _DevFriendlyCacheManager._()
+      : super(
+    Config(
+      key,
+      fileService: HttpFileService(
+        httpClient: _createHttpClient(),
+      ),
+    ),
+  );
+
+  static IOClient _createHttpClient() {
+    final httpClient = HttpClient();
+    if (kDebugMode) {
+      httpClient.badCertificateCallback =
+          (X509Certificate cert, String host, int port) => true;
+    }
+    return IOClient(httpClient);
+  }
+}
 
 class SafeNetworkImage extends StatelessWidget {
   final String url;
@@ -19,18 +49,35 @@ class SafeNetworkImage extends StatelessWidget {
     this.borderRadius,
   });
 
+  String _resolveUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      return trimmed;
+    }
+    if (trimmed.startsWith('/data/') || trimmed.startsWith('/storage/')) {
+      return trimmed;
+    }
+    final base = ApiClient().baseUrl.endsWith('/')
+        ? ApiClient().baseUrl.substring(0, ApiClient().baseUrl.length - 1)
+        : ApiClient().baseUrl;
+    final path = trimmed.startsWith('/') ? trimmed : '/$trimmed';
+    return '$base$path';
+  }
+
   @override
   Widget build(BuildContext context) {
+    final resolved = _resolveUrl(url);
     Widget imageWidget;
 
-    // Check if the URL is a local file path (from image_picker) or a network URL
-    if (url.startsWith('http://') || url.startsWith('https://')) {
+    if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
       imageWidget = CachedNetworkImage(
-        imageUrl: url,
+        imageUrl: resolved,
+        cacheManager: kDebugMode ? _DevFriendlyCacheManager() : DefaultCacheManager(),
         width: width,
         height: height,
         fit: fit,
-        placeholder: (context, url) => Container(
+        placeholder: (context, _) => Container(
           width: width,
           height: height,
           color: AppColors.inputFill,
@@ -42,16 +89,23 @@ class SafeNetworkImage extends StatelessWidget {
             ),
           ),
         ),
-        errorWidget: (context, url, error) => _buildErrorPlaceholder(),
+        errorWidget: (context, _, error) {
+          if (kDebugMode) {
+            debugPrint('SafeNetworkImage error ($resolved): $error');
+          }
+          return _buildErrorPlaceholder();
+        },
       );
-    } else if (url.isNotEmpty) {
-      // Load local file image (picked from device gallery)
+    } else if (resolved.isNotEmpty) {
       imageWidget = Image.file(
-        File(url),
+        File(resolved),
         width: width,
         height: height,
         fit: fit,
         errorBuilder: (context, error, stackTrace) {
+          if (kDebugMode) {
+            debugPrint('SafeNetworkImage local file error ($resolved): $error');
+          }
           return _buildErrorPlaceholder();
         },
       );
