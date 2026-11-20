@@ -10,6 +10,9 @@ class BookingResponseDTO {
   final String startTime; // HH:mm:ss
   final String endTime; // HH:mm:ss
   final double totalAmount;
+  final double depositAmount;
+  final String? depositDueAt;
+  final String depositStatus;
   final String status;
   final String qrCode;
   final String photographerName;
@@ -29,6 +32,9 @@ class BookingResponseDTO {
     required this.startTime,
     required this.endTime,
     required this.totalAmount,
+    this.depositAmount = 0.0,
+    this.depositDueAt,
+    this.depositStatus = '',
     required this.status,
     required this.qrCode,
     required this.photographerName,
@@ -50,6 +56,9 @@ class BookingResponseDTO {
       startTime: json['startTime'] ?? '',
       endTime: json['endTime'] ?? '',
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
+      depositAmount: (json['depositAmount'] as num?)?.toDouble() ?? 0.0,
+      depositDueAt: json['depositDueAt']?.toString(),
+      depositStatus: json['depositStatus'] ?? '',
       status: json['status'] ?? '',
       qrCode: json['qrCode'] ?? '',
       photographerName: json['photographerName'] ?? '',
