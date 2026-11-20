@@ -49,13 +49,16 @@ jobs:
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
             echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+            ls -l android/app/upload-keystore.jks
+          else
+            echo "KEYSTORE_BASE64 is empty! Build will fall back to debug key."
           fi
 
       # 5. Build file APK với Release Keystore (Nếu có)
       - name: Build APK
         run: flutter build apk --release -t lib/app/main.dart
         env:
-          KEYSTORE_PATH: upload-keystore.jks
+          KEYSTORE_PATH: ${{ secrets.KEYSTORE_BASE64 != '' && 'upload-keystore.jks' || '' }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}

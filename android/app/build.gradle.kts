@@ -25,7 +25,7 @@ android {
 
     signingConfigs {
         val keystorePath = System.getenv("KEYSTORE_PATH")
-        if (keystorePath != null) {
+        if (!keystorePath.isNullOrEmpty()) {
             create("release") {
                 storeFile = file(keystorePath)
                 storePassword = System.getenv("KEYSTORE_PASSWORD")
@@ -38,7 +38,8 @@ android {
     buildTypes {
         release {
             // Tự động dùng Release Keystore nếu có trên GitHub Actions, ngược lại dùng debug
-            if (System.getenv("KEYSTORE_PATH") != null) {
+            val keystorePath = System.getenv("KEYSTORE_PATH")
+            if (!keystorePath.isNullOrEmpty()) {
                 signingConfig = signingConfigs.getByName("release")
             } else {
                 signingConfig = signingConfigs.getByName("debug")
