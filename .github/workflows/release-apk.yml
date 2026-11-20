@@ -44,7 +44,7 @@ jobs:
 
       # 5. Build file APK (chế độ release, tự động giảm dung lượng và tối ưu mã nguồn)
       - name: Build APK
-        run: flutter build apk --release
+        run: flutter build apk --release -t lib/app/main.dart
 
       # 6a. NẾU CÓ TAG (VD: git push origin v1.0.0): Tự động tạo Release và đính kèm APK
       - name: Create GitHub Release
