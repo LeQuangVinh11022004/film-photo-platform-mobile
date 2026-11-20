@@ -1,0 +1,67 @@
+name: Build & Release APK
+
+# Kích hoạt workflow khi:
+# 1. Push một Tag bắt đầu bằng chữ "v" (VD: v1.0.0, v1.0.1)
+# 2. Chạy thủ công bằng tay từ giao diện web GitHub Actions (workflow_dispatch)
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-and-release:
+    name: Build & Release Android APK
+    runs-on: ubuntu-latest
+
+    # POLICY QUAN TRỌNG: Cấp quyền Ghi (Write) cho GitHub Token 
+    # để bot có thể tự động tạo Release và Upload file APK lên Repo.
+    permissions:
+      contents: write
+
+    steps:
+      # 1. Checkout mã nguồn từ Repo
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 2. Cài đặt môi trường Java (Bắt buộc cho Gradle của Android)
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17' # Tương thích tốt nhất với Gradle mới
+
+      # 3. Cài đặt môi trường Flutter
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true # Bật cache để build nhanh hơn ở các lần sau
+
+      # 4. Tải các gói phụ thuộc
+      - name: Install Dependencies
+        run: flutter pub get
+
+      # 5. Build file APK (chế độ release, tự động giảm dung lượng và tối ưu mã nguồn)
+      - name: Build APK
+        run: flutter build apk --release
+
+      # 6a. NẾU CÓ TAG (VD: git push origin v1.0.0): Tự động tạo Release và đính kèm APK
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/app/outputs/flutter-apk/app-release.apk
+          generate_release_notes: true
+          name: Release ${{ github.ref_name }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 6b. NẾU CHẠY THỦ CÔNG (Không có Tag): Upload APK lên Artifacts để tải về tạm thời
+      - name: Upload APK as Artifact
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnalogAI-APK
+          path: build/app/outputs/flutter-apk/app-release.apk
+          retention-days: 7
