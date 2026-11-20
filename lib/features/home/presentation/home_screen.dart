@@ -1,7 +1,11 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
+import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../../../core/widgets/primary_button.dart';
+import '../../../core/widgets/custom_text_field.dart';
+import '../../ai_tools/services/ai_api_service.dart';
 import '../../booking/models/booking_api_models.dart';
 import '../../booking/models/booking_item.dart';
 import '../../booking/services/booking_api_service.dart';
@@ -23,6 +27,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // API Data state
   final BookingApiService _bookingApiService = BookingApiService();
+  final AiApiService _aiApiService = AiApiService();
   List<BookingItem> _apiItems = [];
   bool _isLoadingItems = true;
 
@@ -309,6 +314,158 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showAIGuideModal() {
+    final themeController = TextEditingController(text: 'Chân dung vintage');
+    final locationController = TextEditingController(text: 'Studio');
+    final lightController = TextEditingController(text: 'Ánh sáng cửa sổ chiều');
+    final equipmentController = TextEditingController(text: 'Máy film 35mm, lens 50mm');
+    final experienceController = TextEditingController(text: 'Beginner');
+
+    bool isLoading = false;
+    String? aiResponseText;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return Container(
+            height: MediaQuery.of(context).size.height * 0.85,
+            decoration: BoxDecoration(
+              color: context.bgColor,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+              left: 24,
+              right: 24,
+              top: 24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.auto_awesome_rounded, color: AppColors.primary),
+                    const SizedBox(width: 8),
+                    Text('Trợ lý AI Nhiếp ảnh', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor)),
+                  ],
+                ),
+                const SizedBox(height: 4),
+                Text('Nhập thông tin buổi chụp để AI tư vấn thông số & gợi ý.', style: TextStyle(fontSize: 13, color: context.textSecColor)),
+                const SizedBox(height: 20),
+                Expanded(
+                  child: aiResponseText != null 
+                    ? SingleChildScrollView(
+                        physics: const BouncingScrollPhysics(),
+                        child: Container(
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                          ),
+                          child: Text(
+                            aiResponseText!,
+                            style: TextStyle(fontSize: 15, color: context.textColor, height: 1.5),
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        physics: const BouncingScrollPhysics(),
+                        children: [
+                          CustomTextField(
+                            hintText: 'Chủ đề (VD: Chân dung vintage)',
+                            controller: themeController,
+                            prefixIcon: Icons.style_outlined,
+                          ),
+                          const SizedBox(height: 16),
+                          CustomTextField(
+                            hintText: 'Địa điểm (VD: Studio)',
+                            controller: locationController,
+                            prefixIcon: Icons.location_on_outlined,
+                          ),
+                          const SizedBox(height: 16),
+                          CustomTextField(
+                            hintText: 'Ánh sáng (VD: Ánh sáng cửa sổ chiều)',
+                            controller: lightController,
+                            prefixIcon: Icons.wb_sunny_outlined,
+                          ),
+                          const SizedBox(height: 16),
+                          CustomTextField(
+                            hintText: 'Thiết bị (VD: Máy film 35mm, lens 50mm)',
+                            controller: equipmentController,
+                            prefixIcon: Icons.camera_alt_outlined,
+                          ),
+                          const SizedBox(height: 16),
+                          CustomTextField(
+                            hintText: 'Kinh nghiệm (VD: Beginner)',
+                            controller: experienceController,
+                            prefixIcon: Icons.person_outline_rounded,
+                          ),
+                        ],
+                      ),
+                ),
+                const SizedBox(height: 16),
+                if (aiResponseText == null)
+                  PrimaryButton(
+                    text: 'Nhận Tư Vấn',
+                    isLoading: isLoading,
+                    onPressed: () async {
+                      setModalState(() => isLoading = true);
+                      
+                      final result = await _aiApiService.getPhotographyGuide(
+                        theme: themeController.text,
+                        location: locationController.text,
+                        availableLight: lightController.text,
+                        equipment: equipmentController.text,
+                        experienceLevel: experienceController.text,
+                      );
+                      
+                      setModalState(() => isLoading = false);
+                      if (!mounted) return;
+                      
+                      if (result['success']) {
+                        setModalState(() {
+                          // Tuỳ cấu trúc trả về, giả sử API C# trả về chuỗi JSON chứa field "guide" hoặc "suggestions" hoặc trả về dict trực tiếp.
+                          aiResponseText = result['data']['guide'] ?? result['data']['message'] ?? result['data'].toString();
+                        });
+                      } else {
+                        toastification.show(
+                          context: context,
+                          type: ToastificationType.error,
+                          title: const Text('Lỗi kết nối'),
+                          description: Text(result['message']),
+                          autoCloseDuration: const Duration(seconds: 3),
+                        );
+                      }
+                    },
+                  ),
+                if (aiResponseText != null)
+                  PrimaryButton(
+                    text: 'Tư vấn lại',
+                    onPressed: () {
+                      setModalState(() => aiResponseText = null);
+                    },
+                  ),
+                const SizedBox(height: 16),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   void _showLocationPicker() {
     showModalBottomSheet(
       context: context,
@@ -352,6 +509,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: context.bgColor,
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: _showAIGuideModal,
+        backgroundColor: AppColors.primary,
+        icon: const Icon(Icons.auto_awesome_rounded, color: Colors.white),
+        label: const Text('AI Tư vấn', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ),
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.primary,
