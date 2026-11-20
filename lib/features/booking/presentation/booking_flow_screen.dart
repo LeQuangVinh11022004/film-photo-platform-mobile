@@ -31,18 +31,104 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   // Step 2: Date & Time state
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   int _selectedTimeSlotIndex = 0;
-  final List<Map<String, dynamic>> _timeSlots = [
-    {'slot': '08:00 - 10:00', 'hours': 2},
-    {'slot': '10:00 - 12:00', 'hours': 2},
-    {'slot': '13:00 - 16:00', 'hours': 3},
-    {'slot': '16:00 - 19:00', 'hours': 3},
-    {'slot': '19:00 - 22:00', 'hours': 3},
-  ];
+
+  /// Lấy danh sách khung giờ thuộc ngày `_selectedDate` từ `widget.item.availableSlots`.
+  /// Nếu ngày đó không có slot nào thì trả về danh sách rỗng (bỏ hoàn toàn fallback).
+  List<Map<String, dynamic>> get _timeSlots {
+    if (widget.item.availableSlots.isEmpty) {
+      return [];
+    }
+
+    final formattedSlots = <Map<String, dynamic>>[];
+    for (int i = 0; i < widget.item.availableSlots.length; i++) {
+    final slotMap = widget.item.availableSlots[i];
+    final availabilityId = slotMap['availabilityId']?.toString() ?? '';
+
+    DateTime? startAt;
+    DateTime? endAt;
+
+    final rawStart = slotMap['startAt'];
+    if (rawStart is DateTime) {
+    startAt = rawStart;
+    } else if (rawStart is String) {
+    startAt = DateTime.tryParse(rawStart);
+    }
+
+    final rawEnd = slotMap['endAt'];
+    if (rawEnd is DateTime) {
+    endAt = rawEnd;
+    } else if (rawEnd is String) {
+    endAt = DateTime.tryParse(rawEnd);
+    }
+
+    if (startAt != null && endAt != null) {
+    final utcStart = startAt.toUtc();
+    final utcEnd = endAt.toUtc();
+
+    // Chỉ lấy những slot trùng ngày (Năm / Tháng / Ngày) với _selectedDate
+    if (utcStart.year == _selectedDate.year &&
+    utcStart.month == _selectedDate.month &&
+    utcStart.day == _selectedDate.day) {
+    final startFormatted = DateFormat('HH:mm').format(utcStart);
+    final endFormatted = DateFormat('HH:mm').format(utcEnd);
+    final diffMinutes = utcEnd.difference(utcStart).inMinutes;
+    final hours = (diffMinutes / 60).round();
+
+    formattedSlots.add({
+    'slot': '$startFormatted - $endFormatted',
+    'hours': hours > 0 ? hours : 1,
+    'price': slotMap['price'],
+    'availabilityId': availabilityId,
+    'startAt': utcStart,
+    'endAt': utcEnd,
+    });
+    }
+    }
+    }
+
+    return formattedSlots;
+  }
+
+  double _calculateBasePrice(Map<String, dynamic> slot, int hours) {
+    final slotPrice = (slot['price'] as num?)?.toDouble();
+    if (slotPrice != null) {
+      return slotPrice;
+    }
+    return widget.item.pricePerHour * hours;
+  }
+
+  double _calculateAddonPrice() {
+    double addonPrice = 0;
+    for (var a in _availableAddons) {
+      if (_selectedAddons.contains(a['name'])) {
+        addonPrice += (a['price'] as num).toDouble();
+      }
+    }
+    return addonPrice;
+  }
 
   @override
   void initState() {
     super.initState();
     _initAddons();
+    _initSelectedDate();
+  }
+
+  void _initSelectedDate() {
+    if (widget.item.availableSlots.isNotEmpty) {
+      final firstSlot = widget.item.availableSlots.first;
+      final rawStart = firstSlot['startAt'];
+      DateTime? startAt;
+      if (rawStart is DateTime) {
+        startAt = rawStart;
+      } else if (rawStart is String) {
+        startAt = DateTime.tryParse(rawStart);
+      }
+      if (startAt != null) {
+        final utcStart = startAt.toUtc();
+        _selectedDate = DateTime(utcStart.year, utcStart.month, utcStart.day);
+      }
+    }
   }
 
   void _initAddons() {
@@ -68,6 +154,20 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   }
 
   void _nextStep() {
+    if (_currentStep == 1 && _timeSlots.isEmpty) {
+      toastification.show(
+        context: context,
+        type: ToastificationType.warning,
+        style: ToastificationStyle.flatColored,
+        title: const Text('Không có khung giờ khả dụng'),
+        description: const Text('Ngày bạn chọn hiện không có khung giờ trống. Vui lòng chọn ngày khác.'),
+        alignment: Alignment.topCenter,
+        autoCloseDuration: const Duration(seconds: 3),
+        showProgressBar: false,
+      );
+      return;
+    }
+
     if (_currentStep < 2) {
       _pageController.nextPage(duration: 300.ms, curve: Curves.easeInOut);
       setState(() => _currentStep++);
@@ -86,25 +186,40 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   }
 
   Future<void> _submitBooking() async {
+    final slots = _timeSlots;
+    if (slots.isEmpty) {
+      toastification.show(
+        context: context,
+        type: ToastificationType.warning,
+        style: ToastificationStyle.flatColored,
+        title: const Text('Không có khung giờ khả dụng'),
+        description: const Text('Vui lòng chọn ngày có khung giờ khả dụng trước khi tiếp tục.'),
+        alignment: Alignment.topCenter,
+        autoCloseDuration: const Duration(seconds: 3),
+        showProgressBar: false,
+      );
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
-    final slot = _timeSlots[_selectedTimeSlotIndex];
+    final safeIndex = _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
+    final slot = slots[safeIndex];
     final hours = slot['hours'] as int;
-    double addonPrice = 0;
-    for (var a in _availableAddons) {
-      if (_selectedAddons.contains(a['name'])) addonPrice += a['price'];
-    }
-    final totalPrice = (widget.item.pricePerHour * hours) + addonPrice;
+    final availabilityId = slot['availabilityId'] as String;
+
+    final basePrice = _calculateBasePrice(slot, hours);
+    final addonPrice = _calculateAddonPrice();
+    final totalPrice = basePrice + addonPrice;
 
     // 1. Tạo request DTO gửi cho C# API
-    // Gắn GUID có sẵn trong CSDL từ Swagger
     final request = BookingCreateRequestDTO(
-      availabilityId: '55d5d130-5b00-487a-b8f4-7fae91a60d62',
+      availabilityId: availabilityId,
     );
 
     // 2. Gọi API POST thực tế thông qua BookingApiService
     final result = await BookingApiService().createBooking(request);
-    
+
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
@@ -334,6 +449,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   }
 
   Widget _buildStep2DateTime() {
+    final slots = _timeSlots;
+
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -342,7 +459,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
         ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
         const SizedBox(height: 24),
-        
+
         const Text('Chọn Ngày', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
         const SizedBox(height: 12),
         InkWell(
@@ -350,8 +467,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             final picked = await showDatePicker(
               context: context,
               initialDate: _selectedDate,
-              firstDate: DateTime.now(),
-              lastDate: DateTime.now().add(const Duration(days: 90)),
+              firstDate: DateTime(2024),
+              lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
               builder: (context, child) {
                 return Theme(
                   data: Theme.of(context).copyWith(
@@ -366,7 +483,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               },
             );
             if (picked != null) {
-              setState(() => _selectedDate = picked);
+              setState(() {
+                _selectedDate = picked;
+                _selectedTimeSlotIndex = 0;
+              });
             }
           },
           borderRadius: BorderRadius.circular(16),
@@ -388,54 +508,80 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             ),
           ),
         ).animate().fadeIn(delay: 100.ms),
-        
+
         const SizedBox(height: 28),
-        
+
         const Text('Chọn Khung Giờ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: List.generate(_timeSlots.length, (index) {
-            final slot = _timeSlots[index];
-            final isSelected = _selectedTimeSlotIndex == index;
-            return GestureDetector(
-              onTap: () => setState(() => _selectedTimeSlotIndex = index),
-              child: AnimatedContainer(
-                duration: 200.ms,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.primary : AppColors.cardBg,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
-                  boxShadow: isSelected ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
-                ),
-                child: Text(
-                  '${slot['slot']} (${slot['hours']}h)',
-                  style: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.textPrimary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
-                  ),
+        if (slots.isEmpty)
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
+            width: double.infinity,
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Center(
+              child: Text(
+                'Không có khung giờ trống cho ngày này',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
                 ),
               ),
-            );
-          }),
-        ).animate().fadeIn(delay: 200.ms),
+            ),
+          ).animate().fadeIn(delay: 200.ms)
+        else
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: List.generate(slots.length, (index) {
+              final slot = slots[index];
+              final isSelected = _selectedTimeSlotIndex == index;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedTimeSlotIndex = index),
+                child: AnimatedContainer(
+                  duration: 200.ms,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary : AppColors.cardBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
+                    boxShadow: isSelected ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
+                  ),
+                  child: Text(
+                    '${slot['slot']} (${slot['hours']}h)',
+                    style: TextStyle(
+                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ).animate().fadeIn(delay: 200.ms),
       ],
     );
   }
 
   Widget _buildStep3Checkout() {
-    final slot = _timeSlots[_selectedTimeSlotIndex];
-    final hours = slot['hours'] as int;
-    final basePrice = widget.item.pricePerHour * hours;
-    
-    double addonPrice = 0;
-    for (var a in _availableAddons) {
-      if (_selectedAddons.contains(a['name'])) addonPrice += a['price'];
+    final slots = _timeSlots;
+    if (slots.isEmpty) {
+      return const Center(
+        child: Text(
+          'Không có khung giờ trống cho ngày đã chọn',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+        ),
+      );
     }
-    
+    final safeIndex = _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
+    final slot = slots[safeIndex];
+    final hours = slot['hours'] as int;
+    final basePrice = _calculateBasePrice(slot, hours);
+    final addonPrice = _calculateAddonPrice();
     final totalPrice = basePrice + addonPrice;
 
     return ListView(
@@ -446,7 +592,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
         ).animate().fadeIn(),
         const SizedBox(height: 24),
-        
+
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -498,7 +644,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             ],
           ),
         ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
-        
+
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(20),

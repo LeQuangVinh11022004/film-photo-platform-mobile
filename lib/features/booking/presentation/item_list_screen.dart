@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
 import '../services/booking_api_service.dart';
 
@@ -57,7 +58,7 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
       final fromDateStr = _selectedFromDate != null ? DateFormat('yyyy-MM-dd').format(_selectedFromDate!) : null;
       final toDateStr = _selectedToDate != null ? DateFormat('yyyy-MM-dd').format(_selectedToDate!) : null;
 
-      final results = await Future.wait([
+      final results = await Future.wait<List<ResourceItemResponseDTO>>([
         _apiService.getStudios(fromDate: fromDateStr, toDate: toDateStr),
         _apiService.getDarkrooms(fromDate: fromDateStr, toDate: toDateStr),
       ]);

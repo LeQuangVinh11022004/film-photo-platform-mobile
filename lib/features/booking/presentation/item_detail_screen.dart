@@ -25,35 +25,35 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   int _selectedTimeSlotIndex = 0;
   final List<Map<String, dynamic>> _timeSlots = [
-    {'slot': '08:00 - 10:00', 'hours': 2},
-    {'slot': '10:00 - 12:00', 'hours': 2},
-    {'slot': '13:00 - 16:00', 'hours': 3},
-    {'slot': '16:00 - 19:00', 'hours': 3},
-    {'slot': '19:00 - 22:00', 'hours': 3},
+  {'slot': '08:00 - 10:00', 'hours': 2},
+  {'slot': '10:00 - 12:00', 'hours': 2},
+  {'slot': '13:00 - 16:00', 'hours': 3},
+  {'slot': '16:00 - 19:00', 'hours': 3},
+  {'slot': '19:00 - 22:00', 'hours': 3},
   ];
 
   final List<Map<String, dynamic>> _reviews = [
-    {
-      'name': 'Nguyễn Văn Minh',
-      'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      'rating': 5.0,
-      'date': '2 ngày trước',
-      'comment': 'Studio trang bị ánh sáng cực đỉnh! Đèn Profoto hoạt động rất ổn định, phông nền film vintage chụp portrait lên màu rất mịn. Rất đáng tiền!',
-    },
-    {
-      'name': 'Trần Thị Thu Hà',
-      'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-      'rating': 5.0,
-      'date': '1 tuần trước',
-      'comment': 'Không gian sạch sẽ, yên tĩnh, chủ studio thân thiện và nhiệt tình hỗ trợ kê đặt thiết bị. Chắc chắn sẽ quay lại đặt thường xuyên!',
-    },
-    {
-      'name': 'Lê Quốc Bảo',
-      'avatar': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
-      'rating': 4.8,
-      'date': '2 tuần trước',
-      'comment': 'Thiết bị rất mới, có sẵn nước uống và wifi nhanh. Trải nghiệm tuyệt vời cho nhiếp ảnh gia tự do.',
-    },
+  {
+  'name': 'Nguyễn Văn Minh',
+  'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+  'rating': 5.0,
+  'date': '2 ngày trước',
+  'comment': 'Studio trang bị ánh sáng cực đỉnh! Đèn Profoto hoạt động rất ổn định, phông nền film vintage chụp portrait lên màu rất mịn. Rất đáng tiền!',
+  },
+  {
+  'name': 'Trần Thị Thu Hà',
+  'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
+  'rating': 5.0,
+  'date': '1 tuần trước',
+  'comment': 'Không gian sạch sẽ, yên tĩnh, chủ studio thân thiện và nhiệt tình hỗ trợ kê đặt thiết bị. Chắc chắn sẽ quay lại đặt thường xuyên!',
+  },
+  {
+  'name': 'Lê Quốc Bảo',
+  'avatar': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
+  'rating': 4.8,
+  'date': '2 tuần trước',
+  'comment': 'Thiết bị rất mới, có sẵn nước uống và wifi nhanh. Trải nghiệm tuyệt vời cho nhiếp ảnh gia tự do.',
+  },
   ];
 
   @override
@@ -114,10 +114,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             const SizedBox(height: 16),
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(5, (index) => IconButton(
-                icon: const Icon(Icons.star_border_rounded, size: 40, color: Colors.amber),
-                onPressed: () {},
-              )),
+              children: List.generate(
+                5,
+                    (index) => IconButton(
+                  icon: const Icon(Icons.star_border_rounded, size: 40, color: Colors.amber),
+                  onPressed: () {},
+                ),
+              ),
             ),
             const SizedBox(height: 16),
             TextField(
@@ -156,7 +159,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Combine main image and preview images for the slider
     final List<String> allImages = [_item.imageUrl, ..._item.previewImages];
 
     return Scaffold(
@@ -164,9 +166,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       body: CustomScrollView(
         physics: const BouncingScrollPhysics(),
         slivers: [
-          // Elegant Sliver App Bar with Image Carousel
+          // Sliver App Bar with Image Carousel
           SliverAppBar(
-            expandedHeight: 350,
+            expandedHeight: 370,
             pinned: true,
             stretch: true,
             backgroundColor: context.bgColor,
@@ -174,7 +176,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
               padding: const EdgeInsets.all(8.0),
               child: Container(
                 decoration: BoxDecoration(
-                  color: context.cardColor.withValues(alpha: 0.8),
+                  color: context.cardColor.withValues(alpha: 0.85),
                   shape: BoxShape.circle,
                 ),
                 child: IconButton(
@@ -188,7 +190,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 padding: const EdgeInsets.all(8.0),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: context.cardColor.withValues(alpha: 0.8),
+                    color: context.cardColor.withValues(alpha: 0.85),
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
@@ -244,42 +246,44 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       );
                     }).toList(),
                   ),
-                  // Gradient Overlay for text readability if needed
+                  // Bottom gradient for indicator legibility
                   Positioned(
                     bottom: 0,
                     left: 0,
                     right: 0,
-                    height: 80,
+                    height: 96,
                     child: Container(
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           begin: Alignment.bottomCenter,
                           end: Alignment.topCenter,
                           colors: [
-                            Colors.black.withValues(alpha: 0.5),
+                            Colors.black.withValues(alpha: 0.55),
                             Colors.transparent,
                           ],
                         ),
                       ),
                     ),
                   ),
-                  // Pagination dots
+                  // Pagination dots positioned clear of the overlapping sheet curve
                   Positioned(
-                    bottom: 16,
+                    bottom: 40,
                     left: 0,
                     right: 0,
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: allImages.asMap().entries.map((entry) {
-                        return Container(
-                          width: _currentImageIndex == entry.key ? 24.0 : 8.0,
+                        final bool isActive = _currentImageIndex == entry.key;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 220),
+                          width: isActive ? 24.0 : 8.0,
                           height: 8.0,
                           margin: const EdgeInsets.symmetric(horizontal: 4.0),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(4),
-                            color: _currentImageIndex == entry.key
+                            color: isActive
                                 ? AppColors.primary
-                                : Colors.white.withValues(alpha: 0.6),
+                                : Colors.white.withValues(alpha: 0.65),
                           ),
                         );
                       }).toList(),
@@ -295,15 +299,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             child: Container(
               decoration: BoxDecoration(
                 color: context.bgColor,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+                borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
               ),
-              transform: Matrix4.translationValues(0, -32, 0),
+              transform: Matrix4.translationValues(0, -28, 0),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(24, 32, 24, 120), // Bottom padding for FAB
+                padding: const EdgeInsets.fromLTRB(24, 28, 24, 124),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Header Section (Name, Price, Location)
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -314,17 +317,21 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                               Text(
                                 _item.name,
                                 style: TextStyle(
-                                  fontSize: 26,
+                                  fontSize: 25,
                                   fontWeight: FontWeight.w800,
                                   color: context.textColor,
-                                  height: 1.2,
+                                  height: 1.25,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 10),
                               Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.location_on_rounded, color: AppColors.primary, size: 18),
-                                  const SizedBox(width: 4),
+                                  Padding(
+                                    padding: const EdgeInsets.only(top: 1),
+                                    child: Icon(Icons.location_on_rounded, color: AppColors.primary, size: 18),
+                                  ),
+                                  const SizedBox(width: 6),
                                   Expanded(
                                     child: Text(
                                       _item.location,
@@ -332,11 +339,34 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                         fontSize: 14,
                                         fontWeight: FontWeight.w500,
                                         color: context.textSecColor,
+                                        height: 1.4,
                                       ),
                                     ),
                                   ),
                                 ],
                               ),
+                              if (_item.providerName.isNotEmpty) ...[
+                                const SizedBox(height: 8),
+                                Row(
+                                  children: [
+                                    const Icon(Icons.storefront_rounded, size: 17, color: AppColors.primary),
+                                    const SizedBox(width: 6),
+                                    Expanded(
+                                      child: Text(
+                                        _item.providerName,
+                                        style: TextStyle(
+                                          fontSize: 14,
+                                          fontWeight: FontWeight.w600,
+                                          color: context.textColor,
+                                          height: 1.35,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -357,6 +387,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                   color: AppColors.primary,
                                 ),
                               ),
+                              const SizedBox(height: 2),
                               const Text(
                                 '/ giờ',
                                 style: TextStyle(
@@ -370,10 +401,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         ),
                       ],
                     ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.2, curve: Curves.easeOutQuad),
-                    
-                    const SizedBox(height: 24),
-                    
-                    // Rating & Community interactions
+
+                    const SizedBox(height: 18),
+
+                    // Rating & Capacity Row (Provider moved below location)
                     Row(
                       children: [
                         Container(
@@ -393,37 +424,16 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             ],
                           ),
                         ),
-                        if (_item.providerName.isNotEmpty) ...[
-                          const SizedBox(width: 12),
-                          Text('•', style: TextStyle(color: context.textSecColor)),
-                          const SizedBox(width: 12),
-                          Flexible(
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.storefront_rounded, size: 16, color: AppColors.primary),
-                                const SizedBox(width: 4),
-                                Flexible(
-                                  child: Text(
-                                    _item.providerName,
-                                    style: TextStyle(fontWeight: FontWeight.w600, color: context.textSecColor),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                        const SizedBox(width: 12),
-                        Text('•', style: TextStyle(color: context.textSecColor)),
-                        const SizedBox(width: 12),
+                        const SizedBox(width: 14),
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.people_alt_outlined, size: 16, color: AppColors.textSecondary),
-                            const SizedBox(width: 4),
-                            Text('Tối đa ${_item.capacity} người', style: TextStyle(fontWeight: FontWeight.w600, color: context.textSecColor)),
+                            const Icon(Icons.people_alt_outlined, size: 17, color: AppColors.textSecondary),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Tối đa ${_item.capacity} người',
+                              style: TextStyle(fontWeight: FontWeight.w600, color: context.textSecColor),
+                            ),
                           ],
                         ),
                       ],
@@ -431,7 +441,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
                     const SizedBox(height: 28),
 
-                    // Technical Specifications Grid (Kích thước, Chiều cao, Giờ mở cửa)
+                    // Technical Specifications Grid
                     if (_item.lengthM > 0 || _item.operatingHours.isNotEmpty || _item.artisticStyle.isNotEmpty) ...[
                       Text(
                         'Thông số & Đặc điểm không gian',
@@ -443,7 +453,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       ).animate().fadeIn(delay: 150.ms),
                       const SizedBox(height: 14),
                       Container(
-                        padding: const EdgeInsets.all(16),
+                        padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
                           color: context.cardColor,
                           borderRadius: BorderRadius.circular(16),
@@ -458,7 +468,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 label: 'Kích thước',
                                 value: '${_item.lengthM}m × ${_item.widthM}m (Trần cao ${_item.heightM}m)',
                               ),
-                              const Divider(height: 20),
+                              const Divider(height: 22),
                             ],
                             if (_item.operatingHours.isNotEmpty) ...[
                               _buildSpecRow(
@@ -467,7 +477,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 label: 'Giờ hoạt động',
                                 value: _item.operatingHours,
                               ),
-                              const Divider(height: 20),
+                              const Divider(height: 22),
                             ],
                             if (_item.artisticStyle.isNotEmpty) ...[
                               _buildSpecRow(
@@ -477,7 +487,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 value: _item.artisticStyle,
                               ),
                               if (_item.supportedProcesses.isNotEmpty || _item.lightingConditions.isNotEmpty)
-                                const Divider(height: 20),
+                                const Divider(height: 22),
                             ],
                             if (_item.supportedProcesses.isNotEmpty) ...[
                               _buildSpecRow(
@@ -486,7 +496,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 label: 'Quy trình tráng rọi',
                                 value: _item.supportedProcesses,
                               ),
-                              if (_item.lightingConditions.isNotEmpty) const Divider(height: 20),
+                              if (_item.lightingConditions.isNotEmpty) const Divider(height: 22),
                             ],
                             if (_item.lightingConditions.isNotEmpty) ...[
                               _buildSpecRow(
@@ -511,13 +521,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         color: context.textColor,
                       ),
                     ).animate().fadeIn(delay: 200.ms),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
                     Wrap(
                       spacing: 12,
                       runSpacing: 12,
                       children: _item.amenities.map((amenity) {
                         return Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                           decoration: BoxDecoration(
                             color: context.cardColor,
                             borderRadius: BorderRadius.circular(12),
@@ -545,7 +555,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       }).toList(),
                     ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
 
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 28),
 
                     // Description Section
                     Text(
@@ -562,7 +572,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       style: TextStyle(
                         fontSize: 15,
                         color: context.textSecColor,
-                        height: 1.6,
+                        height: 1.65,
                       ),
                     ).animate().fadeIn(delay: 500.ms),
 
@@ -594,9 +604,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                               child: Text(
                                 _item.usagePolicies,
                                 style: TextStyle(
-                                  fontSize: 13,
+                                  fontSize: 13.5,
                                   color: context.textColor,
-                                  height: 1.5,
+                                  height: 1.55,
                                 ),
                               ),
                             ),
@@ -604,8 +614,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         ),
                       ).animate().fadeIn(delay: 600.ms),
                     ],
-                    
-                    const SizedBox(height: 40),
+
+                    const SizedBox(height: 32),
                     Divider(color: context.borderColor),
                     const SizedBox(height: 24),
 
@@ -631,62 +641,62 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         ),
                       ],
                     ).animate().fadeIn(delay: 600.ms),
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 14),
 
                     // Review List Cards
                     ..._reviews.map((rev) => Container(
-                          margin: const EdgeInsets.only(bottom: 16),
-                          padding: const EdgeInsets.all(20),
-                          decoration: BoxDecoration(
-                            color: context.cardColor,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: context.borderColor),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: context.cardColor,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: context.borderColor),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
                             children: [
-                              Row(
-                                children: [
-                                  CircleAvatar(
-                                    radius: 20,
-                                    backgroundImage: NetworkImage(rev['avatar']!),
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                              CircleAvatar(
+                                radius: 20,
+                                backgroundImage: NetworkImage(rev['avatar'] as String),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      rev['name'] as String,
+                                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: context.textColor),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
                                       children: [
-                                        Text(
-                                          rev['name']!,
-                                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: context.textColor),
-                                        ),
-                                        const SizedBox(height: 4),
-                                        Row(
-                                          children: [
-                                            ...List.generate(
-                                              rev['rating'].toInt(),
+                                        ...List.generate(
+                                          (rev['rating'] as num).toInt(),
                                               (i) => const Icon(Icons.star_rounded, color: Colors.amber, size: 14),
-                                            ),
-                                            const SizedBox(width: 8),
-                                            Text(
-                                              rev['date']!,
-                                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: context.textSecColor),
-                                            ),
-                                          ],
+                                        ),
+                                        const SizedBox(width: 8),
+                                        Text(
+                                          rev['date'] as String,
+                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500, color: context.textSecColor),
                                         ),
                                       ],
                                     ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(height: 12),
-                              Text(
-                                rev['comment']!,
-                                style: TextStyle(fontSize: 14, color: context.textColor, height: 1.5),
+                                  ],
+                                ),
                               ),
                             ],
                           ),
-                        )).toList().animate().fadeIn(delay: 700.ms).slideY(begin: 0.1),
+                          const SizedBox(height: 12),
+                          Text(
+                            rev['comment'] as String,
+                            style: TextStyle(fontSize: 14, color: context.textColor, height: 1.55),
+                          ),
+                        ],
+                      ),
+                    )).toList().animate().fadeIn(delay: 700.ms).slideY(begin: 0.1),
                   ],
                 ),
               ),
@@ -696,10 +706,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       ),
       // Floating Bottom Bar for Booking
       bottomSheet: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
         decoration: BoxDecoration(
           color: context.cardColor,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withValues(alpha: 0.08),
@@ -717,6 +727,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Giá chỉ từ', style: TextStyle(fontSize: 12, color: context.textSecColor)),
+                    const SizedBox(height: 2),
                     Text(
                       '${_item.pricePerHour.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ',
                       style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: context.textColor),
@@ -724,10 +735,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   ],
                 ),
               ),
+              const SizedBox(width: 12),
               Expanded(
                 flex: 2,
                 child: SizedBox(
-                  height: 56,
+                  height: 54,
                   child: PrimaryButton(
                     text: 'Đặt Ngay',
                     onPressed: _showBookingDialog,
@@ -762,10 +774,10 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                 label,
                 style: TextStyle(fontSize: 12, color: context.textSecColor, fontWeight: FontWeight.w500),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 4),
               Text(
                 value,
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textColor, height: 1.3),
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textColor, height: 1.35),
               ),
             ],
           ),
