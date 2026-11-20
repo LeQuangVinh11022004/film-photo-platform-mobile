@@ -42,9 +42,20 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      # 5. Build file APK (chế độ release, tự động giảm dung lượng và tối ưu mã nguồn)
+      # 4b. Giải mã file Keystore (Chữ ký ứng dụng) từ GitHub Secrets
+      # Bước này giúp ứng dụng có định danh chính thức, không bị lỗi "Ứng dụng độc hại" và có thể đè Update
+      - name: Decode Keystore
+        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
+
+      # 5. Build file APK với Release Keystore (Nếu có)
       - name: Build APK
         run: flutter build apk --release -t lib/app/main.dart
+        env:
+          KEYSTORE_PATH: upload-keystore.jks
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       # 6a. NẾU CÓ TAG (VD: git push origin v1.0.0): Tự động tạo Release và đính kèm APK
       - name: Create GitHub Release
