@@ -44,12 +44,12 @@ jobs:
 
       # 4b. Giải mã file Keystore (Chữ ký ứng dụng) từ GitHub Secrets
       - name: Decode Keystore
-        if: ${{ env.HAS_SECRET == 'true' }}
         env:
-          HAS_SECRET: ${{ secrets.KEYSTORE_BASE64 != '' }}
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          if [ -n "$KEYSTORE_BASE64" ]; then
+            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
+          fi
 
       # 5. Build file APK với Release Keystore (Nếu có)
       - name: Build APK
