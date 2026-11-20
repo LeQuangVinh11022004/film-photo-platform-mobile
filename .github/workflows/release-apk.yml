@@ -45,7 +45,9 @@ jobs:
       # 4b. Giải mã file Keystore (Chữ ký ứng dụng) từ GitHub Secrets
       # Bước này giúp ứng dụng có định danh chính thức, không bị lỗi "Ứng dụng độc hại" và có thể đè Update
       - name: Decode Keystore
-        if: ${{ secrets.KEYSTORE_BASE64 != '' }}
+        if: "${{ env.HAS_SECRET == 'true' }}"
+        env:
+          HAS_SECRET: ${{ secrets.KEYSTORE_BASE64 != '' }}
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > android/app/upload-keystore.jks
 
       # 5. Build file APK với Release Keystore (Nếu có)
