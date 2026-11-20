@@ -5,7 +5,7 @@ import 'package:http/io_client.dart';
 
 void main() async {
   // Config
-  const String baseUrl = 'https://localhost:7104';
+  const String baseUrl = 'https://filmbooking-api-h7bghwcydwb8eecn.japaneast-01.azurewebsites.net';
   
   // Accept self-signed certificates
   final HttpClient httpClient = HttpClient()

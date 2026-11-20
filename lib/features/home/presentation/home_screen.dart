@@ -322,7 +322,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final experienceController = TextEditingController(text: 'Beginner');
 
     bool isLoading = false;
-    String? aiResponseText;
+    bool showForm = true;
+    
+    // Lưu trữ tin nhắn dưới dạng: { 'isUser': bool, 'text': String }
+    List<Map<String, dynamic>> messages = [
+      {
+        'isUser': false,
+        'text': 'Chào bạn! Mình là Trợ lý AI Nhiếp ảnh. Hãy cho mình biết thông tin buổi chụp để mình gợi ý thông số và thiết bị phù hợp nhé! 📸'
+      }
+    ];
 
     showModalBottomSheet(
       context: context,
@@ -338,126 +346,180 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).viewInsets.bottom,
-              left: 24,
-              right: 24,
-              top: 24,
+              top: 16,
             ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Header (Kéo xuống)
                 Center(
                   child: Container(
                     width: 40,
                     height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
                     decoration: BoxDecoration(color: context.borderColor, borderRadius: BorderRadius.circular(2)),
                   ),
                 ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    const Icon(Icons.auto_awesome_rounded, color: AppColors.primary),
-                    const SizedBox(width: 8),
-                    Text('Trợ lý AI Nhiếp ảnh', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor)),
-                  ],
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.auto_awesome_rounded, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text('Trợ lý AI', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textColor)),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 4),
-                Text('Nhập thông tin buổi chụp để AI tư vấn thông số & gợi ý.', style: TextStyle(fontSize: 13, color: context.textSecColor)),
-                const SizedBox(height: 20),
+                const Divider(height: 30),
+                
+                // Khung chat
                 Expanded(
-                  child: aiResponseText != null 
-                    ? SingleChildScrollView(
-                        physics: const BouncingScrollPhysics(),
-                        child: Container(
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    physics: const BouncingScrollPhysics(),
+                    itemCount: messages.length + (showForm ? 1 : 0) + (isLoading ? 1 : 0),
+                    itemBuilder: (context, index) {
+                      // Tin nhắn bình thường
+                      if (index < messages.length) {
+                        final msg = messages[index];
+                        final isUser = msg['isUser'] as bool;
+                        return Align(
+                          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.8),
+                            decoration: BoxDecoration(
+                              color: isUser ? AppColors.primary : context.inputColor,
+                              borderRadius: BorderRadius.only(
+                                topLeft: const Radius.circular(20),
+                                topRight: const Radius.circular(20),
+                                bottomLeft: Radius.circular(isUser ? 20 : 0),
+                                bottomRight: Radius.circular(isUser ? 0 : 20),
+                              ),
+                            ),
+                            child: Text(
+                              msg['text'],
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: isUser ? Colors.white : context.textColor,
+                                height: 1.5,
+                              ),
+                            ),
                           ),
-                          child: Text(
-                            aiResponseText!,
-                            style: TextStyle(fontSize: 15, color: context.textColor, height: 1.5),
-                          ),
-                        ),
-                      )
-                    : ListView(
-                        physics: const BouncingScrollPhysics(),
-                        children: [
-                          CustomTextField(
-                            hintText: 'Chủ đề (VD: Chân dung vintage)',
-                            controller: themeController,
-                            prefixIcon: Icons.style_outlined,
-                          ),
-                          const SizedBox(height: 16),
-                          CustomTextField(
-                            hintText: 'Địa điểm (VD: Studio)',
-                            controller: locationController,
-                            prefixIcon: Icons.location_on_outlined,
-                          ),
-                          const SizedBox(height: 16),
-                          CustomTextField(
-                            hintText: 'Ánh sáng (VD: Ánh sáng cửa sổ chiều)',
-                            controller: lightController,
-                            prefixIcon: Icons.wb_sunny_outlined,
-                          ),
-                          const SizedBox(height: 16),
-                          CustomTextField(
-                            hintText: 'Thiết bị (VD: Máy film 35mm, lens 50mm)',
-                            controller: equipmentController,
-                            prefixIcon: Icons.camera_alt_outlined,
-                          ),
-                          const SizedBox(height: 16),
-                          CustomTextField(
-                            hintText: 'Kinh nghiệm (VD: Beginner)',
-                            controller: experienceController,
-                            prefixIcon: Icons.person_outline_rounded,
-                          ),
-                        ],
-                      ),
-                ),
-                const SizedBox(height: 16),
-                if (aiResponseText == null)
-                  PrimaryButton(
-                    text: 'Nhận Tư Vấn',
-                    isLoading: isLoading,
-                    onPressed: () async {
-                      setModalState(() => isLoading = true);
-                      
-                      final result = await _aiApiService.getPhotographyGuide(
-                        theme: themeController.text,
-                        location: locationController.text,
-                        availableLight: lightController.text,
-                        equipment: equipmentController.text,
-                        experienceLevel: experienceController.text,
-                      );
-                      
-                      setModalState(() => isLoading = false);
-                      if (!mounted) return;
-                      
-                      if (result['success']) {
-                        setModalState(() {
-                          // Tuỳ cấu trúc trả về, giả sử API C# trả về chuỗi JSON chứa field "guide" hoặc "suggestions" hoặc trả về dict trực tiếp.
-                          aiResponseText = result['data']['guide'] ?? result['data']['message'] ?? result['data'].toString();
-                        });
-                      } else {
-                        toastification.show(
-                          context: context,
-                          type: ToastificationType.error,
-                          title: const Text('Lỗi kết nối'),
-                          description: Text(result['message']),
-                          autoCloseDuration: const Duration(seconds: 3),
                         );
                       }
+
+                      // Khối Loading
+                      if (isLoading && index == messages.length) {
+                        return Align(
+                          alignment: Alignment.centerLeft,
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                            decoration: BoxDecoration(
+                              color: context.inputColor,
+                              borderRadius: const BorderRadius.only(
+                                topLeft: Radius.circular(20),
+                                topRight: Radius.circular(20),
+                                bottomRight: Radius.circular(20),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                                SizedBox(width: 12),
+                                Text('AI đang suy nghĩ...', style: TextStyle(fontSize: 13, color: AppColors.primary, fontStyle: FontStyle.italic)),
+                              ],
+                            ),
+                          ),
+                        );
+                      }
+
+                      // Khối Form nhập liệu
+                      if (showForm && index == messages.length) {
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 24, top: 8),
+                          padding: const EdgeInsets.all(20),
+                          decoration: BoxDecoration(
+                            color: context.cardColor,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: context.borderColor),
+                            boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.03), blurRadius: 10, offset: const Offset(0, 4))],
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Cung cấp thông tin', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: context.textColor)),
+                              const SizedBox(height: 16),
+                              CustomTextField(hintText: 'Chủ đề (VD: Chân dung)', controller: themeController, prefixIcon: Icons.style_outlined),
+                              const SizedBox(height: 12),
+                              CustomTextField(hintText: 'Địa điểm (VD: Studio)', controller: locationController, prefixIcon: Icons.location_on_outlined),
+                              const SizedBox(height: 12),
+                              CustomTextField(hintText: 'Ánh sáng (VD: Cửa sổ)', controller: lightController, prefixIcon: Icons.wb_sunny_outlined),
+                              const SizedBox(height: 12),
+                              CustomTextField(hintText: 'Thiết bị (VD: Máy 35mm)', controller: equipmentController, prefixIcon: Icons.camera_alt_outlined),
+                              const SizedBox(height: 12),
+                              CustomTextField(hintText: 'Kinh nghiệm (VD: Mới)', controller: experienceController, prefixIcon: Icons.person_outline_rounded),
+                              const SizedBox(height: 20),
+                              PrimaryButton(
+                                text: 'Gửi yêu cầu',
+                                onPressed: () async {
+                                  // Hiển thị câu hỏi của user
+                                  final userText = 'Chủ đề: ${themeController.text}\nTại: ${locationController.text}\nÁnh sáng: ${lightController.text}\nThiết bị: ${equipmentController.text}\nLevel: ${experienceController.text}';
+                                  setModalState(() {
+                                    showForm = false;
+                                    messages.add({'isUser': true, 'text': userText});
+                                    isLoading = true;
+                                  });
+
+                                  // Gọi API
+                                  final result = await _aiApiService.getPhotographyGuide(
+                                    theme: themeController.text,
+                                    location: locationController.text,
+                                    availableLight: lightController.text,
+                                    equipment: equipmentController.text,
+                                    experienceLevel: experienceController.text,
+                                  );
+
+                                  if (!mounted) return;
+
+                                  setModalState(() {
+                                    isLoading = false;
+                                    if (result['success']) {
+                                      final aiReply = result['data']['guide'] ?? result['data']['message'] ?? result['data'].toString();
+                                      messages.add({'isUser': false, 'text': aiReply});
+                                    } else {
+                                      messages.add({'isUser': false, 'text': 'Rất tiếc, đã xảy ra lỗi: ${result['message']}'});
+                                    }
+                                  });
+                                },
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+
+                      return const SizedBox.shrink();
                     },
                   ),
-                if (aiResponseText != null)
-                  PrimaryButton(
-                    text: 'Tư vấn lại',
-                    onPressed: () {
-                      setModalState(() => aiResponseText = null);
-                    },
+                ),
+
+                // Nút Hỏi Lại (khi đã chat xong)
+                if (!showForm && !isLoading)
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: PrimaryButton(
+                      text: 'Tư vấn lại từ đầu',
+                      onPressed: () {
+                        setModalState(() {
+                          messages.clear();
+                          messages.add({'isUser': false, 'text': 'Bạn muốn hỏi thêm gì nào? Hãy điền thông tin mới nhé!'});
+                          showForm = true;
+                        });
+                      },
+                    ),
                   ),
-                const SizedBox(height: 16),
               ],
             ),
           );
@@ -509,13 +571,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       backgroundColor: context.bgColor,
-      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _showAIGuideModal,
-        backgroundColor: AppColors.primary,
-        icon: const Icon(Icons.auto_awesome_rounded, color: Colors.white),
-        label: const Text('AI Tư vấn', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-      ),
       body: SafeArea(
         child: RefreshIndicator(
           color: AppColors.primary,
