@@ -2,6 +2,7 @@
 import 'package:carousel_slider/carousel_slider.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../../booking/models/booking_api_models.dart';
 import '../../booking/models/booking_item.dart';
 import '../../booking/services/booking_api_service.dart';
 import '../../notifications/models/notification_item.dart';
@@ -34,14 +35,14 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _fetchApiResources() async {
     setState(() => _isLoadingItems = true);
     try {
-      final results = await Future.wait([
+      final results = await Future.wait<List<ResourceItemResponseDTO>>([
         _bookingApiService.getStudios(),
         _bookingApiService.getDarkrooms(),
       ]);
 
       final studios = results[0].map((e) => e.toBookingItem()).toList();
       final darkrooms = results[1].map((e) => e.toBookingItem()).toList();
-      final combined = [...studios, ...darkrooms];
+      final List<BookingItem> combined = [...studios, ...darkrooms];
 
       if (mounted) {
         setState(() {
@@ -95,7 +96,9 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   // Filter Modal State
-  double _maxPriceFilter = 5000000;
+  static const double _minPriceFilter = 100000;
+  static const double _maxPriceLimit = 5000000; // Hoặc 5000000 nếu muốn kéo tới 5 triệu
+  double _maxPriceFilter = _maxPriceLimit;
   double _minRatingFilter = 0.0;
   String _sortBy = 'default';
 
@@ -124,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
       list = list.where((e) => e.category == BookingCategory.equipment).toList();
     }
 
-    if (_maxPriceFilter < 5000000) {
+    if (_maxPriceFilter < _maxPriceLimit) {
       list = list.where((e) => e.pricePerHour <= _maxPriceFilter).toList();
     }
     if (_minRatingFilter > 0) {
@@ -184,7 +187,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     TextButton(
                       onPressed: () {
                         setModalState(() {
-                          _maxPriceFilter = 500000;
+                          _maxPriceFilter = _maxPriceLimit;
                           _minRatingFilter = 0.0;
                           _sortBy = 'default';
                         });
@@ -201,9 +204,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
                 ),
                 Slider(
-                  value: _maxPriceFilter,
-                  min: 100000,
-                  max: 500000,
+                  value: _maxPriceFilter.clamp(_minPriceFilter, _maxPriceLimit),
+                  min: _minPriceFilter,
+                  max: _maxPriceLimit,
                   divisions: 8,
                   activeColor: AppColors.primary,
                   label: '${_maxPriceFilter.toInt()}đ',

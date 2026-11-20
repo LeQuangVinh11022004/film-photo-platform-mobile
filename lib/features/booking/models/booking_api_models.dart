@@ -374,3 +374,38 @@ class ResourceItemResponseDTO {
     );
   }
 }
+
+class DepositPaymentResponseDTO {
+  final String transactionId;
+  final String bookingId;
+  final num amount;
+  final String? depositDueAt;
+  final String currency;
+  final String paymentMethod;
+  final String status;
+  final String? paymentUrl;
+
+  DepositPaymentResponseDTO({
+    required this.transactionId,
+    required this.bookingId,
+    required this.amount,
+    this.depositDueAt,
+    required this.currency,
+    required this.paymentMethod,
+    required this.status,
+    this.paymentUrl,
+  });
+
+  factory DepositPaymentResponseDTO.fromJson(Map<String, dynamic> json) {
+    return DepositPaymentResponseDTO(
+      transactionId: json['transactionId']?.toString() ?? '',
+      bookingId: json['bookingId']?.toString() ?? '',
+      amount: json['amount'] as num? ?? 0,
+      depositDueAt: json['depositDueAt']?.toString(),
+      currency: json['currency']?.toString() ?? 'VND',
+      paymentMethod: json['paymentMethod']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      paymentUrl: json['paymentUrl']?.toString(),
+    );
+  }
+}
