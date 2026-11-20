@@ -32,14 +32,9 @@ class ApiClient {
     return _client!;
   }
 
-  /// Địa chỉ Base URL mặc định (Tự động đổi IP cho Android Emulator)
+  /// Địa chỉ Base URL (Đã Deploy lên Azure)
   static String get defaultBaseUrl {
-    if (!kIsWeb && Platform.isAndroid) {
-      // 10.0.2.2 là địa chỉ map tới localhost của máy chủ từ Android Emulator
-      // Vì đang dùng IIS Express, nên dùng HTTPS port thay vì HTTP bị chặn 307
-      return 'https://10.0.2.2:7104'; 
-    }
-    return 'https://localhost:7104'; 
+    return 'https://filmbooking-api-h7bghwcydwb8eecn.japaneast-01.azurewebsites.net'; 
   }
 
   String baseUrl = defaultBaseUrl;

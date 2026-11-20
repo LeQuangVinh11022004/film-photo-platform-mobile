@@ -1,5 +1,7 @@
 ﻿import 'package:flutter/material.dart';
+import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
+import '../services/ai_api_service.dart';
 
 class AIAssistantScreen extends StatefulWidget {
   const AIAssistantScreen({super.key});
@@ -11,33 +13,26 @@ class AIAssistantScreen extends StatefulWidget {
 class _AIAssistantScreenState extends State<AIAssistantScreen> {
   final TextEditingController _messageController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  final AiApiService _aiApiService = AiApiService();
+  
+  bool _isLoading = false;
 
   final List<Map<String, dynamic>> _messages = [
     {
       'isUser': false,
-      'text': 'Xin chào! Tôi là Trợ Lý Nhiếp Ảnh Film AI. Bạn cần hỗ trợ về khẩu độ, chọn loại film, tỷ lệ pha hóa chất D-76 hay kỹ thuật phòng tối?',
+      'text': 'Xin chào! Tôi là Trợ Lý Nhiếp Ảnh Film AI. Hãy chia sẻ thông số buổi chụp (chủ đề, địa điểm, ánh sáng...) để tôi gợi ý cách set up phù hợp nhất nhé!',
       'time': '10:00 AM',
-    },
-    {
-      'isUser': true,
-      'text': 'Nên dùng hóa chất Kodak D-76 hay ILFORD ID-11 để tráng film Kodak Tri-X 400?',
-      'time': '10:01 AM',
-    },
-    {
-      'isUser': false,
-      'text': 'Đối với film Kodak Tri-X 400 B&W:\n\n1. **Kodak D-76 (Pha 1:1)**: Mang lại độ tương phản vừa phải, dải xám mềm mại, chi tiết vùng tối rất rõ.\n2. **ILFORD ID-11**: Công thức tương đương D-76, cho hạt hạt film mịn và độ sắc nét cao.\n\n👉 Khuyên dùng D-76 tỷ lệ 1:1 ở nhiệt độ 20°C trong 9 phút 45 giây.',
-      'time': '10:01 AM',
     },
   ];
 
   final List<String> _suggestedQuestions = [
+    'Chân dung vintage ngoài trời',
+    'Chụp mẫu trong Studio',
+    'Chụp phố đêm với Kodak Portra',
     'Quy tắc Sunny 16?',
-    'Cách pha D-76 1:1',
-    'Kodak Gold vs ColorPlus',
-    'Khẩu độ chụp chân dung',
   ];
 
-  void _sendMessage(String text) {
+  Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;
 
     setState(() {
@@ -46,23 +41,42 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
         'text': text.trim(),
         'time': 'Vừa xong',
       });
+      _isLoading = true;
     });
 
     _messageController.clear();
     _scrollToBottom();
 
-    // AI Simulated Response
-    Future.delayed(const Duration(milliseconds: 1200), () {
-      if (!mounted) return;
-      setState(() {
+    // Call Real API
+    final result = await _aiApiService.getPhotographyGuide(
+      theme: text.trim(),
+      location: 'Chưa xác định',
+      availableLight: 'Ánh sáng tự nhiên',
+      equipment: 'Máy 35mm',
+      experienceLevel: 'Beginner',
+    );
+
+    if (!mounted) return;
+
+    setState(() {
+      _isLoading = false;
+      if (result['success']) {
+        final aiReply = result['data']['guide'] ?? result['data']['message'] ?? result['data'].toString();
         _messages.add({
           'isUser': false,
-          'text': 'AI Response: Dựa trên tri thức Nhiếp ảnh Film chuyên sâu:\n\nCảm ơn bạn đã hỏi về "${text.trim()}". Đối với câu hỏi này, chuyên gia khuyến nghị chú ý nhiệt độ thuốc 20°C và canh chuẩn tốc độ màn trập.',
+          'text': aiReply,
           'time': 'Vừa xong',
         });
-      });
-      _scrollToBottom();
+      } else {
+        _messages.add({
+          'isUser': false,
+          'text': 'Rất tiếc, đã xảy ra lỗi: ${result['message']}',
+          'time': 'Vừa xong',
+        });
+      }
     });
+    
+    _scrollToBottom();
   }
 
   void _scrollToBottom() {
@@ -123,8 +137,35 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
               controller: _scrollController,
               padding: EdgeInsets.all(20),
               physics: const BouncingScrollPhysics(),
-              itemCount: _messages.length,
+              itemCount: _messages.length + (_isLoading ? 1 : 0),
               itemBuilder: (context, index) {
+                // Khối Loading
+                if (index == _messages.length && _isLoading) {
+                  return Align(
+                    alignment: Alignment.centerLeft,
+                    child: Container(
+                      margin: const EdgeInsets.only(bottom: 16),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                      decoration: BoxDecoration(
+                        color: context.inputColor,
+                        borderRadius: const BorderRadius.only(
+                          topLeft: Radius.circular(20),
+                          topRight: Radius.circular(20),
+                          bottomRight: Radius.circular(20),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary)),
+                          SizedBox(width: 12),
+                          Text('AI đang phân tích...', style: TextStyle(fontSize: 13, color: AppColors.primary, fontStyle: FontStyle.italic)),
+                        ],
+                      ),
+                    ),
+                  );
+                }
+
                 final msg = _messages[index];
                 final isUser = msg['isUser'] as bool;
 
