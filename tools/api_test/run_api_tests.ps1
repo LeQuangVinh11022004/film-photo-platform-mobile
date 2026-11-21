@@ -220,5 +220,114 @@ foreach ($r in $results) {
 Set-Content -Path (Join-Path $OutDir "SUMMARY.md") -Value ($md -join "`n") -Encoding UTF8
 $results | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $OutDir "summary.json") -Encoding UTF8
 
+# =====================================================================
+# TAO FILE LOG TONG HOP DUY NHAT (summary.log) BANG POWERSHELL THUAN (100% KHONG DUNG PYTHON)
+# =====================================================================
+$w = 110
+$sepDouble = "=" * $w
+$sepSingle = "-" * $w
+
+$pctPass = if ($results.Count -gt 0) { [math]::Round(($pass / $results.Count) * 100, 1) } else { 0 }
+$pctFail = if ($results.Count -gt 0) { [math]::Round(($fail / $results.Count) * 100, 1) } else { 0 }
+
+$logLines = [System.Collections.Generic.List[string]]::new()
+$logLines.Add($sepDouble)
+$logLines.Add("                    BÁO CÁO TOÀN DIỆN KIỂM THỬ API - FILM PHOTOGRAPHY PLATFORM")
+$logLines.Add("                             CONSOLIDATED API TEST EXECUTION REPORT")
+$logLines.Add($sepDouble)
+$logLines.Add(" Thoi gian thuc thi : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
+$logLines.Add(" Base URL Backend   : $BaseUrl")
+$logLines.Add(" Tai khoan kiem thu : $email (Role: PHOTOGRAPHER)")
+$logLines.Add(" Tong so kiem thu   : $($results.Count) endpoints")
+$logLines.Add(" Ket qua tong quan  : [PASS]: $pass/$($results.Count) ($pctPass%)   |   [FAIL/ERROR]: $fail/$($results.Count) ($pctFail%)")
+$logLines.Add($sepDouble)
+$logLines.Add("")
+$logLines.Add($sepSingle)
+$logLines.Add(" [PHẦN 1] BẢNG TỔNG HỢP KẾT QUẢ TẤT CẢ CÁC API (API TEST OVERVIEW)")
+$logLines.Add($sepSingle)
+
+$fmt = "{0,-3} | {1,-7} | {2,-6} | {3,-4} | {4,-4} | {5,-5} | {6,-45} | {7}"
+$logLines.Add([string]::Format($fmt, "#", "KẾT QUẢ", "METHOD", "HTTP", "EXP", "MS", "ENDPOINT", "MÃ NGUỒN APP SỬ DỤNG"))
+$logLines.Add($sepSingle)
+
+foreach ($r in $results) {
+  $p = if ($r.Path.Length -gt 44) { $r.Path.Substring(0, 41) + "..." } else { $r.Path }
+  $u = if ($r.UsedBy.Length -gt 30) { $r.UsedBy.Substring(0, 27) + "..." } else { $r.UsedBy }
+  $logLines.Add([string]::Format($fmt, $r.No, $r.Verdict, $r.Method, $r.Status, $r.Expected, $r.Ms, $p, $u))
+}
+
+$logLines.Add($sepSingle)
+$logLines.Add("")
+$logLines.Add($sepDouble)
+$logLines.Add(" [PHẦN 2] PHÂN TÍCH CHUYÊN SÂU HỆ THỐNG THANH TOÁN (PAYMENT SYSTEM DEEP DIVE)")
+$logLines.Add($sepDouble)
+$logLines.Add(@"
+1. THỰC TRẠNG API THANH TOÁN TRÊN BACKEND (Azure):
+   * Backend HIỆN TẠI CHỈ HỖ TRỢ VNPAY:
+     - Endpoint chuẩn: POST /api/photographer/bookings/{bookingId}/deposit-payment
+     - Request body hợp lệ: { "paymentMethod": "VNPAY" }
+     - Trả về: HTTP 200 OK kèm URL sandbox VNPay hoàn chỉnh.
+   * Backend TỪ CHỐI MoMo và VietQR:
+     - Khi gửi paymentMethod = "MOMO" hoặc "VIETQR", Backend trả về HTTP 400 Bad Request
+       với thông báo lỗi: 'paymentMethod must be VNPAY'.
+
+2. ĐỘ LỆCH GIỮA CLIENT (FLUTTER APP) VÀ BACKEND:
+   * payment_api_service.dart gọi sai đường dẫn:
+     - App đang gọi: POST /api/payments/vnpay/create và POST /api/payments/momo/create
+     - Cả 2 route này trên Azure đều trả về HTTP 404 NOT FOUND vì Backend không khai báo route này.
+   * Xử lý callback thanh toán:
+     - payment_api_service.dart gọi GET /api/payments/vnpay/return với tham số giả lập không có vnp_SecureHash,
+       dẫn tới Backend trả về HTTP 400 'InvalidNotification: Required VNPay callback fields are missing'.
+   * UI hiện tại (payment_screen.dart):
+     - Đang hiển thị cả 3 nút: VNPay, MoMo, VietQR.
+     - Khi gọi API lỗi, màn hình bật Modal offline fallback giả lập thành công nên người dùng tưởng vẫn chạy được.
+
+3. HÀNH ĐỘNG CẦN SỬA ĐỂ THANH TOÁN HOẠT ĐỘNG THỰC TẾ:
+   (1) payment_screen.dart & booking_flow: Chuyển sang gọi booking_api_service.dart -> payDeposit(bookingId, paymentMethod: 'VNPAY').
+   (2) Tạm ẩn lựa chọn MoMo và VietQR trên UI cho đến khi Backend bổ sung tích hợp.
+   (3) Sau khi nhận được paymentUrl từ VNPay, mở Webview / InAppBrowser để khách hàng quẹt thẻ thử nghiệm trên cổng VNPay Sandbox.
+"@)
+$logLines.Add($sepDouble)
+$logLines.Add(" [PHẦN 3] CHI TIẾT REQUEST & RESPONSE TOÀN BỘ $($results.Count) API ĐÃ KIỂM THỬ")
+$logLines.Add($sepDouble)
+$logLines.Add("")
+
+foreach ($r in $results) {
+  $logLines.Add($sepSingle)
+  $logLines.Add(" >>> [API $($r.No)/$($results.Count)] $($r.Name) | KẾT QUẢ: [$($r.Verdict)] (HTTP $($r.Status) - Kỳ vọng: $($r.Expected)) - Thời gian: $($r.Ms)ms")
+  if ($r.UsedBy) { $logLines.Add("     Nơi gọi trong App: $($r.UsedBy)") }
+  if ($r.Note) { $logLines.Add("     Ghi chú          : $($r.Note)") }
+  $logLines.Add($sepSingle)
+
+  $individualLogPath = Join-Path $OutDir $r.Log
+  if (Test-Path $individualLogPath) {
+    $rawLines = Get-Content -Path $individualLogPath -Encoding UTF8
+    $filtered = @()
+    foreach ($line in $rawLines) {
+      if ($line -like "====================*") { continue }
+      if ($line -match "^(Name|Time|Result|Duration|Used by|Note)\s*:") { continue }
+      $filtered += $line
+    }
+    $logLines.Add(($filtered -join "`n").Trim())
+  } else {
+    $logLines.Add("Method : $($r.Method)")
+    $logLines.Add("Path   : $($r.Path)")
+  }
+  $logLines.Add("")
+  $logLines.Add("")
+}
+
+$logLines.Add($sepDouble)
+$logLines.Add("                                        HẾT BÁO CÁO")
+$logLines.Add($sepDouble)
+
+$summaryContent = $logLines -join "`n"
+
+# Luu vao ca 3 vi tri thuan tien:
+Set-Content -Path (Join-Path $OutDir "summary.log") -Value $summaryContent -Encoding UTF8
+Set-Content -Path (Join-Path $root "test_logs\summary.log") -Value $summaryContent -Encoding UTF8
+Set-Content -Path (Join-Path $root "summary.log") -Value $summaryContent -Encoding UTF8
+
 Write-Host "`nPASS $pass / $($results.Count)  |  FAIL/ERROR $fail"
 Write-Host "Logs: $OutDir"
+Write-Host "Summary log: $(Join-Path $root 'summary.log')"
