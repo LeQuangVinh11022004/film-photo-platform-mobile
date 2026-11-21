@@ -47,28 +47,31 @@ class BookingResponseDTO {
 
   factory BookingResponseDTO.fromJson(Map<String, dynamic> json) {
     return BookingResponseDTO(
-      bookingId: json['bookingId'] ?? '',
-      photographerId: json['photographerId'] ?? '',
-      providerId: json['providerId'] ?? '',
-      spaceId: json['spaceId'] ?? '',
-      packageId: json['packageId'],
-      bookingDate: json['bookingDate'] ?? '',
-      startTime: json['startTime'] ?? '',
-      endTime: json['endTime'] ?? '',
+      bookingId: json['bookingId']?.toString() ?? '',
+      photographerId: json['photographerId']?.toString() ?? '',
+      providerId: json['providerId']?.toString() ?? '',
+      spaceId: json['spaceId']?.toString() ?? '',
+      packageId: json['packageId']?.toString(),
+      bookingDate: json['bookingDate']?.toString() ?? '',
+      startTime: json['startTime']?.toString() ?? '',
+      endTime: json['endTime']?.toString() ?? '',
       totalAmount: (json['totalAmount'] as num?)?.toDouble() ?? 0.0,
       depositAmount: (json['depositAmount'] as num?)?.toDouble() ?? 0.0,
       depositDueAt: json['depositDueAt']?.toString(),
-      depositStatus: json['depositStatus'] ?? '',
-      status: json['status'] ?? '',
-      qrCode: json['qrCode'] ?? '',
-      photographerName: json['photographerName'] ?? '',
-      providerName: json['providerName'] ?? '',
-      spaceName: json['spaceName'] ?? '',
-      packageName: json['packageName'],
-      createdAt: DateTime.parse(json['createdAt'] ?? DateTime.now().toIso8601String()),
+      depositStatus: json['depositStatus']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      qrCode: json['qrCode']?.toString() ?? '',
+      photographerName: json['photographerName']?.toString() ?? '',
+      providerName: json['providerName']?.toString() ?? '',
+      spaceName: json['spaceName']?.toString() ?? '',
+      packageName: json['packageName']?.toString(),
+      createdAt: json['createdAt'] != null
+          ? (DateTime.tryParse(json['createdAt'].toString()) ?? DateTime.now())
+          : DateTime.now(),
       equipment: (json['equipment'] as List<dynamic>?)
-              ?.map((e) => BookingEquipmentResponseDTO.fromJson(e))
-              .toList() ??
+          ?.map((e) =>
+          BookingEquipmentResponseDTO.fromJson(e as Map<String, dynamic>))
+          .toList() ??
           [],
     );
   }
@@ -89,9 +92,9 @@ class BookingEquipmentResponseDTO {
 
   factory BookingEquipmentResponseDTO.fromJson(Map<String, dynamic> json) {
     return BookingEquipmentResponseDTO(
-      equipmentId: json['equipmentId'] ?? '',
-      name: json['name'] ?? '',
-      quantity: json['quantity'] ?? 0,
+      equipmentId: json['equipmentId']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      quantity: (json['quantity'] as num?)?.toInt() ?? 0,
       unitPrice: (json['unitPrice'] as num?)?.toDouble() ?? 0.0,
     );
   }
@@ -109,10 +112,10 @@ class BookingCreateRequestDTO {
   });
 
   Map<String, dynamic> toJson() => {
-        'availabilityId': availabilityId,
-        'packageId': packageId,
-        'equipmentIds': equipmentIds,
-      };
+    'availabilityId': availabilityId,
+    'packageId': packageId,
+    'equipmentIds': equipmentIds,
+  };
 }
 
 class ProviderSpaceAvailabilityResponseDTO {
@@ -132,13 +135,16 @@ class ProviderSpaceAvailabilityResponseDTO {
     required this.price,
   });
 
-  factory ProviderSpaceAvailabilityResponseDTO.fromJson(Map<String, dynamic> json) {
+  factory ProviderSpaceAvailabilityResponseDTO.fromJson(
+      Map<String, dynamic> json) {
+    final resolvedDate =
+        json['availableDate'] ?? json['date'] ?? '';
     return ProviderSpaceAvailabilityResponseDTO(
-      availabilityId: json['availabilityId'] ?? '',
-      spaceId: json['spaceId'] ?? '',
-      date: json['date'] ?? '',
-      startTime: json['startTime'] ?? '',
-      endTime: json['endTime'] ?? '',
+      availabilityId: json['availabilityId']?.toString() ?? '',
+      spaceId: json['spaceId']?.toString() ?? '',
+      date: resolvedDate.toString(),
+      startTime: json['startTime']?.toString() ?? '',
+      endTime: json['endTime']?.toString() ?? '',
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
     );
   }
@@ -157,14 +163,18 @@ class PagedResponseDTO<T> {
     required this.items,
   });
 
-  factory PagedResponseDTO.fromJson(Map<String, dynamic> json, T Function(Map<String, dynamic>) fromJsonT) {
+  factory PagedResponseDTO.fromJson(
+      Map<String, dynamic> json,
+      T Function(Map<String, dynamic>) fromJsonT,
+      ) {
+    final rawTotal = json['totalItems'] ?? json['totalCount'];
     return PagedResponseDTO(
-      totalCount: json['totalCount'] ?? 0,
-      page: json['page'] ?? 1,
-      pageSize: json['pageSize'] ?? 20,
+      totalCount: (rawTotal as num?)?.toInt() ?? 0,
+      page: (json['page'] as num?)?.toInt() ?? 1,
+      pageSize: (json['pageSize'] as num?)?.toInt() ?? 20,
       items: (json['items'] as List<dynamic>?)
-              ?.map((item) => fromJsonT(item as Map<String, dynamic>))
-              .toList() ??
+          ?.map((item) => fromJsonT(item as Map<String, dynamic>))
+          .toList() ??
           [],
     );
   }
@@ -231,8 +241,8 @@ class ResourceImageDTO {
 
   factory ResourceImageDTO.fromJson(Map<String, dynamic> json) {
     return ResourceImageDTO(
-      imageUrl: json['imageUrl'] ?? '',
-      imageType: json['imageType'] ?? '',
+      imageUrl: json['imageUrl']?.toString() ?? '',
+      imageType: json['imageType']?.toString() ?? '',
     );
   }
 }
@@ -252,9 +262,10 @@ class ResourceAvailableSlotDTO {
 
   factory ResourceAvailableSlotDTO.fromJson(Map<String, dynamic> json) {
     return ResourceAvailableSlotDTO(
-      availabilityId: json['availabilityId'] ?? '',
-      startAt: json['startAt'] != null ? DateTime.tryParse(json['startAt']) : null,
-      endAt: json['endAt'] != null ? DateTime.tryParse(json['endAt']) : null,
+      availabilityId: json['availabilityId']?.toString() ?? '',
+      startAt:
+      json['startAt'] != null ? DateTime.tryParse(json['startAt'].toString()) : null,
+      endAt: json['endAt'] != null ? DateTime.tryParse(json['endAt'].toString()) : null,
       price: (json['price'] as num?)?.toDouble() ?? 0.0,
     );
   }
@@ -289,22 +300,25 @@ class ResourceItemResponseDTO {
 
   factory ResourceItemResponseDTO.fromJson(Map<String, dynamic> json) {
     return ResourceItemResponseDTO(
-      resourceId: json['resourceId'] ?? '',
-      resourceType: json['resourceType'] ?? '',
-      name: json['name'] ?? '',
-      description: json['description'] ?? '',
-      address: json['address'] ?? '',
+      resourceId: json['resourceId']?.toString() ?? '',
+      resourceType: json['resourceType']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString() ?? '',
+      address: json['address']?.toString() ?? '',
       capacity: (json['capacity'] as num?)?.toInt() ?? 0,
       hourlyRate: (json['hourlyRate'] as num?)?.toDouble() ?? 0.0,
-      providerName: json['providerName'] ?? '',
-      details: json['details'] != null ? ResourceDetailDTO.fromJson(json['details']) : null,
+      providerName: json['providerName']?.toString() ?? '',
+      details: json['details'] != null
+          ? ResourceDetailDTO.fromJson(json['details'] as Map<String, dynamic>)
+          : null,
       images: (json['images'] as List<dynamic>?)
-              ?.map((e) => ResourceImageDTO.fromJson(e as Map<String, dynamic>))
-              .toList() ??
+          ?.map((e) => ResourceImageDTO.fromJson(e as Map<String, dynamic>))
+          .toList() ??
           [],
       availableSlots: (json['availableSlots'] as List<dynamic>?)
-              ?.map((e) => ResourceAvailableSlotDTO.fromJson(e as Map<String, dynamic>))
-              .toList() ??
+          ?.map((e) =>
+          ResourceAvailableSlotDTO.fromJson(e as Map<String, dynamic>))
+          .toList() ??
           [],
     );
   }
@@ -348,7 +362,9 @@ class ResourceItemResponseDTO {
 
     return BookingItem(
       id: resourceId,
-      name: name.isNotEmpty ? name : (isDarkroom ? 'Phòng tối tiêu chuẩn' : 'Studio tiêu chuẩn'),
+      name: name.isNotEmpty
+          ? name
+          : (isDarkroom ? 'Phòng tối tiêu chuẩn' : 'Studio tiêu chuẩn'),
       category: isDarkroom ? BookingCategory.darkroom : BookingCategory.studio,
       location: address.isNotEmpty ? address : 'Hồ Chí Minh, Việt Nam',
       pricePerHour: resolvedPrice,
@@ -357,8 +373,8 @@ class ResourceItemResponseDTO {
       description: description.isNotEmpty
           ? description
           : (details?.artisticStyle.isNotEmpty == true
-              ? 'Phong cách: ${details!.artisticStyle}. ${details!.usagePolicies}'
-              : 'Không gian chuyên nghiệp dành cho nghệ sĩ nhiếp ảnh film.'),
+          ? 'Phong cách: ${details!.artisticStyle}. ${details!.usagePolicies}'
+          : 'Không gian chuyên nghiệp dành cho nghệ sĩ nhiếp ảnh film.'),
       amenities: parsedAmenities,
       previewImages: allPreviews,
       isFavorite: false,
@@ -374,12 +390,14 @@ class ResourceItemResponseDTO {
       acousticDetails: details?.acousticDetails ?? '',
       operatingHours: details?.operatingHours ?? '',
       usagePolicies: details?.usagePolicies ?? '',
-      availableSlots: availableSlots.map((s) => {
+      availableSlots: availableSlots
+          .map((s) => {
         'availabilityId': s.availabilityId,
         'startAt': s.startAt?.toIso8601String(),
         'endAt': s.endAt?.toIso8601String(),
         'price': s.price,
-      }).toList(),
+      })
+          .toList(),
     );
   }
 }

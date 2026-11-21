@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../models/booking_api_models.dart';
@@ -58,18 +59,27 @@ class PaymentApiService {
 
   final BookingApiService _bookingApiService = BookingApiService();
 
-  /// Khởi tạo giao dịch đặt cọc và lấy `paymentUrl` từ BE
+  /// Khởi tạo giao dịch đặt cọc qua POST /api/photographer/bookings/{bookingId}/deposit-payment
   Future<Map<String, dynamic>> initiateDepositPayment({
     required String bookingId,
-    required String paymentMethod,
+    String paymentMethod = 'VNPAY',
   }) async {
+    final normalizedMethod = paymentMethod.trim().toUpperCase();
     _paymentApiLog(
-      'initiateDepositPayment start | bookingId=$bookingId | paymentMethod=$paymentMethod',
+      'initiateDepositPayment start | bookingId=$bookingId | paymentMethod=$normalizedMethod',
     );
+
+    if (normalizedMethod != 'VNPAY') {
+      return {
+        'success': false,
+        'message': 'Hiện tại hệ thống chỉ hỗ trợ thanh toán qua VNPAY.',
+      };
+    }
+
     try {
       final result = await _bookingApiService.payDeposit(
         bookingId: bookingId,
-        paymentMethod: paymentMethod,
+        paymentMethod: normalizedMethod,
       );
       _paymentApiLog('payDeposit raw response: $result');
 
@@ -110,7 +120,7 @@ class PaymentApiService {
     }
   }
 
-  /// Gọi callback/return URL (nếu URL trả về là endpoint JSON của BE) để lấy status, message, transactionId
+  /// Chỉ gọi khi URL redirect trả về endpoint JSON hợp lệ của BE (không gọi với tham số tự tạo)
   Future<PaymentConfirmationResult?> verifyReturnEndpoint(Uri returnUri) async {
     _paymentApiLog('verifyReturnEndpoint GET: $returnUri');
     try {
@@ -123,8 +133,6 @@ class PaymentApiService {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
           return PaymentConfirmationResult.fromJson(decoded);
-        } else {
-          _paymentApiLog('verifyReturnEndpoint body is not a JSON object: ${decoded.runtimeType}');
         }
       }
     } catch (e, stackTrace) {
@@ -133,14 +141,13 @@ class PaymentApiService {
     return null;
   }
 
-  /// Helper parse nhanh chuỗi JSON trả về trực tiếp từ web/callback
   PaymentConfirmationResult parsePaymentJson(String rawJson) {
     _paymentApiLog('parsePaymentJson input: $rawJson');
     final decoded = jsonDecode(rawJson) as Map<String, dynamic>;
     return PaymentConfirmationResult.fromJson(decoded);
   }
 
-  /// Fallback kiểm tra trạng thái booking từ BE
+  /// Kiểm tra lại trạng thái booking từ GET /api/photographer/bookings/{bookingId}
   Future<BookingResponseDTO?> refreshBookingStatus(String bookingId) async {
     _paymentApiLog('refreshBookingStatus start | bookingId=$bookingId');
     try {

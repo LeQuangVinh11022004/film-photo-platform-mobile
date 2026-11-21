@@ -255,14 +255,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Chi Tiết Đơn #$shortId',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: context.textColor,
+                Expanded(
+                  child: Text(
+                    'Chi Tiết Đơn',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: context.textColor,
+                    ),
                   ),
                 ),
+                const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
@@ -280,7 +283,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 4),
+            Text(
+              'Mã đơn: #$shortId',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: context.textSecColor,
+              ),
+            ),
+            const SizedBox(height: 16),
 
             // Space & Provider Banner
             Container(

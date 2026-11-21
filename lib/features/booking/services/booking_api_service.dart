@@ -29,14 +29,12 @@ class BookingApiService {
       }
 
       if (response.statusCode == 200) {
-        dynamic decoded = jsonDecode(response.body);
-        List<dynamic> jsonList = [];
-        if (decoded is List) {
-          jsonList = decoded;
-        } else if (decoded is Map<String, dynamic>) {
-          jsonList = decoded['items'] ?? decoded['data'] ?? [];
-        }
-        return jsonList.map((e) => ResourceItemResponseDTO.fromJson(e as Map<String, dynamic>)).toList();
+        final decoded = jsonDecode(response.body);
+        final jsonList = _extractJsonList(decoded);
+        return jsonList
+            .map((e) =>
+            ResourceItemResponseDTO.fromJson(e as Map<String, dynamic>))
+            .toList();
       } else {
         if (kDebugMode) print('Failed to get studios (${response.statusCode}): ${response.body}');
         return [];
@@ -65,14 +63,12 @@ class BookingApiService {
       }
 
       if (response.statusCode == 200) {
-        dynamic decoded = jsonDecode(response.body);
-        List<dynamic> jsonList = [];
-        if (decoded is List) {
-          jsonList = decoded;
-        } else if (decoded is Map<String, dynamic>) {
-          jsonList = decoded['items'] ?? decoded['data'] ?? [];
-        }
-        return jsonList.map((e) => ResourceItemResponseDTO.fromJson(e as Map<String, dynamic>)).toList();
+        final decoded = jsonDecode(response.body);
+        final jsonList = _extractJsonList(decoded);
+        return jsonList
+            .map((e) =>
+            ResourceItemResponseDTO.fromJson(e as Map<String, dynamic>))
+            .toList();
       } else {
         if (kDebugMode) print('Failed to get darkrooms (${response.statusCode}): ${response.body}');
         return [];
@@ -99,8 +95,12 @@ class BookingApiService {
       final response = await _apiClient.get('/api/photographer/spaces/$spaceId/availability$queryParams');
 
       if (response.statusCode == 200) {
-        final List<dynamic> jsonList = jsonDecode(response.body);
-        return jsonList.map((e) => ProviderSpaceAvailabilityResponseDTO.fromJson(e)).toList();
+        final decoded = jsonDecode(response.body);
+        final jsonList = _extractJsonList(decoded);
+        return jsonList
+            .map((e) => ProviderSpaceAvailabilityResponseDTO.fromJson(
+            e as Map<String, dynamic>))
+            .toList();
       } else {
         if (kDebugMode) print('Failed to get slots: ${response.body}');
         return [];
@@ -250,6 +250,20 @@ class BookingApiService {
         'message': 'Đã xảy ra lỗi khi gọi API thanh toán cọc: $e',
       };
     }
+  }
+
+  //
+  List<dynamic> _extractJsonList(dynamic decoded) {
+    if (decoded is List) {
+      return decoded;
+    }
+    if (decoded is Map<String, dynamic>) {
+      final candidate = decoded['value'] ?? decoded['items'] ?? decoded['data'];
+      if (candidate is List) {
+        return candidate;
+      }
+    }
+    return [];
   }
 
   /// Hủy đơn đặt phòng (Photographer)
