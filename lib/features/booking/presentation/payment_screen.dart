@@ -24,7 +24,7 @@ class PaymentScreen extends StatefulWidget {
   final DateTime? bookingDate;
   final String? timeSlot;
 
-  /// Mặc định mở trong WebView nội bộ để bắt JSON trả về và tự đóng về app.
+  /// Mặc định mở trong WebView nội bộ để bắt kết quả và tự đóng về app.
   final bool openInAppWebView;
 
   const PaymentScreen({
@@ -43,7 +43,8 @@ class PaymentScreen extends StatefulWidget {
 
 class _PaymentScreenState extends State<PaymentScreen>
     with WidgetsBindingObserver {
-  int _selectedPaymentMethod = 0; // 0: VNPay, 1: MoMo, 2: VietQR
+  // Hiện tại Backend chỉ hỗ trợ VNPAY (index 0)
+  int _selectedPaymentMethod = 0;
   bool _isProcessing = false;
   bool _awaitingExternalReturn = false;
   bool _hasHandledConfirmation = false;
@@ -108,8 +109,6 @@ class _PaymentScreenState extends State<PaymentScreen>
     switch (index) {
       case 0:
         return 'VNPAY';
-      case 1:
-        return 'MOMO';
       default:
         return null;
     }
@@ -117,17 +116,7 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   Future<void> _handlePayment() async {
     _paymentLog('Start Of Payment Process=============================');
-    _paymentLog(
-      '_handlePayment triggered | bookingId=$_bookingId | '
-          'selectedIndex=$_selectedPaymentMethod | '
-          'hasHandledConfirmation=$_hasHandledConfirmation | '
-          'openInAppWebView=${widget.openInAppWebView}',
-    );
-
-    if (_hasHandledConfirmation) {
-      _paymentLog('_handlePayment aborted: already handled confirmation');
-      return;
-    }
+    if (_hasHandledConfirmation) return;
 
     if (_bookingId.isEmpty) {
       _paymentLog('_handlePayment error: _bookingId is empty');
@@ -136,56 +125,41 @@ class _PaymentScreenState extends State<PaymentScreen>
     }
 
     final methodCode = _resolveBackendPaymentMethod(_selectedPaymentMethod);
-    _paymentLog('Resolved methodCode=$methodCode');
     if (methodCode == null) {
-      _paymentLog(
-          '_handlePayment aborted: unsupported payment method index=$_selectedPaymentMethod');
-      _showErrorToast(
-        'Phương thức VietQR hiện chưa được Backend hỗ trợ qua API đặt cọc. Vui lòng chọn VNPay hoặc MoMo.',
-      );
+      _showErrorToast('Hiện tại chỉ hỗ trợ thanh toán qua VNPay.');
       return;
     }
 
     setState(() => _isProcessing = true);
 
     try {
-      _paymentLog(
-          'Calling initiateDepositPayment(bookingId=$_bookingId, paymentMethod=$methodCode)...');
       final initResult = await _paymentService.initiateDepositPayment(
         bookingId: _bookingId,
         paymentMethod: methodCode,
       );
       _paymentLog('initiateDepositPayment result: $initResult');
 
-      if (!mounted) {
-        _paymentLog('Widget unmounted after initiateDepositPayment');
-        return;
-      }
+      if (!mounted) return;
 
       if (initResult['success'] != true) {
         setState(() => _isProcessing = false);
         final errMsg = initResult['message'] ?? 'Khởi tạo thanh toán thất bại.';
-        _paymentLog('initiateDepositPayment failed: $errMsg');
         _showErrorToast(errMsg);
         return;
       }
 
       final String paymentUrl = initResult['paymentUrl'] as String;
-      _paymentLog('Received paymentUrl: $paymentUrl');
       final uri = Uri.tryParse(paymentUrl);
 
       if (uri == null || !(uri.isScheme('http') || uri.isScheme('https'))) {
         setState(() => _isProcessing = false);
-        _paymentLog('Invalid paymentUrl URI: $paymentUrl');
         _showErrorToast('URL thanh toán từ Backend không hợp lệ: $paymentUrl');
         return;
       }
 
       if (widget.openInAppWebView) {
-        _paymentLog('Opening payment URL in WebView: $uri');
         await _openWithWebView(uri);
       } else {
-        _paymentLog('Opening payment URL in external launcher: $uri');
         await _openWithExternalLauncher(uri);
       }
     } catch (e, stackTrace) {
@@ -208,19 +182,12 @@ class _PaymentScreenState extends State<PaymentScreen>
       ),
     );
 
-    _paymentLog(
-      '_openWithWebView returned | mounted=$mounted | result='
-          '${result != null ? "{isConfirmed: ${result.isConfirmed}, status: ${result.status}, message: ${result.message}, txId: ${result.transactionId}}" : "null"}',
-    );
-
     if (!mounted) return;
     setState(() => _isProcessing = false);
 
     if (result != null && result.isConfirmed) {
       _onPaymentConfirmed(result);
     } else {
-      _paymentLog(
-          'WebView closed without confirmation -> running _checkBookingFallback');
       await _checkBookingFallback(showPendingToastIfNotPaid: true);
     }
   }
@@ -230,8 +197,6 @@ class _PaymentScreenState extends State<PaymentScreen>
       paymentUri,
       mode: LaunchMode.externalApplication,
     );
-    _paymentLog(
-        '_openWithExternalLauncher launched=$launched for uri=$paymentUri');
 
     if (!mounted) return;
 
@@ -243,35 +208,15 @@ class _PaymentScreenState extends State<PaymentScreen>
 
     _awaitingExternalReturn = true;
     setState(() => _isProcessing = false);
-    _paymentLog('_awaitingExternalReturn set to true');
   }
 
   Future<void> _handleResumeFromExternalBrowser() async {
-    _paymentLog(
-        '_handleResumeFromExternalBrowser start | pendingReturnUri=$pendingReturnUri');
     _awaitingExternalReturn = false;
     if (!mounted || _hasHandledConfirmation) return;
 
     setState(() => _isProcessing = true);
 
     try {
-      if (pendingReturnUri != null) {
-        final uriToVerify = pendingReturnUri!;
-        pendingReturnUri = null;
-        _paymentLog('Verifying pendingReturnUri: $uriToVerify');
-
-        final verified = await _paymentService.verifyReturnEndpoint(uriToVerify);
-        _paymentLog('verifyReturnEndpoint result: $verified');
-        if (!mounted) return;
-
-        if (verified != null && verified.isConfirmed) {
-          setState(() => _isProcessing = false);
-          _onPaymentConfirmed(verified);
-          return;
-        }
-      }
-
-      _paymentLog('Falling back to _checkBookingFallback after resume');
       await _checkBookingFallback(showPendingToastIfNotPaid: true);
     } finally {
       if (mounted) {
@@ -282,18 +227,9 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   Future<void> _checkBookingFallback(
       {bool showPendingToastIfNotPaid = false}) async {
-    _paymentLog(
-      '_checkBookingFallback start | bookingId=$_bookingId | '
-          'hasHandledConfirmation=$_hasHandledConfirmation | '
-          'showPendingToastIfNotPaid=$showPendingToastIfNotPaid',
-    );
     if (_bookingId.isEmpty || _hasHandledConfirmation) return;
 
     final updatedBooking = await _paymentService.refreshBookingStatus(_bookingId);
-    _paymentLog(
-      'refreshBookingStatus response | depositStatus=${updatedBooking?.depositStatus} | '
-          'status=${updatedBooking?.status}',
-    );
     if (!mounted || _hasHandledConfirmation) return;
 
     final depositStatus = updatedBooking?.depositStatus.toUpperCase() ?? '';
@@ -306,9 +242,6 @@ class _PaymentScreenState extends State<PaymentScreen>
         bookingStatus == 'CONFIRMED' ||
         bookingStatus == 'PAID';
 
-    _paymentLog(
-        'Fallback evaluated isPaid=$isPaid (depositStatus=$depositStatus, bookingStatus=$bookingStatus)');
-
     if (isPaid) {
       _onPaymentConfirmed(
         PaymentConfirmationResult(
@@ -319,7 +252,6 @@ class _PaymentScreenState extends State<PaymentScreen>
         ),
       );
     } else if (showPendingToastIfNotPaid) {
-      _paymentLog('Payment not yet paid -> showing pending toast');
       toastification.show(
         context: context,
         type: ToastificationType.info,
@@ -336,10 +268,6 @@ class _PaymentScreenState extends State<PaymentScreen>
   }
 
   void _onPaymentConfirmed(PaymentConfirmationResult result) {
-    _paymentLog(
-      '_onPaymentConfirmed | alreadyHandled=$_hasHandledConfirmation | '
-          'status=${result.status} | message=${result.message} | txId=${result.transactionId}',
-    );
     if (_hasHandledConfirmation) return;
     _hasHandledConfirmation = true;
 
@@ -367,7 +295,6 @@ class _PaymentScreenState extends State<PaymentScreen>
   }
 
   void _showErrorToast(String message) {
-    _paymentLog('_showErrorToast: $message');
     toastification.show(
       context: context,
       type: ToastificationType.error,
@@ -497,7 +424,6 @@ class _PaymentScreenState extends State<PaymentScreen>
                 child: PrimaryButton(
                   text: 'Hoàn tất & Về Trang chủ',
                   onPressed: () {
-                    _paymentLog('User tapped "Hoàn tất & Về Trang chủ"');
                     Navigator.pop(ctx);
                     Navigator.pop(context);
                   },
@@ -557,7 +483,13 @@ class _PaymentScreenState extends State<PaymentScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Thanh Toán Đặt Chỗ'),
+        title: const Text(
+          'Thanh Toán Đặt Chỗ',
+          style: TextStyle(
+            color: AppColors.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -582,44 +514,23 @@ class _PaymentScreenState extends State<PaymentScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Flexible(
-                          child: Text(
-                            'TỔNG QUAN ĐƠN HÀNG',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.primary,
-                              letterSpacing: 0.5,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Flexible(
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Text(
-                              _bookingId,
-                              style: const TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ),
-                      ],
+                    const Text(
+                      'TỔNG QUAN ĐƠN HÀNG',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.primary,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Mã đơn: $_bookingId',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                     const SizedBox(height: 12),
                     _buildSummaryRow(
@@ -663,29 +574,13 @@ class _PaymentScreenState extends State<PaymentScreen>
               _buildPaymentOption(
                 index: 0,
                 name: 'Cổng thanh toán VNPay',
-                subtitle: 'Khởi tạo qua /deposit-payment & xác nhận giao dịch',
+                subtitle: 'Thanh toán đặt cọc qua cổng VNPay Sandbox',
                 icon: Icons.account_balance_rounded,
                 color: Colors.blue.shade700,
               ),
-              const SizedBox(height: 10),
-              _buildPaymentOption(
-                index: 1,
-                name: 'Ví Điện Tử MoMo',
-                subtitle: 'Khởi tạo qua /deposit-payment & xác nhận giao dịch',
-                icon: Icons.account_balance_wallet_rounded,
-                color: Colors.pink.shade600,
-              ),
-              const SizedBox(height: 10),
-              _buildPaymentOption(
-                index: 2,
-                name: 'Chuyển Khoản Ngân Hàng (VietQR)',
-                subtitle: 'Chưa hỗ trợ API trực tiếp trên Backend',
-                icon: Icons.qr_code_2_rounded,
-                color: Colors.teal.shade700,
-              ),
               const SizedBox(height: 32),
               PrimaryButton(
-                text: 'XÁC NHẬN THANH TOÁN $formattedAmount',
+                text: 'XÁC NHẬN THANH TOÁN',
                 isLoading: _isProcessing,
                 onPressed: _handlePayment,
               ),
@@ -706,10 +601,7 @@ class _PaymentScreenState extends State<PaymentScreen>
     final isSelected = _selectedPaymentMethod == index;
     return GestureDetector(
       onTap: () {
-        _paymentLog('Selected payment method index=$index ($name)');
-        setState(() {
-          _selectedPaymentMethod = index;
-        });
+        setState(() => _selectedPaymentMethod = index);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
@@ -773,7 +665,6 @@ class _PaymentScreenState extends State<PaymentScreen>
               activeColor: AppColors.primary,
               onChanged: (val) {
                 if (val != null) {
-                  _paymentLog('Radio changed to index=$val');
                   setState(() => _selectedPaymentMethod = val);
                 }
               },
@@ -809,46 +700,32 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
   @override
   void initState() {
     super.initState();
-    _paymentLog(
-        '_PaymentWebViewPage.initState | initialUri=${widget.initialUri}');
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (url) {
-            final isReturn = _isReturnUrl(url);
-            _paymentLog(
-                'WebView.onPageStarted | url=$url | isReturnUrl=$isReturn');
             if (mounted) {
               setState(() {
                 _isLoading = true;
                 _hasWebError = false;
               });
             }
-            if (isReturn) {
+            if (_isReturnUrl(url)) {
               _scheduleReturnCheck(url);
             }
           },
           onUrlChange: (change) {
             final url = change.url;
-            final isReturn = url != null && _isReturnUrl(url);
-            _paymentLog(
-                'WebView.onUrlChange | url=$url | isReturnUrl=$isReturn');
-            if (isReturn) {
+            if (url != null && _isReturnUrl(url)) {
               _scheduleReturnCheck(url);
             }
           },
           onPageFinished: (url) async {
-            _paymentLog('WebView.onPageFinished | url=$url');
             if (mounted) setState(() => _isLoading = false);
             await _tryResolveFromCurrentPage(url);
           },
           onWebResourceError: (error) {
-            _paymentLog(
-              'WebView.onWebResourceError | code=${error.errorCode} | '
-                  'desc=${error.description} | type=${error.errorType} | '
-                  'url=${error.url} | isForMainFrame=${error.isForMainFrame}',
-            );
             if (error.errorCode == -202 ||
                 error.description.toLowerCase().contains('cert') ||
                 error.description.toLowerCase().contains('ssl') ||
@@ -870,12 +747,10 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
   bool _isReturnUrl(String url) {
     final lower = url.toLowerCase();
     return lower.contains('/api/payments/vnpay/return') ||
-        lower.contains('/api/payments/momo/return') ||
         lower.contains('payment/return');
   }
 
   void _scheduleReturnCheck(String url) {
-    _paymentLog('_scheduleReturnCheck scheduled in 350ms for url=$url');
     Future.delayed(const Duration(milliseconds: 350), () {
       if (mounted && !_hasPopped) {
         _tryResolveFromCurrentPage(url);
@@ -884,43 +759,25 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
   }
 
   Future<void> _tryResolveFromCurrentPage(String url) async {
-    _paymentLog(
-      '_tryResolveFromCurrentPage start | url=$url | '
-          'isResolvingReturn=$_isResolvingReturn | hasPopped=$_hasPopped',
-    );
     if (_isResolvingReturn || _hasPopped || !mounted) return;
     _isResolvingReturn = true;
 
     try {
-      // 1. Đọc JSON trực tiếp từ nội dung trang đang hiển thị trên WebView
       final rawBody = await _controller.runJavaScriptReturningResult(
         '(document.querySelector("pre") ? document.querySelector("pre").innerText : (document.body ? document.body.innerText : ""))',
       );
-      _paymentLog('WebView DOM rawBody: $rawBody');
-
       final parsedFromDom = _parseDomJson(rawBody);
-      _paymentLog(
-        'parsedFromDom: ${parsedFromDom != null ? "{isConfirmed: ${parsedFromDom.isConfirmed}, status: ${parsedFromDom.status}, message: ${parsedFromDom.message}, txId: ${parsedFromDom.transactionId}}" : "null"}',
-      );
-
       if (parsedFromDom != null && parsedFromDom.isConfirmed) {
         _popWithResult(parsedFromDom);
         return;
       }
 
-      // 2. Chỉ khi trên DOM chưa có JSON mà URL đúng là endpoint return thì mới gọi verifyReturnEndpoint
       if (_isReturnUrl(url)) {
         final uri = Uri.tryParse(url);
-        _paymentLog(
-            'DOM had no confirmed JSON, checking return URL via verifyReturnEndpoint: $uri');
         if (uri != null) {
           final verified = await widget.paymentService.verifyReturnEndpoint(uri);
-          _paymentLog(
-            'WebView verifyReturnEndpoint result: ${verified != null ? "{isConfirmed: ${verified.isConfirmed}, status: ${verified.status}, message: ${verified.message}, txId: ${verified.transactionId}}" : "null"}',
-          );
           if (verified != null && verified.isConfirmed) {
             _popWithResult(verified);
-            return;
           }
         }
       }
@@ -932,70 +789,49 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
   }
 
   void _popWithResult(PaymentConfirmationResult result) {
-    _paymentLog(
-      '_popWithResult | hasPopped=$_hasPopped | isConfirmed=${result.isConfirmed} | '
-          'status=${result.status} | txId=${result.transactionId}',
-    );
     if (_hasPopped || !mounted) return;
     _hasPopped = true;
     Navigator.pop(context, result);
   }
 
   PaymentConfirmationResult? _parseDomJson(Object? rawResult) {
-    if (rawResult == null) {
-      _paymentLog('_parseDomJson: rawResult is null');
-      return null;
-    }
+    if (rawResult == null) return null;
     String text = rawResult.toString().trim();
 
     if (text.startsWith('"') && text.endsWith('"') && text.length > 1) {
       try {
         final unwrapped = jsonDecode(text);
         if (unwrapped is String) text = unwrapped.trim();
-      } catch (e) {
-        _paymentLog('_parseDomJson unwrap string warning: $e');
-      }
+      } catch (_) {}
     }
 
-    // Nếu trang có thêm text khác ngoài JSON, thử trích xuất khối {...}
     final startIdx = text.indexOf('{');
     final endIdx = text.lastIndexOf('}');
     if (startIdx == -1 || endIdx == -1 || endIdx <= startIdx) {
-      _paymentLog('_parseDomJson: no valid {...} block found in DOM text');
       return null;
     }
 
     final jsonCandidate = text.substring(startIdx, endIdx + 1);
-    _paymentLog('_parseDomJson candidate: $jsonCandidate');
-
     try {
       final decoded = jsonDecode(jsonCandidate);
       if (decoded is Map<String, dynamic> && decoded.containsKey('status')) {
         return PaymentConfirmationResult.fromJson(decoded);
-      } else {
-        _paymentLog(
-            '_parseDomJson: decoded JSON missing "status" key or not a Map');
       }
-    } catch (e) {
-      _paymentLog('_parseDomJson jsonDecode error: $e');
-    }
+    } catch (_) {}
 
     return null;
   }
 
   Future<void> _openInExternalBrowser(Uri uri) async {
-    _paymentLog('_openInExternalBrowser: $uri');
     try {
       final launched =
       await launchUrl(uri, mode: LaunchMode.externalApplication);
-      _paymentLog('_openInExternalBrowser launched=$launched');
       if (!launched && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Không thể mở liên kết trình duyệt.')),
         );
       }
     } catch (e) {
-      _paymentLog('_openInExternalBrowser error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Lỗi mở trình duyệt: $e')),

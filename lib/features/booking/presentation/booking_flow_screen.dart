@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:intl/intl.dart';
 import 'package:toastification/toastification.dart';
-import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
 import '../models/booking_schedule.dart';
-import '../models/booking_api_models.dart';
 import '../services/booking_api_service.dart';
-import 'package:intl/intl.dart';
 import 'payment_screen.dart';
 
 class BookingFlowScreen extends StatefulWidget {
@@ -32,8 +31,6 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   int _selectedTimeSlotIndex = 0;
 
-  /// Lấy danh sách khung giờ thuộc ngày `_selectedDate` từ `widget.item.availableSlots`.
-  /// Nếu ngày đó không có slot nào thì trả về danh sách rỗng (bỏ hoàn toàn fallback).
   List<Map<String, dynamic>> get _timeSlots {
     if (widget.item.availableSlots.isEmpty) {
       return [];
@@ -65,7 +62,6 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final utcStart = startAt.toUtc();
     final utcEnd = endAt.toUtc();
 
-    // Chỉ lấy những slot trùng ngày (Năm / Tháng / Ngày) với _selectedDate
     if (utcStart.year == _selectedDate.year &&
     utcStart.month == _selectedDate.month &&
     utcStart.day == _selectedDate.day) {
@@ -114,6 +110,12 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     _initSelectedDate();
   }
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   void _initSelectedDate() {
     if (widget.item.availableSlots.isNotEmpty) {
       final firstSlot = widget.item.availableSlots.first;
@@ -134,21 +136,57 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   void _initAddons() {
     if (widget.item.category == BookingCategory.studio) {
       _availableAddons = [
-        {'name': 'Đèn Flash Profoto B10', 'price': 150000, 'icon': Icons.flash_on_rounded},
-        {'name': 'Background Vải Canvas (Nhiều màu)', 'price': 50000, 'icon': Icons.format_paint_rounded},
-        {'name': 'Máy ảnh Leica M6 (Kèm lens)', 'price': 200000, 'icon': Icons.camera_alt_rounded},
-        {'name': 'Kỹ thuật viên hỗ trợ ánh sáng', 'price': 300000, 'icon': Icons.person_rounded},
+        {
+          'name': 'Đèn Flash Profoto B10',
+          'price': 150000,
+          'icon': Icons.flash_on_rounded,
+        },
+        {
+          'name': 'Background Vải Canvas (Nhiều màu)',
+          'price': 50000,
+          'icon': Icons.format_paint_rounded,
+        },
+        {
+          'name': 'Máy ảnh Leica M6 (Kèm lens)',
+          'price': 200000,
+          'icon': Icons.camera_alt_rounded,
+        },
+        {
+          'name': 'Kỹ thuật viên hỗ trợ ánh sáng',
+          'price': 300000,
+          'icon': Icons.person_rounded,
+        },
       ];
     } else if (widget.item.category == BookingCategory.darkroom) {
       _availableAddons = [
-        {'name': 'Hóa chất tráng màu C41', 'price': 100000, 'icon': Icons.science_rounded},
-        {'name': 'Hóa chất đen trắng D-76', 'price': 80000, 'icon': Icons.science_outlined},
-        {'name': 'Giấy rọi ảnh Ilford (10 tờ)', 'price': 150000, 'icon': Icons.insert_drive_file_rounded},
+        {
+          'name': 'Hóa chất tráng màu C41',
+          'price': 100000,
+          'icon': Icons.science_rounded,
+        },
+        {
+          'name': 'Hóa chất đen trắng D-76',
+          'price': 80000,
+          'icon': Icons.science_outlined,
+        },
+        {
+          'name': 'Giấy rọi ảnh Ilford (10 tờ)',
+          'price': 150000,
+          'icon': Icons.insert_drive_file_rounded,
+        },
       ];
     } else {
       _availableAddons = [
-        {'name': 'Chân máy Manfrotto', 'price': 50000, 'icon': Icons.camera_rounded},
-        {'name': 'Dây bấm mềm', 'price': 20000, 'icon': Icons.settings_input_component_rounded},
+        {
+          'name': 'Chân máy Manfrotto',
+          'price': 50000,
+          'icon': Icons.camera_rounded,
+        },
+        {
+          'name': 'Dây bấm mềm',
+          'price': 20000,
+          'icon': Icons.settings_input_component_rounded,
+        },
       ];
     }
   }
@@ -160,7 +198,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         type: ToastificationType.warning,
         style: ToastificationStyle.flatColored,
         title: const Text('Không có khung giờ khả dụng'),
-        description: const Text('Ngày bạn chọn hiện không có khung giờ trống. Vui lòng chọn ngày khác.'),
+        description: const Text(
+          'Ngày bạn chọn hiện không có khung giờ trống. Vui lòng chọn ngày khác.',
+        ),
         alignment: Alignment.topCenter,
         autoCloseDuration: const Duration(seconds: 3),
         showProgressBar: false,
@@ -193,7 +233,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         type: ToastificationType.warning,
         style: ToastificationStyle.flatColored,
         title: const Text('Không có khung giờ khả dụng'),
-        description: const Text('Vui lòng chọn ngày có khung giờ khả dụng trước khi tiếp tục.'),
+        description: const Text(
+          'Vui lòng chọn ngày có khung giờ khả dụng trước khi tiếp tục.',
+        ),
         alignment: Alignment.topCenter,
         autoCloseDuration: const Duration(seconds: 3),
         showProgressBar: false,
@@ -203,7 +245,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
 
     setState(() => _isSubmitting = true);
 
-    final safeIndex = _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
+    final safeIndex =
+    _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
     final slot = slots[safeIndex];
     final hours = slot['hours'] as int;
     final availabilityId = slot['availabilityId'] as String;
@@ -212,21 +255,30 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final addonPrice = _calculateAddonPrice();
     final totalPrice = basePrice + addonPrice;
 
-    // 1. Tạo request DTO gửi cho C# API
     final request = BookingCreateRequestDTO(
       availabilityId: availabilityId,
     );
 
-    // 2. Gọi API POST thực tế thông qua BookingApiService
     final result = await BookingApiService().createBooking(request);
 
     if (!mounted) return;
     setState(() => _isSubmitting = false);
 
-    // 3. Xử lý kết quả trả về từ Backend
     if (result['success'] == true) {
-      final bookingId = (result['booking'] as BookingResponseDTO?)?.bookingId ??
-          'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
+      final bookingId = (result['booking'] as BookingResponseDTO?)?.bookingId;
+      if (bookingId == null || bookingId.isEmpty) {
+        toastification.show(
+          context: context,
+          type: ToastificationType.error,
+          style: ToastificationStyle.flatColored,
+          title: const Text('Đặt lịch thất bại'),
+          description: const Text('Backend không trả về mã đơn đặt chỗ hợp lệ.'),
+          alignment: Alignment.topCenter,
+          autoCloseDuration: const Duration(seconds: 4),
+          showProgressBar: false,
+        );
+        return;
+      }
 
       final newSchedule = BookingSchedule(
         id: bookingId,
@@ -238,7 +290,6 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       );
       BookingSchedule.sampleSchedules.insert(0, newSchedule);
 
-      // Chuyển sang màn hình thanh toán
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
@@ -252,42 +303,15 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         ),
       );
     } else {
-      // Báo lỗi từ API (VD: Lỗi Conflict 409, Lỗi NotFound,...)
       toastification.show(
         context: context,
         type: ToastificationType.error,
         style: ToastificationStyle.flatColored,
         title: const Text('Đặt lịch thất bại'),
-        description: Text(result['message']),
+        description: Text(result['message'] ?? 'Không thể tạo đơn đặt chỗ.'),
         alignment: Alignment.topCenter,
         autoCloseDuration: const Duration(seconds: 4),
         showProgressBar: false,
-      );
-
-      // (TÙY CHỌN CHO BẠN DEMO KHI KHÔNG BẬT BACKEND SERVER HOẶC TRUYỀN SAI GUID)
-      // Tự động chuyển sang PaymentScreen với đơn mẫu offline để bạn vẫn test được:
-      final mockBookingId = 'BK-${DateTime.now().millisecondsSinceEpoch.toString().substring(7)}';
-      final newSchedule = BookingSchedule(
-        id: mockBookingId,
-        item: widget.item,
-        bookingDate: _selectedDate,
-        timeSlot: '${slot['slot']} ($hours giờ)',
-        totalPrice: totalPrice,
-        status: BookingStatus.confirmed,
-      );
-      BookingSchedule.sampleSchedules.insert(0, newSchedule);
-
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(
-          builder: (context) => PaymentScreen(
-            bookingId: mockBookingId,
-            item: widget.item,
-            totalAmount: totalPrice,
-            bookingDate: _selectedDate,
-            timeSlot: '${slot['slot']} ($hours giờ)',
-          ),
-        ),
       );
     }
   }
@@ -352,14 +376,25 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             child: Center(
               child: isActive
                   ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
-                  : Text('${step + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textHint)),
+                  : Text(
+                '${step + 1}',
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textHint,
+                ),
+              ),
             ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
-            style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: isActive ? AppColors.textPrimary : AppColors.textHint),
-          )
+            style: TextStyle(
+              fontSize: 10,
+              fontWeight: FontWeight.bold,
+              color: isActive ? AppColors.textPrimary : AppColors.textHint,
+            ),
+          ),
         ],
       ),
     );
@@ -380,12 +415,20 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       children: [
         const Text(
           'Nâng cấp trải nghiệm',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
         ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
         const SizedBox(height: 8),
         Text(
           'Chọn thêm các trang thiết bị hoặc dịch vụ đi kèm phù hợp với nhu cầu của bạn.',
-          style: TextStyle(fontSize: 14, color: AppColors.textSecondary, height: 1.5),
+          style: TextStyle(
+            fontSize: 14,
+            color: AppColors.textSecondary,
+            height: 1.5,
+          ),
         ).animate().fadeIn(delay: 100.ms),
         const SizedBox(height: 24),
         ..._availableAddons.map((addon) {
@@ -405,13 +448,22 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               margin: const EdgeInsets.only(bottom: 12),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary.withValues(alpha: 0.05) : AppColors.cardBg,
-                border: Border.all(color: isSelected ? AppColors.primary : AppColors.border, width: isSelected ? 2 : 1),
+                color: isSelected
+                    ? AppColors.primary.withValues(alpha: 0.05)
+                    : AppColors.cardBg,
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.border,
+                  width: isSelected ? 2 : 1,
+                ),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
                 children: [
-                  Icon(addon['icon'], color: isSelected ? AppColors.primary : AppColors.textSecondary, size: 28),
+                  Icon(
+                    addon['icon'],
+                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                    size: 28,
+                  ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -419,12 +471,20 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                       children: [
                         Text(
                           addon['name'],
-                          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
                         ),
                         const SizedBox(height: 4),
                         Text(
                           '+${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(addon['price'])}',
-                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.primary),
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
                         ),
                       ],
                     ),
@@ -435,9 +495,14 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       color: isSelected ? AppColors.primary : Colors.transparent,
-                      border: Border.all(color: isSelected ? AppColors.primary : AppColors.border, width: 2),
+                      border: Border.all(
+                        color: isSelected ? AppColors.primary : AppColors.border,
+                        width: 2,
+                      ),
                     ),
-                    child: isSelected ? const Icon(Icons.check, size: 16, color: Colors.white) : null,
+                    child: isSelected
+                        ? const Icon(Icons.check, size: 16, color: Colors.white)
+                        : null,
                   ),
                 ],
               ),
@@ -456,11 +521,21 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       children: [
         const Text(
           'Thời gian đặt chỗ',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
         ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
         const SizedBox(height: 24),
-
-        const Text('Chọn Ngày', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
+        const Text(
+          'Chọn Ngày',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: AppColors.textPrimary,
+          ),
+        ),
         const SizedBox(height: 12),
         InkWell(
           onTap: () async {
@@ -501,17 +576,26 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               children: [
                 Text(
                   '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
                 ),
                 const Icon(Icons.calendar_month_rounded, color: AppColors.primary),
               ],
             ),
           ),
         ).animate().fadeIn(delay: 100.ms),
-
         const SizedBox(height: 28),
-
-        const Text('Chọn Khung Giờ', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppColors.textPrimary)),
+        const Text(
+          'Chọn Khung Giờ',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 15,
+            color: AppColors.textPrimary,
+          ),
+        ),
         const SizedBox(height: 12),
         if (slots.isEmpty)
           Container(
@@ -544,12 +628,23 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                 onTap: () => setState(() => _selectedTimeSlotIndex = index),
                 child: AnimatedContainer(
                   duration: 200.ms,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
                     color: isSelected ? AppColors.primary : AppColors.cardBg,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: isSelected ? AppColors.primary : AppColors.border),
-                    boxShadow: isSelected ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 8, offset: const Offset(0, 4))] : [],
+                    border: Border.all(
+                      color: isSelected ? AppColors.primary : AppColors.border,
+                    ),
+                    boxShadow: isSelected
+                        ? [
+                      BoxShadow(
+                        color: AppColors.primary.withValues(alpha: 0.3),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                        : [],
                   ),
                   child: Text(
                     '${slot['slot']} (${slot['hours']}h)',
@@ -577,7 +672,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         ),
       );
     }
-    final safeIndex = _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
+    final safeIndex =
+    _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
     final slot = slots[safeIndex];
     final hours = slot['hours'] as int;
     final basePrice = _calculateBasePrice(slot, hours);
@@ -589,10 +685,13 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       children: [
         const Text(
           'Tổng quan Đơn đặt',
-          style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+          style: TextStyle(
+            fontSize: 22,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary,
+          ),
         ).animate().fadeIn(),
         const SizedBox(height: 24),
-
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
@@ -603,13 +702,30 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(widget.item.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppColors.textPrimary)),
+              Text(
+                widget.item.name,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: AppColors.textPrimary,
+                ),
+              ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(Icons.access_time_rounded, size: 16, color: AppColors.textSecondary),
+                  const Icon(
+                    Icons.access_time_rounded,
+                    size: 16,
+                    color: AppColors.textSecondary,
+                  ),
                   const SizedBox(width: 8),
-                  Text('${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year} • ${slot['slot']}', style: const TextStyle(fontSize: 14, color: AppColors.textSecondary)),
+                  Text(
+                    '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year} • ${slot['slot']}',
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
               const Padding(
@@ -619,23 +735,53 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('Phí thuê cơ bản', style: TextStyle(color: AppColors.textSecondary)),
-                  Text(NumberFormat.currency(locale: 'vi', symbol: 'đ').format(basePrice), style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                  const Text(
+                    'Phí thuê cơ bản',
+                    style: TextStyle(color: AppColors.textSecondary),
+                  ),
+                  Text(
+                    NumberFormat.currency(locale: 'vi', symbol: 'đ')
+                        .format(basePrice),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
                 ],
               ),
               if (_selectedAddons.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                const Text('Dịch vụ thêm:', style: TextStyle(color: AppColors.textSecondary)),
+                const Text(
+                  'Dịch vụ thêm:',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
                 const SizedBox(height: 8),
                 ..._selectedAddons.map((name) {
-                  final price = _availableAddons.firstWhere((a) => a['name'] == name)['price'];
+                  final price = _availableAddons
+                      .firstWhere((a) => a['name'] == name)['price'];
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 4, left: 8),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        Expanded(child: Text('• $name', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary))),
-                        Text(NumberFormat.currency(locale: 'vi', symbol: 'đ').format(price), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.textPrimary)),
+                        Expanded(
+                          child: Text(
+                            '• $name',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          NumberFormat.currency(locale: 'vi', symbol: 'đ')
+                              .format(price),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
                       ],
                     ),
                   );
@@ -644,22 +790,39 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             ],
           ),
         ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
-
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
             gradient: AppColors.primaryGradient,
             borderRadius: BorderRadius.circular(20),
-            boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 16, offset: const Offset(0, 8))],
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withValues(alpha: 0.3),
+                blurRadius: 16,
+                offset: const Offset(0, 8),
+              ),
+            ],
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Tổng thanh toán', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
+              const Text(
+                'Tổng thanh toán',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                ),
+              ),
               Text(
-                NumberFormat.currency(locale: 'vi', symbol: 'đ').format(totalPrice),
-                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Colors.white),
+                NumberFormat.currency(locale: 'vi', symbol: 'đ')
+                    .format(totalPrice),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                ),
               ),
             ],
           ),
@@ -673,7 +836,13 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05), blurRadius: 20, offset: const Offset(0, -5))],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 20,
+            offset: const Offset(0, -5),
+          ),
+        ],
       ),
       child: SafeArea(
         child: PrimaryButton(
