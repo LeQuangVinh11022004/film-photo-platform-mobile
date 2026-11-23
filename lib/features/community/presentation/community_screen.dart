@@ -1,8 +1,9 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/device_image_picker.dart';
+import '../../auth/services/auth_service.dart';
 import '../models/blog_post.dart';
 
 class CommunityScreen extends StatefulWidget {
@@ -221,10 +222,24 @@ class _CommunityScreenState extends State<CommunityScreen> {
                       final title = titleController.text.trim();
                       final content = contentController.text.trim();
                       if (title.isNotEmpty && content.isNotEmpty) {
+                        final currentUser = AuthService().currentUser;
+                        final rawRole =
+                            (currentUser?.role ?? '').trim().toUpperCase();
+                        final resolvedRole = rawRole.contains('EXPERT')
+                            ? 'Chuyên gia Film'
+                            : rawRole.contains('PROVIDER')
+                                ? 'Nhà cung cấp'
+                                : 'Nhiếp ảnh gia';
+                        final resolvedName =
+                            (currentUser != null &&
+                                    currentUser.fullName.trim().isNotEmpty)
+                                ? currentUser.fullName.trim()
+                                : 'Lê Hoàng Anh';
+
                         final newPost = BlogPost(
                           id: 'P-${DateTime.now().millisecondsSinceEpoch}',
-                          authorName: 'Lê Hoàng Anh',
-                          authorRole: 'Nhiếp ảnh gia',
+                          authorName: resolvedName,
+                          authorRole: resolvedRole,
                           authorAvatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
                           timeAgo: 'Vừa xong',
                           title: title,

@@ -111,6 +111,190 @@ class BookingApiService {
     }
   }
 
+  /// Lấy danh sách khung giờ trống của một Thiết bị (/api/photographer/equipment/{equipmentId}/availability)
+  /// `fromDate` và `toDate` có định dạng 'YYYY-MM-DD'
+  Future<List<PhotographerEquipmentAvailabilityResponseDTO>> getEquipmentAvailability({
+    required String equipmentId,
+    String? fromDate,
+    String? toDate,
+  }) async {
+    try {
+      String queryParams = '';
+      if (fromDate != null && toDate != null) {
+        queryParams = '?fromDate=$fromDate&toDate=$toDate';
+      }
+
+      final response = await _apiClient.get(
+        '/api/photographer/equipment/$equipmentId/availability$queryParams',
+      );
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final jsonList = _extractJsonList(decoded);
+        return jsonList
+            .map((e) => PhotographerEquipmentAvailabilityResponseDTO.fromJson(
+                e as Map<String, dynamic>))
+            .toList();
+      } else {
+        if (kDebugMode) {
+          print('Failed to get equipment slots (${response.statusCode}): ${response.body}');
+        }
+        return [];
+      }
+    } catch (e) {
+      if (kDebugMode) print('getEquipmentAvailability API Error: $e');
+      return [];
+    }
+  }
+
+  /// Lấy danh sách các Gói dịch vụ Combo đang hoạt động (/api/photographer/service-packages)
+  Future<List<PhotographerServicePackageResponseDTO>> getServicePackages() async {
+    try {
+      final response = await _apiClient.get('/api/photographer/service-packages');
+      if (kDebugMode) {
+        print('getServicePackages status: ${response.statusCode}');
+      }
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final jsonList = _extractJsonList(decoded);
+        return jsonList
+            .map((e) => PhotographerServicePackageResponseDTO.fromJson(
+                e as Map<String, dynamic>))
+            .toList();
+      } else {
+        if (kDebugMode) {
+          print('Failed to get service packages (${response.statusCode}): ${response.body}');
+        }
+        return [];
+      }
+    } catch (e) {
+      if (kDebugMode) print('getServicePackages API Error: $e');
+      return [];
+    }
+  }
+
+  /// Khởi tạo giao dịch mua Gói dịch vụ qua VNPay (/api/photographer/service-packages/{packageId}/purchase)
+  Future<Map<String, dynamic>> purchaseServicePackage(String packageId) async {
+    try {
+      final response = await _apiClient.post(
+        '/api/photographer/service-packages/$packageId/purchase',
+      );
+
+      Map<String, dynamic> json = {};
+      if (response.body.isNotEmpty) {
+        try {
+          json = jsonDecode(response.body) as Map<String, dynamic>;
+        } catch (_) {}
+      }
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        return {
+          'success': true,
+          'data': json.isNotEmpty
+              ? PackagePurchasePaymentResponseDTO.fromJson(json)
+              : null,
+        };
+      } else if (response.statusCode == 401) {
+        return {
+          'success': false,
+          'message': 'Phiên đăng nhập hết hạn hoặc bạn không có quyền thực hiện. Vui lòng đăng nhập lại.',
+        };
+      } else if (response.statusCode == 403) {
+        return {
+          'success': false,
+          'message': 'Chỉ tài khoản Photographer mới có thể mua gói dịch vụ.',
+        };
+      } else if (response.statusCode == 404) {
+        return {
+          'success': false,
+          'message': json['message'] ?? 'Gói dịch vụ không khả dụng hoặc không thể mua.',
+        };
+      } else if (response.statusCode == 503) {
+        return {
+          'success': false,
+          'message': json['message'] ?? 'Cổng thanh toán VNPay hiện đang tạm ngưng (503).',
+        };
+      } else {
+        return {
+          'success': false,
+          'message': json['message'] ??
+              json['detail'] ??
+              json['title'] ??
+              'Không thể khởi tạo mua gói dịch vụ (Mã lỗi: ${response.statusCode})',
+        };
+      }
+    } catch (e) {
+      if (kDebugMode) print('purchaseServicePackage API Error: $e');
+      return {
+        'success': false,
+        'message': 'Đã xảy ra lỗi khi gọi API mua gói dịch vụ: $e',
+      };
+    }
+  }
+
+  /// Lấy danh sách các Gói dịch vụ đã đăng ký của Photographer (/api/photographer/package-subscriptions)
+  Future<List<PhotographerPackageSubscriptionResponseDTO>> getPackageSubscriptions() async {
+    try {
+      final response = await _apiClient.get('/api/photographer/package-subscriptions');
+      if (kDebugMode) {
+        print('getPackageSubscriptions status: ${response.statusCode}');
+      }
+
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final jsonList = _extractJsonList(decoded);
+        return jsonList
+            .map((e) => PhotographerPackageSubscriptionResponseDTO.fromJson(
+                e as Map<String, dynamic>))
+            .toList();
+      } else {
+        if (kDebugMode) {
+          print('Failed to get package subscriptions (${response.statusCode}): ${response.body}');
+        }
+        return [];
+      }
+    } catch (e) {
+      if (kDebugMode) print('getPackageSubscriptions API Error: $e');
+      return [];
+    }
+  }
+
+  /// Lấy thông tin chi tiết một Gói dịch vụ đã đăng ký (/api/photographer/package-subscriptions/{subscriptionId})
+  Future<PhotographerPackageSubscriptionResponseDTO?> getPackageSubscriptionDetail(
+      String subscriptionId) async {
+    try {
+      final response = await _apiClient.get(
+        '/api/photographer/package-subscriptions/$subscriptionId',
+      );
+
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        return PhotographerPackageSubscriptionResponseDTO.fromJson(json);
+      } else {
+        if (kDebugMode) {
+          print('Failed to get subscription detail (${response.statusCode}): ${response.body}');
+        }
+        return null;
+      }
+    } catch (e) {
+      if (kDebugMode) print('getPackageSubscriptionDetail API Error: $e');
+      return null;
+    }
+  }
+
+  /// Tạo đơn đặt lịch sử dụng Gói Subscription đã mua (/api/photographer/bookings)
+  Future<Map<String, dynamic>> createPackageBooking({
+    required String subscriptionId,
+    required List<PackageBookingSegmentRequestDTO> segments,
+  }) async {
+    final request = BookingCreateRequestDTO.fromSubscription(
+      subscriptionId: subscriptionId,
+      segments: segments,
+    );
+    return createBooking(request);
+  }
+
   /// Lấy danh sách các đơn đặt phòng của Photographer hiện tại
   Future<PagedResponseDTO<BookingResponseDTO>?> getMyBookings({
     String? status,

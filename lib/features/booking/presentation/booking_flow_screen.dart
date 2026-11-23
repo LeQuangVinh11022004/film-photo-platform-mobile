@@ -30,15 +30,21 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   // Step 2: Date & Time state
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   int _selectedTimeSlotIndex = 0;
+  List<Map<String, dynamic>> _liveAvailableSlots = [];
+  List<PhotographerPackageSubscriptionResponseDTO> _matchingSubscriptions = [];
+  PhotographerPackageSubscriptionResponseDTO? _selectedSubscription;
 
   List<Map<String, dynamic>> get _timeSlots {
-    if (widget.item.availableSlots.isEmpty) {
+    final sourceSlots = _liveAvailableSlots.isNotEmpty
+        ? _liveAvailableSlots
+        : widget.item.availableSlots;
+    if (sourceSlots.isEmpty) {
       return [];
     }
 
     final formattedSlots = <Map<String, dynamic>>[];
-    for (int i = 0; i < widget.item.availableSlots.length; i++) {
-    final slotMap = widget.item.availableSlots[i];
+    for (int i = 0; i < sourceSlots.length; i++) {
+    final slotMap = sourceSlots[i];
     final availabilityId = slotMap['availabilityId']?.toString() ?? '';
 
     DateTime? startAt;
@@ -106,8 +112,63 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   @override
   void initState() {
     super.initState();
+    _liveAvailableSlots = List<Map<String, dynamic>>.from(widget.item.availableSlots);
     _initAddons();
     _initSelectedDate();
+    _syncLiveSlotsAndSubscriptions();
+  }
+
+  Future<void> _syncLiveSlotsAndSubscriptions() async {
+    final spaceId = widget.item.id.trim();
+    if (spaceId.length < 32) return; // Skip mock non-UUID items
+
+    try {
+      final results = await Future.wait([
+        BookingApiService().getAvailableSlots(spaceId: spaceId),
+        BookingApiService().getPackageSubscriptions(),
+      ]);
+
+      if (!mounted) return;
+
+      final apiSlots = results[0] as List<ProviderSpaceAvailabilityResponseDTO>;
+      final apiSubs = results[1] as List<PhotographerPackageSubscriptionResponseDTO>;
+
+      if (apiSlots.isNotEmpty) {
+        final converted = <Map<String, dynamic>>[];
+        for (final s in apiSlots) {
+          final startIso = '${s.date}T${s.startTime}Z';
+          final endIso = '${s.date}T${s.endTime}Z';
+          converted.add({
+            'availabilityId': s.availabilityId,
+            'startAt': startIso,
+            'endAt': endIso,
+            'price': s.price,
+          });
+        }
+        setState(() {
+          _liveAvailableSlots = converted;
+        });
+        if (widget.item.availableSlots.isEmpty) {
+          _initSelectedDateFromSource(_liveAvailableSlots);
+        }
+      }
+
+      final activeMatching = apiSubs.where((sub) {
+        if (sub.status.toUpperCase() != 'ACTIVE' ||
+            sub.remainingUsesThisPeriod <= 0) {
+          return false;
+        }
+        return sub.items.any(
+          (i) => i.resourceId.toLowerCase() == spaceId.toLowerCase(),
+        );
+      }).toList();
+
+      if (activeMatching.isNotEmpty) {
+        setState(() {
+          _matchingSubscriptions = activeMatching;
+        });
+      }
+    } catch (_) {}
   }
 
   @override
@@ -117,8 +178,16 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   }
 
   void _initSelectedDate() {
-    if (widget.item.availableSlots.isNotEmpty) {
-      final firstSlot = widget.item.availableSlots.first;
+    _initSelectedDateFromSource(
+      _liveAvailableSlots.isNotEmpty
+          ? _liveAvailableSlots
+          : widget.item.availableSlots,
+    );
+  }
+
+  void _initSelectedDateFromSource(List<Map<String, dynamic>> source) {
+    if (source.isNotEmpty) {
+      final firstSlot = source.first;
       final rawStart = firstSlot['startAt'];
       DateTime? startAt;
       if (rawStart is DateTime) {
@@ -128,7 +197,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       }
       if (startAt != null) {
         final utcStart = startAt.toUtc();
-        _selectedDate = DateTime(utcStart.year, utcStart.month, utcStart.day);
+        setState(() {
+          _selectedDate = DateTime(utcStart.year, utcStart.month, utcStart.day);
+        });
       }
     }
   }
@@ -255,9 +326,34 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final addonPrice = _calculateAddonPrice();
     final totalPrice = basePrice + addonPrice;
 
-    final request = BookingCreateRequestDTO(
-      availabilityId: availabilityId,
-    );
+    final BookingCreateRequestDTO request;
+    if (_selectedSubscription != null) {
+      final stepItem = _selectedSubscription!.items.firstWhere(
+        (i) => i.resourceId.toLowerCase() == widget.item.id.toLowerCase(),
+        orElse: () => _selectedSubscription!.items.first,
+      );
+      final equipIds = _selectedSubscription!.items
+          .where((i) =>
+              i.stepOrder == stepItem.stepOrder &&
+              i.componentType.toUpperCase() == 'EQUIPMENT')
+          .map((e) => e.resourceId)
+          .where((id) => id.isNotEmpty)
+          .toList();
+      request = BookingCreateRequestDTO.fromSubscription(
+        subscriptionId: _selectedSubscription!.subscriptionId,
+        segments: [
+          PackageBookingSegmentRequestDTO(
+            stepOrder: stepItem.stepOrder,
+            availabilityId: availabilityId,
+            equipmentIds: equipIds,
+          ),
+        ],
+      );
+    } else {
+      request = BookingCreateRequestDTO(
+        availabilityId: availabilityId,
+      );
+    }
 
     final result = await BookingApiService().createBooking(request);
 
@@ -265,7 +361,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     setState(() => _isSubmitting = false);
 
     if (result['success'] == true) {
-      final bookingId = (result['booking'] as BookingResponseDTO?)?.bookingId;
+      final createdBooking = result['booking'] as BookingResponseDTO?;
+      final bookingId = createdBooking?.bookingId;
       if (bookingId == null || bookingId.isEmpty) {
         toastification.show(
           context: context,
@@ -285,10 +382,35 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         item: widget.item,
         bookingDate: _selectedDate,
         timeSlot: '${slot['slot']} ($hours giờ)',
-        totalPrice: totalPrice,
+        totalPrice: createdBooking != null && createdBooking.totalAmount > 0
+            ? createdBooking.totalAmount
+            : totalPrice,
         status: BookingStatus.confirmed,
       );
       BookingSchedule.sampleSchedules.insert(0, newSchedule);
+
+      if (_selectedSubscription != null ||
+          createdBooking?.depositStatus.toUpperCase() == 'NOT_REQUIRED') {
+        toastification.show(
+          context: context,
+          type: ToastificationType.success,
+          style: ToastificationStyle.flatColored,
+          title: const Text('Đặt lịch theo gói thành công!'),
+          description: const Text(
+            'Đơn đặt lịch của bạn đã được xác nhận ngay từ Gói Subscription.',
+          ),
+          alignment: Alignment.topCenter,
+          autoCloseDuration: const Duration(seconds: 4),
+          showProgressBar: false,
+        );
+        Navigator.pop(context);
+        return;
+      }
+
+      final amountToPay =
+          (createdBooking != null && createdBooking.depositAmount > 0)
+              ? createdBooking.depositAmount
+              : totalPrice;
 
       Navigator.pushReplacement(
         context,
@@ -296,7 +418,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           builder: (context) => PaymentScreen(
             bookingId: bookingId,
             item: widget.item,
-            totalAmount: totalPrice,
+            totalAmount: amountToPay,
             bookingDate: _selectedDate,
             timeSlot: '${slot['slot']} ($hours giờ)',
           ),
@@ -790,6 +912,57 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             ],
           ),
         ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
+        if (_matchingSubscriptions.isNotEmpty) ...[
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.green.shade50,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.green.shade300),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.card_membership_rounded,
+                        color: Colors.green.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Bạn có Gói Subscription áp dụng cho phòng này',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                          color: Colors.green.shade900,
+                        ),
+                      ),
+                    ),
+                    Switch(
+                      value: _selectedSubscription != null,
+                      activeThumbColor: Colors.green.shade700,
+                      onChanged: (val) {
+                        setState(() {
+                          _selectedSubscription =
+                              val ? _matchingSubscriptions.first : null;
+                        });
+                      },
+                    ),
+                  ],
+                ),
+                if (_selectedSubscription != null)
+                  Text(
+                    'Đang áp dụng: ${_selectedSubscription!.packageName} (Còn ${_selectedSubscription!.remainingUsesThisPeriod} lượt dùng • Miễn đặt cọc)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.green.shade800,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(20),
@@ -807,17 +980,21 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Tổng thanh toán',
-                style: TextStyle(
+              Text(
+                _selectedSubscription != null
+                    ? 'Sử dụng Gói Subscription'
+                    : 'Tổng thanh toán',
+                style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: Colors.white,
                 ),
               ),
               Text(
-                NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                    .format(totalPrice),
+                _selectedSubscription != null
+                    ? '0đ (-1 lượt)'
+                    : NumberFormat.currency(locale: 'vi', symbol: 'đ')
+                        .format(totalPrice),
                 style: const TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w900,

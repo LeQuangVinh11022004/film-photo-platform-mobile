@@ -162,4 +162,66 @@ class PaymentApiService {
       rethrow;
     }
   }
+
+  /// Khởi tạo giao dịch mua Gói Dịch Vụ qua POST /api/photographer/service-packages/{packageId}/purchase
+  Future<Map<String, dynamic>> initiatePackagePurchasePayment({
+    required String packageId,
+  }) async {
+    _paymentApiLog('initiatePackagePurchasePayment start | packageId=$packageId');
+    try {
+      final result = await _bookingApiService.purchaseServicePackage(packageId);
+      _paymentApiLog('purchaseServicePackage raw response: $result');
+
+      if (result['success'] != true) {
+        final msg = result['message'] ?? 'Không thể khởi tạo thanh toán gói dịch vụ.';
+        return {
+          'success': false,
+          'message': msg,
+        };
+      }
+
+      final PackagePurchasePaymentResponseDTO? dto =
+          result['data'] as PackagePurchasePaymentResponseDTO?;
+      final paymentUrl = dto?.paymentUrl.trim();
+
+      if (paymentUrl == null || paymentUrl.isEmpty) {
+        return {
+          'success': false,
+          'message': 'Backend không trả về paymentUrl hợp lệ cho gói dịch vụ.',
+          'data': dto,
+        };
+      }
+
+      return {
+        'success': true,
+        'paymentUrl': paymentUrl,
+        'data': dto,
+      };
+    } catch (e, stackTrace) {
+      _paymentApiLog('initiatePackagePurchasePayment exception: $e\n$stackTrace');
+      return {
+        'success': false,
+        'message': 'Lỗi khi khởi tạo mua gói dịch vụ: $e',
+      };
+    }
+  }
+
+  /// Kiểm tra lại trạng thái gói đăng ký sau khi thanh toán VNPay
+  Future<PhotographerPackageSubscriptionResponseDTO?> refreshPackageSubscriptionStatus(
+      String packageId) async {
+    _paymentApiLog('refreshPackageSubscriptionStatus start | packageId=$packageId');
+    try {
+      final subs = await _bookingApiService.getPackageSubscriptions();
+      for (final sub in subs) {
+        if (sub.packageId.toLowerCase() == packageId.toLowerCase() &&
+            sub.status.toUpperCase() == 'ACTIVE') {
+          return sub;
+        }
+      }
+      return null;
+    } catch (e, stackTrace) {
+      _paymentApiLog('refreshPackageSubscriptionStatus error: $e\n$stackTrace');
+      return null;
+    }
+  }
 }

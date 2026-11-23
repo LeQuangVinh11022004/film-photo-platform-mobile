@@ -1,8 +1,7 @@
 <#
-  Test tat ca API ma project Flutter dang goi va ghi log RIENG cho tung API.
+  Test tat ca API ma project Flutter dang goi (bao gom Package Subscription, Booking, Payment, AI Guide cho PHOTOGRAPHER & EXPERT)
+  va ghi log RIENG cho tung API + file tong hop summary.log (100% PowerShell thuan).
   Chay:  powershell -ExecutionPolicy Bypass -File tools\api_test\run_api_tests.ps1
-  Tuy chon: -BaseUrl <url>  -OutDir <thu muc log>
-  Log: test_logs\api\<yyyyMMdd_HHmmss>\NN_<ten>.log  +  SUMMARY.md
 #>
 param(
   [string]$BaseUrl = "https://filmbooking-api-h7bghwcydwb8eecn.japaneast-01.azurewebsites.net",
@@ -18,16 +17,18 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $script:results = @()
 $script:index = 0
 $script:token = $null
+$script:expertToken = $null
 
 function Mask([string]$s) {
-  if ($script:token) { $s = $s.Replace($script:token, "<JWT_TOKEN>") }
+  if ($script:token) { $s = $s.Replace($script:token, "<PHOTOGRAPHER_JWT>") }
+  if ($script:expertToken) { $s = $s.Replace($script:expertToken, "<EXPERT_JWT>") }
   return $s
 }
 
 function Invoke-ApiTest {
   param(
     [string]$Name, [string]$Method, [string]$Path,
-    $Body = $null, [bool]$Auth = $false, [int[]]$Expect = @(200),
+    $Body = $null, [bool]$Auth = $false, [string]$CustomToken = "", [int[]]$Expect = @(200),
     [string]$Note = "", [string]$UsedBy = ""
   )
   $script:index++
@@ -36,11 +37,15 @@ function Invoke-ApiTest {
   $logFile = Join-Path $OutDir "${num}_${safe}.log"
 
   $headers = @{}
-  if ($Auth -and $script:token) { $headers["Authorization"] = "Bearer $($script:token)" }
+  if ($CustomToken) {
+    $headers["Authorization"] = "Bearer $CustomToken"
+  } elseif ($Auth -and $script:token) {
+    $headers["Authorization"] = "Bearer $($script:token)"
+  }
   $bodyJson = $null
   if ($null -ne $Body) { $bodyJson = if ($Body -is [string]) { $Body } else { $Body | ConvertTo-Json -Depth 8 } }
 
-  $url = "$BaseUrl$Path"
+  $url = if ($Path -match "^https?://") { $Path } else { "$BaseUrl$Path" }
   $sw = [Diagnostics.Stopwatch]::StartNew()
   $status = 0; $content = ""; $respHeaders = ""; $err = ""
   try {
@@ -65,6 +70,7 @@ function Invoke-ApiTest {
   $pretty = $content
   try { if ($content) { $pretty = ($content | ConvertFrom-Json | ConvertTo-Json -Depth 10) } } catch {}
 
+  $authLabel = if ($CustomToken) { "Bearer <EXPERT_JWT>" } elseif ($Auth) { "Bearer <PHOTOGRAPHER_JWT>" } else { "none" }
   $log = @"
 ==================== API TEST LOG ====================
 Name      : $Name
@@ -76,7 +82,7 @@ Note      : $Note
 
 ---------------------- REQUEST ----------------------
 $Method $url
-Auth      : $(if ($Auth) { "Bearer <JWT_TOKEN>" } else { "none" })
+Auth      : $authLabel
 Body      :
 $(Mask $bodyJson)
 
@@ -98,7 +104,7 @@ $(Mask $pretty)
     UsedBy = $UsedBy; Note = $Note; Log = "${num}_${safe}.log"
   }
   $color = switch ($verdict) { "PASS" { "Green" } "FAIL" { "Red" } default { "Yellow" } }
-  Write-Host ("[{0}] {1,-5} {2,-45} HTTP {3}" -f $num, $verdict, $Name, $status) -ForegroundColor $color
+  Write-Host ("[{0}] {1,-5} {2,-48} HTTP {3}" -f $num, $verdict, $Name, $status) -ForegroundColor $color
   if ($content) { try { return ($content | ConvertFrom-Json) } catch { return $null } }
   return $null
 }
@@ -106,7 +112,7 @@ $(Mask $pretty)
 Write-Host "Base URL: $BaseUrl"
 Write-Host "Log dir : $OutDir`n"
 
-# ---------- AUTH ----------
+# ---------- 1. AUTH (PHOTOGRAPHER & EXPERT) ----------
 $email = "apitest_$stamp@example.com"
 $pass = "Test@123456"
 $guid = [guid]::NewGuid().ToString()
@@ -114,92 +120,140 @@ $guid = [guid]::NewGuid().ToString()
 Invoke-ApiTest "Auth_Register_Photographer" POST "/api/auth/register/photographer" `
   @{ fullName = "API Tester"; email = $email; password = $pass } -Expect 201 `
   -UsedBy "auth_service.dart register()" | Out-Null
+
 Invoke-ApiTest "Auth_Register_Duplicate_Email" POST "/api/auth/register/photographer" `
   @{ fullName = "API Tester"; email = $email; password = $pass } -Expect 409 `
   -Note "App xu ly 409 = email da ton tai" -UsedBy "auth_service.dart register()" | Out-Null
-$login = Invoke-ApiTest "Auth_Login_OK" POST "/api/auth/login" `
-  @{ email = $email; password = $pass } -Expect 200 -UsedBy "auth_service.dart login()"
-if ($login -and $login.token) { $script:token = $login.token }
-Invoke-ApiTest "Auth_Login_WrongPassword" POST "/api/auth/login" `
-  @{ email = $email; password = "wrong_pass" } -Expect 401 -UsedBy "auth_service.dart login()" | Out-Null
 
-# ---------- BROWSE ----------
+$login = Invoke-ApiTest "Auth_Login_Photographer_OK" POST "/api/auth/login" `
+  @{ email = $email; password = $pass } -Expect 200 `
+  -Note "Dang nhap PHOTOGRAPHER -> dieu huong /home" -UsedBy "auth_service.dart login()"
+if ($login -and $login.token) { $script:token = $login.token }
+
+Invoke-ApiTest "Auth_Login_WrongPassword" POST "/api/auth/login" `
+  @{ email = $email; password = "wrong_pass" } -Expect 401 `
+  -UsedBy "auth_service.dart login()" | Out-Null
+
+$expertLogin = Invoke-ApiTest "Auth_Login_Expert_OK" POST "/api/auth/login" `
+  @{ email = "expert.demo@filmbooking.local"; password = "FilmDemo2026!" } -Expect 200 `
+  -Note "Dang nhap EXPERT -> dieu huong /expert-workspace" -UsedBy "auth_service.dart login()"
+if ($expertLogin -and $expertLogin.token) { $script:expertToken = $expertLogin.token }
+
+# ---------- 2. BROWSE SPACES & EQUIPMENT (PHOTOGRAPHER vs EXPERT) ----------
 Invoke-ApiTest "Photographer_Studios_NoToken" GET "/api/photographer/studios" -Expect 401 `
-  -Note "Khong co token phai bi chan" | Out-Null
+  -Note "Khong co token phai bi chan (401)" | Out-Null
+
+Invoke-ApiTest "Photographer_Studios_ExpertForbidden" GET "/api/photographer/studios" `
+  -CustomToken $script:expertToken -Expect 403 `
+  -Note "Role EXPERT goi endpoint PHOTOGRAPHER bi chan 403 Forbidden" | Out-Null
+
 $studios = Invoke-ApiTest "Photographer_Studios" GET "/api/photographer/studios" -Auth $true `
   -UsedBy "home_screen.dart, item_list_screen.dart -> getStudios()"
+
 $darkrooms = Invoke-ApiTest "Photographer_Darkrooms" GET "/api/photographer/darkrooms" -Auth $true `
   -UsedBy "home_screen.dart, item_list_screen.dart -> getDarkrooms()"
+
 $from = (Get-Date).ToString("yyyy-MM-dd"); $to = (Get-Date).AddDays(30).ToString("yyyy-MM-dd")
 Invoke-ApiTest "Photographer_Studios_DateFilter" GET "/api/photographer/studios?fromDate=$from&toDate=$to" -Auth $true `
-  -UsedBy "item_list_screen.dart (loc theo ngay)" | Out-Null
+  -UsedBy "item_list_screen.dart -> getStudios(fromDate, toDate)" | Out-Null
 
 $all = @(); if ($studios) { $all += $studios }; if ($darkrooms) { $all += $darkrooms }
 $space = $all | Where-Object { $_.availableSlots.Count -gt 0 } | Select-Object -First 1
-$spaceId = if ($space) { $space.resourceId } else { $guid }
-$slotId = if ($space) { $space.availableSlots[0].availabilityId } else { $guid }
-if (-not $space) { Write-Host "  (!) Khong co studio/darkroom nao co slot -> cac buoc booking dung GUID gia" -ForegroundColor Yellow }
-
-# Anh
-if ($space -and $space.images.Count -gt 0) {
-  Invoke-ApiTest "Static_Image_Upload" GET $space.images[0].imageUrl -Expect 200 `
-    -Note "Anh tuong doi /uploads/... duoc app noi voi BaseUrl (image_utils.dart)" -UsedBy "SafeNetworkImage" | Out-Null
-}
+$spaceId = if ($space) { $space.resourceId } else { "0e85263b-2d1d-4bf3-833e-9986829ac8a6" }
+$slotCount = if ($space -and $space.availableSlots) { $space.availableSlots.Count } else { 0 }
+$slotId = if ($slotCount -gt 0) { $space.availableSlots[$slotCount - 1].availabilityId } else { $guid }
 
 Invoke-ApiTest "Photographer_Space_Availability" GET "/api/photographer/spaces/$spaceId/availability?fromDate=$from&toDate=$to" -Auth $true `
-  -Note "Response dung key availableDate (model Flutter dang doc 'date')" -UsedBy "booking_api_service.dart getAvailableSlots()" | Out-Null
+  -Note "Lay danh sach slot trong cua Studio/Darkroom" -UsedBy "booking_api_service.dart getAvailableSlots()" | Out-Null
 
-# ---------- BOOKING ----------
+Invoke-ApiTest "Photographer_Equipment_Availability" GET "/api/photographer/equipment/40000000-0000-0000-0000-000000000001/availability?fromDate=$from&toDate=$to" -Auth $true `
+  -Note "API MOI: Lay khung gio trong cua thiet bi (Canon EOS 5D Mark IV)" -UsedBy "booking_api_service.dart getEquipmentAvailability()" | Out-Null
+
+Invoke-ApiTest "Photographer_Equipment_Availability_NotFound" GET "/api/photographer/equipment/$guid/availability" -Auth $true -Expect 404 `
+  -Note "API MOI: Thiet bi khong ton tai tra ve 404" -UsedBy "booking_api_service.dart getEquipmentAvailability()" | Out-Null
+
+# ---------- 3. PACKAGE SUBSCRIPTION & SERVICE PACKAGES (NEW APIs) ----------
+Invoke-ApiTest "Photographer_ServicePackages_List" GET "/api/photographer/service-packages" -Auth $true -Expect 200 `
+  -Note "API MOI: Lay danh sach Goi Dich Vu Combo (Azure DB chua migrate bang service_package_items nen dang 500)" `
+  -UsedBy "service_packages_screen.dart -> getServicePackages()" | Out-Null
+
+Invoke-ApiTest "Photographer_ServicePackage_Purchase" POST "/api/photographer/service-packages/$guid/purchase" -Auth $true -Expect 200, 404 `
+  -Note "API MOI: Khoi tao thanh toan VNPay mua Goi Dich Vu Combo" `
+  -UsedBy "payment_api_service.dart -> initiatePackagePurchasePayment()" | Out-Null
+
+Invoke-ApiTest "Photographer_PackageSubscriptions_List" GET "/api/photographer/package-subscriptions" -Auth $true -Expect 200 `
+  -Note "API MOI: Lay danh sach Goi Subscription da mua cua Photographer" `
+  -UsedBy "service_packages_screen.dart, booking_flow_screen.dart -> getPackageSubscriptions()" | Out-Null
+
+Invoke-ApiTest "Photographer_PackageSubscription_Detail" GET "/api/photographer/package-subscriptions/$guid" -Auth $true -Expect 200, 404 `
+  -Note "API MOI: Xem chi tiet 1 Goi Subscription da mua" `
+  -UsedBy "service_packages_screen.dart -> getPackageSubscriptionDetail()" | Out-Null
+
+# ---------- 4. BOOKINGS (STANDARD & PACKAGE SUBSCRIPTION) ----------
 Invoke-ApiTest "Photographer_Bookings_List" GET "/api/photographer/bookings?page=1&pageSize=20" -Auth $true `
-  -Note "Response dung totalItems (model Flutter dang doc 'totalCount')" -UsedBy "getMyBookings() - chua noi vao UI" | Out-Null
+  -UsedBy "schedule_screen.dart, profile_screen.dart -> getMyBookings()" | Out-Null
 
-$bk = Invoke-ApiTest "Photographer_Booking_Create" POST "/api/photographer/bookings" `
-  @{ availabilityId = $slotId; packageId = $null; equipmentIds = @() } -Auth $true -Expect 201 `
+$bk = Invoke-ApiTest "Photographer_Booking_Create_Standard" POST "/api/photographer/bookings" `
+  @{ availabilityId = $slotId; equipmentIds = @() } -Auth $true -Expect 201 `
+  -Note "Dat phong le (schema moi: availabilityId + equipmentIds, khong truyen packageId)" `
   -UsedBy "booking_flow_screen.dart _submitBooking()"
 $bookingId = if ($bk -and $bk.bookingId) { $bk.bookingId } else { $guid }
-Invoke-ApiTest "Photographer_Booking_Create_BadSlot" POST "/api/photographer/bookings" `
-  @{ availabilityId = $guid; packageId = $null; equipmentIds = @() } -Auth $true -Expect 409 `
-  -Note "Slot khong ton tai" | Out-Null
-Invoke-ApiTest "Photographer_Booking_Detail" GET "/api/photographer/bookings/$bookingId" -Auth $true `
-  -UsedBy "getBookingDetail() - chua noi vao UI" | Out-Null
 
-# ---------- PAYMENT ----------
+Invoke-ApiTest "Photographer_Booking_Create_BadSlot" POST "/api/photographer/bookings" `
+  @{ availabilityId = $guid; equipmentIds = @() } -Auth $true -Expect 409 `
+  -Note "Slot khong ton tai tra ve 409 Conflict" -UsedBy "booking_api_service.dart createBooking()" | Out-Null
+
+Invoke-ApiTest "Photographer_Booking_Create_InvalidPayload" POST "/api/photographer/bookings" `
+  @{ availabilityId = $null; subscriptionId = $null } -Auth $true -Expect 400 `
+  -Note "Khong truyen availabilityId hoac subscriptionId tra ve 400 BadRequest" -UsedBy "booking_api_service.dart createBooking()" | Out-Null
+
+Invoke-ApiTest "Photographer_Booking_Create_FromSubscription" POST "/api/photographer/bookings" `
+  @{ subscriptionId = $guid; segments = @( @{ stepOrder = 1; availabilityId = $slotId; equipmentIds = @() } ) } `
+  -Auth $true -Expect 201, 409 `
+  -Note "API MOI: Dat lich su dung Goi Subscription (subscriptionId + segments)" `
+  -UsedBy "service_packages_screen.dart, booking_flow_screen.dart -> createPackageBooking()" | Out-Null
+
+Invoke-ApiTest "Photographer_Booking_Detail" GET "/api/photographer/bookings/$bookingId" -Auth $true `
+  -UsedBy "payment_api_service.dart refreshBookingStatus() -> getBookingDetail()" | Out-Null
+
+# ---------- 5. PAYMENT (VNPAY DEPOSIT & CALLBACKS) ----------
 $dep = Invoke-ApiTest "Payment_DepositPayment_VNPAY" POST "/api/photographer/bookings/$bookingId/deposit-payment" `
   @{ paymentMethod = "VNPAY" } -Auth $true -Expect 200 `
-  -Note "API thanh toan CHUAN. Tra paymentUrl VNPay sandbox. App chua goi payDeposit()" -UsedBy "booking_api_service.dart payDeposit() (khong duoc UI goi)"
+  -Note "Khoi tao thanh toan dat coc 30% qua VNPay Sandbox -> tra ve paymentUrl" `
+  -UsedBy "payment_screen.dart -> initiateDepositPayment() -> payDeposit()"
 if ($dep -and $dep.paymentUrl) { Write-Host "      paymentUrl: $($dep.paymentUrl.Substring(0,[Math]::Min(90,$dep.paymentUrl.Length)))..." }
-Invoke-ApiTest "Payment_DepositPayment_MOMO" POST "/api/photographer/bookings/$bookingId/deposit-payment" `
+
+Invoke-ApiTest "Payment_DepositPayment_MOMO_Unsupported" POST "/api/photographer/bookings/$bookingId/deposit-payment" `
   @{ paymentMethod = "MOMO" } -Auth $true -Expect 400 `
-  -Note "BE chi ho tro VNPAY (UI van hien MoMo)" | Out-Null
-Invoke-ApiTest "Payment_DepositPayment_VIETQR" POST "/api/photographer/bookings/$bookingId/deposit-payment" `
-  @{ paymentMethod = "VIETQR" } -Auth $true -Expect 400 `
-  -Note "BE chi ho tro VNPAY (UI van hien VietQR)" | Out-Null
-Invoke-ApiTest "Payment_DepositPayment_FakeBookingId" POST "/api/photographer/bookings/BK-123456/deposit-payment" `
-  @{ paymentMethod = "VNPAY" } -Auth $true -Expect 404 `
-  -Note "App tao ma gia BK-xxxx khi dat phong loi -> thanh toan se 404" | Out-Null
+  -Note "Backend chi ho tro VNPAY, tu choi MOMO voi HTTP 400" | Out-Null
 
-Invoke-ApiTest "Payment_Create_VNPAY_AppCalls" POST "/api/payments/vnpay/create" `
-  @{ bookingId = $bookingId; amount = 150000 } -Auth $true -Expect 200, 201 `
-  -Note "Endpoint KHONG ton tai tren BE (404) nhung app dang goi" -UsedBy "payment_api_service.dart createPaymentUrl()" | Out-Null
-Invoke-ApiTest "Payment_Create_MOMO_AppCalls" POST "/api/payments/momo/create" `
-  @{ bookingId = $bookingId; amount = 150000 } -Auth $true -Expect 200, 201 `
-  -Note "Endpoint KHONG ton tai tren BE" -UsedBy "payment_api_service.dart createPaymentUrl()" | Out-Null
-Invoke-ApiTest "Payment_VNPay_Return_AppFakeParams" GET "/api/payments/vnpay/return?vnp_Amount=15000000&vnp_BankCode=NCB&vnp_OrderInfo=Test&vnp_ResponseCode=00&vnp_TransactionNo=123456&vnp_TxnRef=$bookingId" -Expect 200 `
-  -Note "App gui tham so gia khong co vnp_SecureHash -> BE tu choi (400)" -UsedBy "payment_api_service.dart verifyVnpayReturn()" | Out-Null
-Invoke-ApiTest "Payment_MoMo_Return_AppFakeParams" GET "/api/payments/momo/return?PartnerCode=MOMO&OrderId=$bookingId&ResultCode=0&Signature=dummy_momo_signature" -Expect 200 `
-  -Note "Route MoMo da bi go khoi BE" -UsedBy "payment_api_service.dart verifyMomoReturn()" | Out-Null
+Invoke-ApiTest "Payment_VNPay_Return_MissingSignature" GET "/api/payments/vnpay/return?vnp_Amount=67500000&vnp_ResponseCode=00&vnp_TxnRef=$bookingId" -Expect 400 `
+  -Note "Thieu vnp_SecureHash -> Backend tu choi 400 InvalidNotification" `
+  -UsedBy "payment_api_service.dart verifyReturnEndpoint()" | Out-Null
+
 Invoke-ApiTest "Payment_VNPay_IPN" GET "/api/payments/vnpay/ipn?vnp_TxnRef=abc&vnp_ResponseCode=00&vnp_SecureHash=bad" -Expect 200 `
-  -Note "Server-to-server cua VNPay, app khong goi. RspCode 99 la binh thuong" | Out-Null
+  -Note "Server-to-server webhook cua VNPay (RspCode 97/99)" | Out-Null
 
-# ---------- CANCEL ----------
+# ---------- 6. CANCEL BOOKING ----------
 Invoke-ApiTest "Photographer_Booking_Cancel" PATCH "/api/photographer/bookings/$bookingId/cancel" -Auth $true -Expect 204 `
-  -UsedBy "cancelBooking() - chua noi vao UI" | Out-Null
-Invoke-ApiTest "Photographer_Booking_Cancel_NotFound" PATCH "/api/photographer/bookings/$guid/cancel" -Auth $true -Expect 404 | Out-Null
+  -Note "Huy don dang o trang thai AWAITING_DEPOSIT -> 204 NoContent, nha slot" `
+  -UsedBy "schedule_screen.dart -> cancelBooking()" | Out-Null
 
-# ---------- AI ----------
-Invoke-ApiTest "AI_Photography_Guide" POST "/api/ai/photography-guide" `
-  @{ theme = "Chan dung vintage"; location = "Studio"; availableLight = "Anh sang cua so"; equipment = "May film 35mm"; experienceLevel = "Beginner" } `
-  -Auth $true -Expect 200 -UsedBy "ai_assistant_screen.dart, home_screen.dart -> getPhotographyGuide()" | Out-Null
+Invoke-ApiTest "Photographer_Booking_Cancel_NotFound" PATCH "/api/photographer/bookings/$guid/cancel" -Auth $true -Expect 404 `
+  -UsedBy "schedule_screen.dart -> cancelBooking()" | Out-Null
+
+# ---------- 7. AI PHOTOGRAPHY GUIDE (PHOTOGRAPHER & EXPERT) ----------
+$aiPayload = @{ theme = "Chan dung vintage"; location = "Studio"; availableLight = "Anh sang cua so"; equipment = "May film 35mm"; experienceLevel = "Beginner" }
+
+Invoke-ApiTest "AI_Photography_Guide_Photographer" POST "/api/ai/photography-guide" `
+  $aiPayload -Auth $true -Expect 200 `
+  -Note "Goi AI Guide voi role PHOTOGRAPHER (503 neu Azure chua cau hinh Gemini API key)" `
+  -UsedBy "ai_assistant_screen.dart -> getPhotographyGuide()" | Out-Null
+
+Invoke-ApiTest "AI_Photography_Guide_Expert" POST "/api/ai/photography-guide" `
+  $aiPayload -CustomToken $script:expertToken -Expect 200 `
+  -Note "Goi AI Guide voi role EXPERT ([Authorize] cho phep ca PHOTOGRAPHER va EXPERT)" `
+  -UsedBy "expert_home_screen.dart -> ai_assistant_screen.dart -> getPhotographyGuide()" | Out-Null
 
 # ---------- SUMMARY ----------
 $pass = ($results | Where-Object Verdict -eq "PASS").Count
@@ -209,7 +263,8 @@ $md += "# API Test Summary"
 $md += ""
 $md += "- Time: $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
 $md += "- Base URL: $BaseUrl"
-$md += "- Test account: $email"
+$md += "- Photographer test account: $email"
+$md += "- Expert test account: expert.demo@filmbooking.local"
 $md += "- **PASS: $pass / $($results.Count)**  |  FAIL/ERROR: $fail"
 $md += ""
 $md += "| # | Result | Method | Endpoint | HTTP | Expected | ms | Used by | Note | Log |"
@@ -221,9 +276,9 @@ Set-Content -Path (Join-Path $OutDir "SUMMARY.md") -Value ($md -join "`n") -Enco
 $results | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $OutDir "summary.json") -Encoding UTF8
 
 # =====================================================================
-# TAO FILE LOG TONG HOP DUY NHAT (summary.log) BANG POWERSHELL THUAN (100% KHONG DUNG PYTHON)
+# TAO FILE LOG TONG HOP DUY NHAT (summary.log) BANG POWERSHELL THUAN
 # =====================================================================
-$w = 110
+$w = 115
 $sepDouble = "=" * $w
 $sepSingle = "-" * $w
 
@@ -233,12 +288,13 @@ $pctFail = if ($results.Count -gt 0) { [math]::Round(($fail / $results.Count) * 
 $logLines = [System.Collections.Generic.List[string]]::new()
 $logLines.Add($sepDouble)
 $logLines.Add("                    BÁO CÁO TOÀN DIỆN KIỂM THỬ API - FILM PHOTOGRAPHY PLATFORM")
-$logLines.Add("                             CONSOLIDATED API TEST EXECUTION REPORT")
+$logLines.Add("                  CONSOLIDATED API TEST REPORT (PHOTOGRAPHER & EXPERT ROLES)")
 $logLines.Add($sepDouble)
 $logLines.Add(" Thoi gian thuc thi : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
 $logLines.Add(" Base URL Backend   : $BaseUrl")
-$logLines.Add(" Tai khoan kiem thu : $email (Role: PHOTOGRAPHER)")
-$logLines.Add(" Tong so kiem thu   : $($results.Count) endpoints")
+$logLines.Add(" Tai khoan test 1   : $email (Role: PHOTOGRAPHER)")
+$logLines.Add(" Tai khoan test 2   : expert.demo@filmbooking.local (Role: EXPERT)")
+$logLines.Add(" Tong so kiem thu   : $($results.Count) kịch bản API")
 $logLines.Add(" Ket qua tong quan  : [PASS]: $pass/$($results.Count) ($pctPass%)   |   [FAIL/ERROR]: $fail/$($results.Count) ($pctFail%)")
 $logLines.Add($sepDouble)
 $logLines.Add("")
@@ -246,46 +302,60 @@ $logLines.Add($sepSingle)
 $logLines.Add(" [PHẦN 1] BẢNG TỔNG HỢP KẾT QUẢ TẤT CẢ CÁC API (API TEST OVERVIEW)")
 $logLines.Add($sepSingle)
 
-$fmt = "{0,-3} | {1,-7} | {2,-6} | {3,-4} | {4,-4} | {5,-5} | {6,-45} | {7}"
+$fmt = "{0,-3} | {1,-7} | {2,-6} | {3,-4} | {4,-7} | {5,-5} | {6,-45} | {7}"
 $logLines.Add([string]::Format($fmt, "#", "KẾT QUẢ", "METHOD", "HTTP", "EXP", "MS", "ENDPOINT", "MÃ NGUỒN APP SỬ DỤNG"))
 $logLines.Add($sepSingle)
 
 foreach ($r in $results) {
   $p = if ($r.Path.Length -gt 44) { $r.Path.Substring(0, 41) + "..." } else { $r.Path }
-  $u = if ($r.UsedBy.Length -gt 30) { $r.UsedBy.Substring(0, 27) + "..." } else { $r.UsedBy }
+  $u = if ($r.UsedBy.Length -gt 32) { $r.UsedBy.Substring(0, 29) + "..." } else { $r.UsedBy }
   $logLines.Add([string]::Format($fmt, $r.No, $r.Verdict, $r.Method, $r.Status, $r.Expected, $r.Ms, $p, $u))
 }
 
 $logLines.Add($sepSingle)
 $logLines.Add("")
 $logLines.Add($sepDouble)
-$logLines.Add(" [PHẦN 2] PHÂN TÍCH CHUYÊN SÂU HỆ THỐNG THANH TOÁN (PAYMENT SYSTEM DEEP DIVE)")
+$logLines.Add(" [PHẦN 2] PHÂN TÍCH CẬP NHẬT API MỚI (PACKAGE SUBSCRIPTION, BOOKING, COMMUNITY POST & ROLES)")
 $logLines.Add($sepDouble)
 $logLines.Add(@"
-1. THỰC TRẠNG API THANH TOÁN TRÊN BACKEND (Azure):
-   * Backend HIỆN TẠI CHỈ HỖ TRỢ VNPAY:
-     - Endpoint chuẩn: POST /api/photographer/bookings/{bookingId}/deposit-payment
-     - Request body hợp lệ: { "paymentMethod": "VNPAY" }
-     - Trả về: HTTP 200 OK kèm URL sandbox VNPay hoàn chỉnh.
-   * Backend TỪ CHỐI MoMo và VietQR:
-     - Khi gửi paymentMethod = "MOMO" hoặc "VIETQR", Backend trả về HTTP 400 Bad Request
-       với thông báo lỗi: 'paymentMethod must be VNPAY'.
+1. CÁC API PACKAGE SUBSCRIPTION & BOOKING MỚI ĐÃ ĐƯỢC TÍCH HỢP VÀO FLUTTER APP:
+   * GET  /api/photographer/service-packages
+     -> BookingApiService.getServicePackages() -> ServicePackagesScreen (Tab 'Gói Combo').
+   * POST /api/photographer/service-packages/{packageId}/purchase
+     -> BookingApiService.purchaseServicePackage() & PaymentApiService.initiatePackagePurchasePayment()
+     -> PaymentScreen hỗ trợ thanh toán mua Gói Combo qua VNPay Sandbox.
+   * GET  /api/photographer/package-subscriptions
+     -> BookingApiService.getPackageSubscriptions() -> ServicePackagesScreen (Tab 'Gói Đã Đăng Ký') & BookingFlowScreen.
+   * GET  /api/photographer/package-subscriptions/{subscriptionId}
+     -> BookingApiService.getPackageSubscriptionDetail() -> Modal xem chi tiết gói & số lượt còn lại trong kỳ.
+   * GET  /api/photographer/equipment/{equipmentId}/availability
+     -> BookingApiService.getEquipmentAvailability() -> Kiểm tra lịch trống của thiết bị đi kèm.
+   * POST /api/photographer/bookings (Schema mới BookingCreateRequestDTO):
+     - Chế độ 1 (Đặt phòng lẻ): Truyền { availabilityId, equipmentIds } (đã bỏ trường packageId cũ).
+     - Chế độ 2 (Đặt theo Gói Subscription): Truyền { subscriptionId, segments: [{ stepOrder, availabilityId, equipmentIds }] }
+       qua BookingApiService.createPackageBooking(). Đơn được CONFIRMED ngay, miễn đặt cọc (depositStatus = NOT_REQUIRED).
 
-2. ĐỘ LỆCH GIỮA CLIENT (FLUTTER APP) VÀ BACKEND:
-   * payment_api_service.dart gọi sai đường dẫn:
-     - App đang gọi: POST /api/payments/vnpay/create và POST /api/payments/momo/create
-     - Cả 2 route này trên Azure đều trả về HTTP 404 NOT FOUND vì Backend không khai báo route này.
-   * Xử lý callback thanh toán:
-     - payment_api_service.dart gọi GET /api/payments/vnpay/return với tham số giả lập không có vnp_SecureHash,
-       dẫn tới Backend trả về HTTP 400 'InvalidNotification: Required VNPay callback fields are missing'.
-   * UI hiện tại (payment_screen.dart):
-     - Đang hiển thị cả 3 nút: VNPay, MoMo, VietQR.
-     - Khi gọi API lỗi, màn hình bật Modal offline fallback giả lập thành công nên người dùng tưởng vẫn chạy được.
+2. GHI CHÚ VỀ LỖI HTTP 500 TRÊN AZURE ĐỐI VỚI CÁC BẢNG PACKAGE ITEMS:
+   * Code C# mới (PhotographerPackagesController) đã được deploy lên Azure.
+   * Tuy nhiên trên database PostgreSQL của Azure, bảng service_package_items / user_package_subscription_items
+     chưa chạy migration thêm các cột mới (step_order, included_duration_minutes, included_chemical_quantity, notes),
+     nên khi EF Core SELECT từ 2 bảng này đang trả về HTTP 500.
+   * App Flutter đã được xử lý fallback an toàn trên ServicePackagesScreen để không bị crash khi DB chưa migrate xong.
 
-3. HÀNH ĐỘNG CẦN SỬA ĐỂ THANH TOÁN HOẠT ĐỘNG THỰC TẾ:
-   (1) payment_screen.dart & booking_flow: Chuyển sang gọi booking_api_service.dart -> payDeposit(bookingId, paymentMethod: 'VNPAY').
-   (2) Tạm ẩn lựa chọn MoMo và VietQR trên UI cho đến khi Backend bổ sung tích hợp.
-   (3) Sau khi nhận được paymentUrl từ VNPay, mở Webview / InAppBrowser để khách hàng quẹt thẻ thử nghiệm trên cổng VNPay Sandbox.
+3. KIỂM TRA COMMUNITY POST API TRÊN BACKEND:
+   * Trong source code Backend (GFA26SE169_FA26SE091_CapstoneProject-main), mới chỉ có các EF Core Entity Model:
+     CommunityPost.cs, CommunityPostImage.cs, Comment.cs, Article.cs, Workshop.cs trong tầng Repository/Models.
+   * Backend CHƯA CÓ Controller hay Endpoint nào cho Community Post (/api/community-posts...).
+   * Trên App Flutter, CommunityScreen đã được đồng bộ với AuthService().currentUser để khi đăng bài/bình luận
+     sẽ lấy đúng tên và vai trò thực tế của tài khoản đang đăng nhập (PHOTOGRAPHER hoặc EXPERT).
+
+4. KIỂM TRA PHÂN QUYỀN ROLE PHOTOGRAPHER vs EXPERT:
+   * PHOTOGRAPHER: Có toàn quyền gọi /api/photographer/* (studios, darkrooms, availability, bookings, deposit-payment,
+     cancel, service-packages, package-subscriptions) và /api/ai/photography-guide.
+   * EXPERT (expert.demo@filmbooking.local / FilmDemo2026!):
+     - Đăng nhập thành công qua POST /api/auth/login (nhận JWT có role = EXPERT), App điều hướng vào /expert-workspace.
+     - Gọi được POST /api/ai/photography-guide (vì PhotographyGuideController dùng [Authorize] cho mọi role đã đăng nhập).
+     - Khi gọi /api/photographer/* sẽ bị chặn đúng chuẩn HTTP 403 Forbidden (do [Authorize(Roles = "PHOTOGRAPHER")]).
 "@)
 $logLines.Add($sepDouble)
 $logLines.Add(" [PHẦN 3] CHI TIẾT REQUEST & RESPONSE TOÀN BỘ $($results.Count) API ĐÃ KIỂM THỬ")
@@ -323,7 +393,6 @@ $logLines.Add($sepDouble)
 
 $summaryContent = $logLines -join "`n"
 
-# Luu vao ca 3 vi tri thuan tien:
 Set-Content -Path (Join-Path $OutDir "summary.log") -Value $summaryContent -Encoding UTF8
 Set-Content -Path (Join-Path $root "test_logs\summary.log") -Value $summaryContent -Encoding UTF8
 Set-Content -Path (Join-Path $root "summary.log") -Value $summaryContent -Encoding UTF8

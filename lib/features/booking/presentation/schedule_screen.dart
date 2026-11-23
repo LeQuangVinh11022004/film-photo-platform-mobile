@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
@@ -21,9 +21,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   int _statusFilterIndex = 0; // 0: All, 1: Confirmed, 2: Pending/Awaiting Deposit, 3: Cancelled
 
   List<BookingResponseDTO> _bookings = [];
+  Map<String, String> _spaceImageMap = {};
   bool _isLoading = true;
   String? _errorMessage;
   bool _isCancelling = false;
+  bool _hasAutoSelectedInitialDate = false;
 
   final List<String> _months = [
     'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
@@ -46,17 +48,67 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     });
 
     try {
-      final result = await _bookingApiService.getMyBookings(page: 1, pageSize: 50);
+      final results = await Future.wait([
+        _bookingApiService.getMyBookings(page: 1, pageSize: 50),
+        _bookingApiService.getStudios(),
+        _bookingApiService.getDarkrooms(),
+      ]);
       if (!mounted) return;
 
+      final result = results[0] as PagedResponseDTO<BookingResponseDTO>?;
+      final studios = results[1] as List<ResourceItemResponseDTO>;
+      final darkrooms = results[2] as List<ResourceItemResponseDTO>;
+
+      final imgMap = <String, String>{};
+      for (final r in [...studios, ...darkrooms]) {
+        if (r.resourceId.isNotEmpty && r.images.isNotEmpty) {
+          imgMap[r.resourceId.toLowerCase()] = r.images.first.imageUrl;
+        }
+      }
+
       if (result != null) {
+        final loaded = result.items;
+        DateTime nextSelected = _selectedDate;
+        DateTime nextMonth = _currentMonth;
+
+        if (!_hasAutoSelectedInitialDate && loaded.isNotEmpty) {
+          _hasAutoSelectedInitialDate = true;
+          final hasToday = loaded.any(
+            (b) => _isSameDay(_parseBookingDate(b.bookingDate), _selectedDate),
+          );
+          if (!hasToday) {
+            final parsedDates = loaded
+                .map((b) => _parseBookingDate(b.bookingDate))
+                .whereType<DateTime>()
+                .toList()
+              ..sort();
+            if (parsedDates.isNotEmpty) {
+              final nowDay = DateTime(
+                DateTime.now().year,
+                DateTime.now().month,
+                DateTime.now().day,
+              );
+              final upcoming = parsedDates.firstWhere(
+                (d) => !d.isBefore(nowDay),
+                orElse: () => parsedDates.last,
+              );
+              nextSelected = upcoming;
+              nextMonth = DateTime(upcoming.year, upcoming.month, 1);
+            }
+          }
+        }
+
         setState(() {
-          _bookings = result.items;
+          _bookings = loaded;
+          _spaceImageMap = imgMap;
+          _selectedDate = nextSelected;
+          _currentMonth = nextMonth;
           _isLoading = false;
         });
       } else {
         setState(() {
           _bookings = [];
+          _spaceImageMap = imgMap;
           _isLoading = false;
           _errorMessage = 'Không thể tải danh sách lịch đặt.';
         });
@@ -71,6 +123,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
   }
 
+  String _resolveSpaceImage(BookingResponseDTO booking) {
+    final key = booking.spaceId.toLowerCase();
+    final mapped = _spaceImageMap[key];
+    if (mapped != null && mapped.isNotEmpty) {
+      return mapped;
+    }
+    final isDarkroom = booking.spaceName.toLowerCase().contains('darkroom') ||
+        booking.spaceName.toLowerCase().contains('phòng tối');
+    return isDarkroom
+        ? 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80'
+        : 'https://images.unsplash.com/photo-1598488035139-bdbb2231ce04?w=800&auto=format&fit=crop&q=80';
+  }
+
   void _changeMonth(int offset) {
     setState(() {
       _currentMonth = DateTime(_currentMonth.year, _currentMonth.month + offset, 1);
@@ -81,10 +146,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   DateTime? _parseBookingDate(String rawDate) {
+    final clean = rawDate.trim().split('T').first;
+    final parts = clean.split('-');
+    if (parts.length == 3) {
+      final y = int.tryParse(parts[0]);
+      final m = int.tryParse(parts[1]);
+      final d = int.tryParse(parts[2]);
+      if (y != null && m != null && d != null) {
+        return DateTime(y, m, d);
+      }
+    }
     final parsed = DateTime.tryParse(rawDate);
     if (parsed == null) return null;
-    final local = parsed.toLocal();
-    return DateTime(local.year, local.month, local.day);
+    return DateTime(parsed.year, parsed.month, parsed.day);
   }
 
   bool _isSameDay(DateTime? a, DateTime b) {
@@ -190,7 +264,13 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   bool _canCancelBooking(BookingResponseDTO booking) {
     final s = booking.status.toUpperCase();
-    return s != 'CANCELLED' && s != 'COMPLETED';
+    final isPackageBooking =
+        (booking.packageId != null && booking.packageId!.isNotEmpty) ||
+            booking.depositStatus.toUpperCase() == 'NOT_REQUIRED';
+    if (isPackageBooking) {
+      return s == 'CONFIRMED' || s == 'AWAITING_DEPOSIT' || s == 'PENDING';
+    }
+    return s == 'AWAITING_DEPOSIT' || s == 'PENDING';
   }
 
   Future<void> _handleCancelBooking(BuildContext sheetContext, BookingResponseDTO booking) async {
@@ -218,13 +298,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Hủy lịch đặt thất bại. Vui lòng thử lại.'),
+          content: Text('Chỉ các đơn đang chờ đặt cọc (hoặc đơn gói chưa diễn ra) mới có thể hủy trực tiếp.'),
         ),
       );
     }
   }
 
-  void _showBookingDetailModal(BookingResponseDTO booking) {
+  Future<void> _showBookingDetailModal(BookingResponseDTO initialBooking) async {
+    BookingResponseDTO booking = initialBooking;
+    // Gọi API GET /api/photographer/bookings/{bookingId} để lấy chi tiết mới nhất
+    final fresh = await _bookingApiService.getBookingDetail(initialBooking.bookingId);
+    if (fresh != null) {
+      booking = fresh;
+    }
+    if (!mounted) return;
+
     final shortId = booking.bookingId.length > 8
         ? booking.bookingId.substring(0, 8).toUpperCase()
         : booking.bookingId.toUpperCase();
@@ -304,7 +392,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               child: Row(
                 children: [
                   SafeNetworkImage(
-                    url: '',
+                    url: _resolveSpaceImage(booking),
                     width: 72,
                     height: 72,
                     borderRadius: BorderRadius.circular(12),
@@ -374,8 +462,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               'Tiền cọc (${booking.depositStatus}):',
               _formatCurrency(booking.depositAmount),
             ),
-            if (booking.qrCode != null && booking.qrCode!.isNotEmpty)
-              _buildDetailRow('Mã QR check-in:', booking.qrCode!),
+            if (booking.qrCode.isNotEmpty)
+              _buildDetailRow('Mã QR check-in:', booking.qrCode),
+            if (booking.equipment.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              _buildDetailRow(
+                'Thiết bị đi kèm:',
+                booking.equipment
+                    .map((e) => '${e.name} (x${e.quantity})')
+                    .join(', '),
+              ),
+            ],
 
             Divider(height: 24, color: context.inputColor),
             Row(
@@ -811,19 +908,35 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                   ]
                                       : [],
                                 ),
-                                child: Center(
-                                  child: Text(
-                                    dayNumber.toString(),
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: isSelected || hasBooking ? FontWeight.bold : FontWeight.w500,
-                                      color: isSelected
-                                          ? context.cardColor
-                                          : (isPast
-                                          ? AppColors.textHint.withValues(alpha: 0.65)
-                                          : (hasBooking ? AppColors.primaryDark : context.textColor)),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Text(
+                                      dayNumber.toString(),
+                                      style: TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: isSelected || hasBooking ? FontWeight.bold : FontWeight.w500,
+                                        color: isSelected
+                                            ? context.cardColor
+                                            : (isPast
+                                            ? AppColors.textHint.withValues(alpha: 0.65)
+                                            : (hasBooking ? AppColors.primaryDark : context.textColor)),
+                                      ),
                                     ),
-                                  ),
+                                    if (hasBooking) ...[
+                                      const SizedBox(height: 2),
+                                      Container(
+                                        width: 5,
+                                        height: 5,
+                                        decoration: BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: isSelected
+                                              ? Colors.white
+                                              : AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
                                 ),
                               ),
                             );
@@ -953,7 +1066,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SafeNetworkImage(
-            url: '',
+            url: _resolveSpaceImage(booking),
             width: 84,
             height: 84,
             borderRadius: BorderRadius.circular(16),

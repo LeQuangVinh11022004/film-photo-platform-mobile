@@ -100,22 +100,282 @@ class BookingEquipmentResponseDTO {
   }
 }
 
-class BookingCreateRequestDTO {
+class PackageBookingSegmentRequestDTO {
+  final int stepOrder;
   final String availabilityId;
-  final String? packageId;
   final List<String> equipmentIds;
 
-  BookingCreateRequestDTO({
+  const PackageBookingSegmentRequestDTO({
+    required this.stepOrder,
     required this.availabilityId,
-    this.packageId,
     this.equipmentIds = const [],
   });
 
   Map<String, dynamic> toJson() => {
+    'stepOrder': stepOrder,
     'availabilityId': availabilityId,
-    'packageId': packageId,
     'equipmentIds': equipmentIds,
   };
+}
+
+class BookingCreateRequestDTO {
+  final String? availabilityId;
+  final String? subscriptionId;
+  final List<String> equipmentIds;
+  final List<PackageBookingSegmentRequestDTO> segments;
+
+  BookingCreateRequestDTO({
+    this.availabilityId,
+    this.subscriptionId,
+    this.equipmentIds = const [],
+    this.segments = const [],
+  });
+
+  factory BookingCreateRequestDTO.fromSubscription({
+    required String subscriptionId,
+    required List<PackageBookingSegmentRequestDTO> segments,
+  }) {
+    return BookingCreateRequestDTO(
+      subscriptionId: subscriptionId,
+      segments: segments,
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{
+      'equipmentIds': equipmentIds,
+    };
+    if (availabilityId != null && availabilityId!.isNotEmpty) {
+      map['availabilityId'] = availabilityId;
+    }
+    if (subscriptionId != null && subscriptionId!.isNotEmpty) {
+      map['subscriptionId'] = subscriptionId;
+    }
+    if (segments.isNotEmpty) {
+      map['segments'] = segments.map((s) => s.toJson()).toList();
+    }
+    return map;
+  }
+}
+
+class PhotographerEquipmentAvailabilityResponseDTO {
+  final String availabilityId;
+  final String equipmentId;
+  final DateTime? startAt;
+  final DateTime? endAt;
+  final double price;
+
+  PhotographerEquipmentAvailabilityResponseDTO({
+    required this.availabilityId,
+    required this.equipmentId,
+    this.startAt,
+    this.endAt,
+    required this.price,
+  });
+
+  factory PhotographerEquipmentAvailabilityResponseDTO.fromJson(
+      Map<String, dynamic> json) {
+    return PhotographerEquipmentAvailabilityResponseDTO(
+      availabilityId: json['availabilityId']?.toString() ?? '',
+      equipmentId: json['equipmentId']?.toString() ?? '',
+      startAt: json['startAt'] != null
+          ? DateTime.tryParse(json['startAt'].toString())
+          : null,
+      endAt: json['endAt'] != null
+          ? DateTime.tryParse(json['endAt'].toString())
+          : null,
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+    );
+  }
+}
+
+class PhotographerServicePackageItemResponseDTO {
+  final String packageItemId;
+  final String componentType; // STUDIO, DARKROOM, EQUIPMENT, CHEMICAL, SERVICE
+  final String resourceId;
+  final String resourceName;
+  final int stepOrder;
+  final int quantity;
+  final int? includedDurationMinutes;
+  final double? includedChemicalQuantity;
+  final String? notes;
+
+  PhotographerServicePackageItemResponseDTO({
+    required this.packageItemId,
+    required this.componentType,
+    required this.resourceId,
+    required this.resourceName,
+    required this.stepOrder,
+    required this.quantity,
+    this.includedDurationMinutes,
+    this.includedChemicalQuantity,
+    this.notes,
+  });
+
+  factory PhotographerServicePackageItemResponseDTO.fromJson(
+      Map<String, dynamic> json) {
+    return PhotographerServicePackageItemResponseDTO(
+      packageItemId: json['packageItemId']?.toString() ?? '',
+      componentType: json['componentType']?.toString() ?? '',
+      resourceId: json['resourceId']?.toString() ?? '',
+      resourceName: json['resourceName']?.toString() ?? '',
+      stepOrder: (json['stepOrder'] as num?)?.toInt() ?? 1,
+      quantity: (json['quantity'] as num?)?.toInt() ?? 1,
+      includedDurationMinutes:
+          (json['includedDurationMinutes'] as num?)?.toInt(),
+      includedChemicalQuantity:
+          (json['includedChemicalQuantity'] as num?)?.toDouble(),
+      notes: json['notes']?.toString(),
+    );
+  }
+}
+
+class PhotographerServicePackageResponseDTO {
+  final String packageId;
+  final String providerId;
+  final String providerName;
+  final String name;
+  final String? description;
+  final double price;
+  final int usesPerMonth;
+  final int validityMonths;
+  final List<PhotographerServicePackageItemResponseDTO> items;
+
+  PhotographerServicePackageResponseDTO({
+    required this.packageId,
+    required this.providerId,
+    required this.providerName,
+    required this.name,
+    this.description,
+    required this.price,
+    required this.usesPerMonth,
+    required this.validityMonths,
+    this.items = const [],
+  });
+
+  factory PhotographerServicePackageResponseDTO.fromJson(
+      Map<String, dynamic> json) {
+    return PhotographerServicePackageResponseDTO(
+      packageId: json['packageId']?.toString() ?? '',
+      providerId: json['providerId']?.toString() ?? '',
+      providerName: json['providerName']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      description: json['description']?.toString(),
+      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      usesPerMonth: (json['usesPerMonth'] as num?)?.toInt() ?? 1,
+      validityMonths: (json['validityMonths'] as num?)?.toInt() ?? 1,
+      items: (json['items'] as List<dynamic>?)
+              ?.map((e) => PhotographerServicePackageItemResponseDTO.fromJson(
+                  e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
+}
+
+class PhotographerPackageSubscriptionResponseDTO {
+  final String subscriptionId;
+  final String packageId;
+  final String purchaseOrderId;
+  final String packageName;
+  final String providerName;
+  final DateTime startsAt;
+  final DateTime endsAt;
+  final int usesPerMonth;
+  final int usedThisPeriod;
+  final int reservedThisPeriod;
+  final int remainingUsesThisPeriod;
+  final DateTime usagePeriodStart;
+  final DateTime usagePeriodEnd;
+  final String status;
+  final List<PhotographerServicePackageItemResponseDTO> items;
+
+  PhotographerPackageSubscriptionResponseDTO({
+    required this.subscriptionId,
+    required this.packageId,
+    required this.purchaseOrderId,
+    required this.packageName,
+    required this.providerName,
+    required this.startsAt,
+    required this.endsAt,
+    required this.usesPerMonth,
+    required this.usedThisPeriod,
+    required this.reservedThisPeriod,
+    required this.remainingUsesThisPeriod,
+    required this.usagePeriodStart,
+    required this.usagePeriodEnd,
+    required this.status,
+    this.items = const [],
+  });
+
+  factory PhotographerPackageSubscriptionResponseDTO.fromJson(
+      Map<String, dynamic> json) {
+    return PhotographerPackageSubscriptionResponseDTO(
+      subscriptionId: json['subscriptionId']?.toString() ?? '',
+      packageId: json['packageId']?.toString() ?? '',
+      purchaseOrderId: json['purchaseOrderId']?.toString() ?? '',
+      packageName: json['packageName']?.toString() ?? '',
+      providerName: json['providerName']?.toString() ?? '',
+      startsAt: json['startsAt'] != null
+          ? (DateTime.tryParse(json['startsAt'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+      endsAt: json['endsAt'] != null
+          ? (DateTime.tryParse(json['endsAt'].toString()) ?? DateTime.now())
+          : DateTime.now(),
+      usesPerMonth: (json['usesPerMonth'] as num?)?.toInt() ?? 0,
+      usedThisPeriod: (json['usedThisPeriod'] as num?)?.toInt() ?? 0,
+      reservedThisPeriod: (json['reservedThisPeriod'] as num?)?.toInt() ?? 0,
+      remainingUsesThisPeriod:
+          (json['remainingUsesThisPeriod'] as num?)?.toInt() ?? 0,
+      usagePeriodStart: json['usagePeriodStart'] != null
+          ? (DateTime.tryParse(json['usagePeriodStart'].toString()) ??
+              DateTime.now())
+          : DateTime.now(),
+      usagePeriodEnd: json['usagePeriodEnd'] != null
+          ? (DateTime.tryParse(json['usagePeriodEnd'].toString()) ??
+              DateTime.now())
+          : DateTime.now(),
+      status: json['status']?.toString() ?? '',
+      items: (json['items'] as List<dynamic>?)
+              ?.map((e) => PhotographerServicePackageItemResponseDTO.fromJson(
+                  e as Map<String, dynamic>))
+              .toList() ??
+          [],
+    );
+  }
+}
+
+class PackagePurchasePaymentResponseDTO {
+  final String orderId;
+  final String transactionId;
+  final String packageId;
+  final double amount;
+  final String paymentMethod;
+  final String status;
+  final String paymentUrl;
+
+  PackagePurchasePaymentResponseDTO({
+    required this.orderId,
+    required this.transactionId,
+    required this.packageId,
+    required this.amount,
+    required this.paymentMethod,
+    required this.status,
+    required this.paymentUrl,
+  });
+
+  factory PackagePurchasePaymentResponseDTO.fromJson(
+      Map<String, dynamic> json) {
+    return PackagePurchasePaymentResponseDTO(
+      orderId: json['orderId']?.toString() ?? '',
+      transactionId: json['transactionId']?.toString() ?? '',
+      packageId: json['packageId']?.toString() ?? '',
+      amount: (json['amount'] as num?)?.toDouble() ?? 0.0,
+      paymentMethod: json['paymentMethod']?.toString() ?? 'VNPAY',
+      status: json['status']?.toString() ?? 'PENDING',
+      paymentUrl: json['paymentUrl']?.toString() ?? '',
+    );
+  }
 }
 
 class ProviderSpaceAvailabilityResponseDTO {
