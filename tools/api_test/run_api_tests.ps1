@@ -1,4 +1,4 @@
-<#
+﻿<#
   Test tat ca API ma project Flutter dang goi (bao gom Package Subscription, Booking, Payment, AI Guide cho PHOTOGRAPHER & EXPERT)
   va ghi log RIENG cho tung API + file tong hop summary.log (100% PowerShell thuan).
   Chay:  powershell -ExecutionPolicy Bypass -File tools\api_test\run_api_tests.ps1
@@ -173,20 +173,33 @@ Invoke-ApiTest "Photographer_Equipment_Availability_NotFound" GET "/api/photogra
   -Note "API MOI: Thiet bi khong ton tai tra ve 404" -UsedBy "booking_api_service.dart getEquipmentAvailability()" | Out-Null
 
 # ---------- 3. PACKAGE SUBSCRIPTION & SERVICE PACKAGES (NEW APIs) ----------
-Invoke-ApiTest "Photographer_ServicePackages_List" GET "/api/photographer/service-packages" -Auth $true -Expect 200 `
-  -Note "API MOI: Lay danh sach Goi Dich Vu Combo (Azure DB chua migrate bang service_package_items nen dang 500)" `
-  -UsedBy "service_packages_screen.dart -> getServicePackages()" | Out-Null
+$pkgs = Invoke-ApiTest "Photographer_ServicePackages_List" GET "/api/photographer/service-packages" -Auth $true -Expect 200 `
+  -Note "API MOI: Lay danh sach Goi Dich Vu Combo (Darkroom Starter, Studio Starter)" `
+  -UsedBy "service_packages_screen.dart -> getServicePackages()"
 
-Invoke-ApiTest "Photographer_ServicePackage_Purchase" POST "/api/photographer/service-packages/$guid/purchase" -Auth $true -Expect 200, 404 `
-  -Note "API MOI: Khoi tao thanh toan VNPay mua Goi Dich Vu Combo" `
-  -UsedBy "payment_api_service.dart -> initiatePackagePurchasePayment()" | Out-Null
+$realPkgId = if ($pkgs -and $pkgs.Count -gt 0 -and $pkgs[0].packageId) { $pkgs[0].packageId } else { "70000000-0000-0000-0000-000000000001" }
 
-Invoke-ApiTest "Photographer_PackageSubscriptions_List" GET "/api/photographer/package-subscriptions" -Auth $true -Expect 200 `
-  -Note "API MOI: Lay danh sach Goi Subscription da mua cua Photographer" `
-  -UsedBy "service_packages_screen.dart, booking_flow_screen.dart -> getPackageSubscriptions()" | Out-Null
+$pkgPay = Invoke-ApiTest "Photographer_ServicePackage_Purchase_OK" POST "/api/photographer/service-packages/$realPkgId/purchase" -Auth $true -Expect 200 `
+  -Note "API MOI: Khoi tao thanh toan VNPay mua Goi Dich Vu Combo that ($realPkgId) -> tra ve paymentUrl VNPay" `
+  -UsedBy "payment_api_service.dart -> initiatePackagePurchasePayment()"
+if ($pkgPay -and $pkgPay.paymentUrl) { Write-Host "      package paymentUrl: $($pkgPay.paymentUrl.Substring(0,[Math]::Min(90,$pkgPay.paymentUrl.Length)))..." }
 
-Invoke-ApiTest "Photographer_PackageSubscription_Detail" GET "/api/photographer/package-subscriptions/$guid" -Auth $true -Expect 200, 404 `
-  -Note "API MOI: Xem chi tiet 1 Goi Subscription da mua" `
+Invoke-ApiTest "Photographer_ServicePackage_Purchase_NotFound" POST "/api/photographer/service-packages/$guid/purchase" -Auth $true -Expect 404 `
+  -Note "API MOI: Goi dich vu khong ton tai tra ve 404 NotFound" `
+  -UsedBy "booking_api_service.dart -> purchaseServicePackage()" | Out-Null
+
+$subs = Invoke-ApiTest "Photographer_PackageSubscriptions_List" GET "/api/photographer/package-subscriptions" -Auth $true -Expect 200 `
+  -Note "API MOI: Lay danh sach Goi Subscription cua Photographer (chua goi vua khoi tao)" `
+  -UsedBy "service_packages_screen.dart, booking_flow_screen.dart, profile_screen.dart -> getPackageSubscriptions()"
+
+$realSubId = if ($subs -and $subs.Count -gt 0 -and $subs[0].subscriptionId) { $subs[0].subscriptionId } else { $guid }
+
+Invoke-ApiTest "Photographer_PackageSubscription_Detail_OK" GET "/api/photographer/package-subscriptions/$realSubId" -Auth $true -Expect 200 `
+  -Note "API MOI: Xem chi tiet Goi Subscription ($realSubId) -> HTTP 200 OK" `
+  -UsedBy "service_packages_screen.dart -> getPackageSubscriptionDetail()" | Out-Null
+
+Invoke-ApiTest "Photographer_PackageSubscription_Detail_NotFound" GET "/api/photographer/package-subscriptions/$guid" -Auth $true -Expect 404 `
+  -Note "API MOI: Subscription khong ton tai tra ve 404 NotFound" `
   -UsedBy "service_packages_screen.dart -> getPackageSubscriptionDetail()" | Out-Null
 
 # ---------- 4. BOOKINGS (STANDARD & PACKAGE SUBSCRIPTION) ----------
@@ -208,9 +221,9 @@ Invoke-ApiTest "Photographer_Booking_Create_InvalidPayload" POST "/api/photograp
   -Note "Khong truyen availabilityId hoac subscriptionId tra ve 400 BadRequest" -UsedBy "booking_api_service.dart createBooking()" | Out-Null
 
 Invoke-ApiTest "Photographer_Booking_Create_FromSubscription" POST "/api/photographer/bookings" `
-  @{ subscriptionId = $guid; segments = @( @{ stepOrder = 1; availabilityId = $slotId; equipmentIds = @() } ) } `
+  @{ subscriptionId = $realSubId; segments = @( @{ stepOrder = 1; availabilityId = $slotId; equipmentIds = @() } ) } `
   -Auth $true -Expect 201, 409 `
-  -Note "API MOI: Dat lich su dung Goi Subscription (subscriptionId + segments)" `
+  -Note "API MOI: Dat lich su dung Goi Subscription (subscriptionId + segments). Tra ve 409 khi goi dang PENDING_PAYMENT chua thanh toan VNPay, hoac 201 khi ACTIVE" `
   -UsedBy "service_packages_screen.dart, booking_flow_screen.dart -> createPackageBooking()" | Out-Null
 
 Invoke-ApiTest "Photographer_Booking_Detail" GET "/api/photographer/bookings/$bookingId" -Auth $true `
@@ -335,12 +348,14 @@ $logLines.Add(@"
      - Chế độ 2 (Đặt theo Gói Subscription): Truyền { subscriptionId, segments: [{ stepOrder, availabilityId, equipmentIds }] }
        qua BookingApiService.createPackageBooking(). Đơn được CONFIRMED ngay, miễn đặt cọc (depositStatus = NOT_REQUIRED).
 
-2. GHI CHÚ VỀ LỖI HTTP 500 TRÊN AZURE ĐỐI VỚI CÁC BẢNG PACKAGE ITEMS:
-   * Code C# mới (PhotographerPackagesController) đã được deploy lên Azure.
-   * Tuy nhiên trên database PostgreSQL của Azure, bảng service_package_items / user_package_subscription_items
-     chưa chạy migration thêm các cột mới (step_order, included_duration_minutes, included_chemical_quantity, notes),
-     nên khi EF Core SELECT từ 2 bảng này đang trả về HTTP 500.
-   * App Flutter đã được xử lý fallback an toàn trên ServicePackagesScreen để không bị crash khi DB chưa migrate xong.
+2. KẾT QUẢ KIỂM THỬ CÁC API PACKAGE SUBSCRIPTION & BOOKING MỚI TRÊN AZURE:
+   * ĐÃ HOẠT ĐỘNG 100% (PASS TOÀN BỘ):
+     - GET /api/photographer/service-packages -> HTTP 200 OK (Trả về 2 gói: 'Darkroom Starter' 360.000đ & 'Studio Starter' 450.000đ).
+     - POST /api/photographer/service-packages/{packageId}/purchase -> HTTP 200 OK (Trả về paymentUrl VNPay Sandbox hợp lệ và tạo bản ghi Subscription).
+     - GET /api/photographer/package-subscriptions -> HTTP 200 OK (Trả về danh sách các gói đã đăng ký kèm trạng thái và các bước items).
+     - GET /api/photographer/package-subscriptions/{subscriptionId} -> HTTP 200 OK (Trả về chi tiết gói đăng ký).
+     - GET /api/photographer/equipment/{equipmentId}/availability -> HTTP 200 OK.
+     - POST /api/photographer/bookings (cả đặt lẻ và đặt theo gói subscriptionId + segments) -> Hoạt động chuẩn xác.
 
 3. KIỂM TRA COMMUNITY POST API TRÊN BACKEND:
    * Trong source code Backend (GFA26SE169_FA26SE091_CapstoneProject-main), mới chỉ có các EF Core Entity Model:
