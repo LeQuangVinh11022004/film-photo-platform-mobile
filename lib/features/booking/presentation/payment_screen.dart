@@ -19,6 +19,8 @@ void _paymentLog(String message) {
 
 class PaymentScreen extends StatefulWidget {
   final String? bookingId;
+  final String? packageId;
+  final String? customItemName;
   final BookingItem? item;
   final double? totalAmount;
   final DateTime? bookingDate;
@@ -30,6 +32,8 @@ class PaymentScreen extends StatefulWidget {
   const PaymentScreen({
     super.key,
     this.bookingId,
+    this.packageId,
+    this.customItemName,
     this.item,
     this.totalAmount,
     this.bookingDate,
@@ -57,6 +61,8 @@ class _PaymentScreenState extends State<PaymentScreen>
   late final double _amount;
   late final String _itemName;
   late final String _bookingId;
+  late final String _packageId;
+  late final bool _isPackagePurchase;
   late final String _timeSlot;
   late final String _dateString;
 
@@ -68,8 +74,12 @@ class _PaymentScreenState extends State<PaymentScreen>
     WidgetsBinding.instance.addObserver(this);
 
     _amount = widget.totalAmount ?? 700000.0;
-    _itemName = widget.item?.name ?? 'Vintage Film Studio Saigon';
+    _itemName = widget.customItemName ??
+        widget.item?.name ??
+        'Vintage Film Studio Saigon';
     _bookingId = widget.bookingId ?? '';
+    _packageId = widget.packageId ?? '';
+    _isPackagePurchase = _packageId.isNotEmpty && _bookingId.isEmpty;
     _timeSlot = widget.timeSlot ?? '3 giờ (09:00 - 12:00)';
     _dateString = widget.bookingDate != null
         ? DateFormat('dd/MM/yyyy').format(widget.bookingDate!)
@@ -77,7 +87,8 @@ class _PaymentScreenState extends State<PaymentScreen>
         .format(DateTime.now().add(const Duration(days: 1)));
 
     _paymentLog(
-      'PaymentScreen.initState | bookingId=$_bookingId | amount=$_amount | '
+      'PaymentScreen.initState | bookingId=$_bookingId | packageId=$_packageId | '
+          'isPackagePurchase=$_isPackagePurchase | amount=$_amount | '
           'itemName=$_itemName | date=$_dateString | timeSlot=$_timeSlot | '
           'openInAppWebView=${widget.openInAppWebView}',
     );
@@ -118,9 +129,9 @@ class _PaymentScreenState extends State<PaymentScreen>
     _paymentLog('Start Of Payment Process=============================');
     if (_hasHandledConfirmation) return;
 
-    if (_bookingId.isEmpty) {
-      _paymentLog('_handlePayment error: _bookingId is empty');
-      _showErrorToast('Thiếu mã booking hợp lệ để thực hiện thanh toán.');
+    if (!_isPackagePurchase && _bookingId.isEmpty) {
+      _paymentLog('_handlePayment error: _bookingId and _packageId are empty');
+      _showErrorToast('Thiếu mã booking hoặc mã gói dịch vụ hợp lệ để thực hiện thanh toán.');
       return;
     }
 
@@ -133,11 +144,19 @@ class _PaymentScreenState extends State<PaymentScreen>
     setState(() => _isProcessing = true);
 
     try {
-      final initResult = await _paymentService.initiateDepositPayment(
-        bookingId: _bookingId,
-        paymentMethod: methodCode,
-      );
-      _paymentLog('initiateDepositPayment result: $initResult');
+      final Map<String, dynamic> initResult;
+      if (_isPackagePurchase) {
+        initResult = await _paymentService.initiatePackagePurchasePayment(
+          packageId: _packageId,
+        );
+        _paymentLog('initiatePackagePurchasePayment result: $initResult');
+      } else {
+        initResult = await _paymentService.initiateDepositPayment(
+          bookingId: _bookingId,
+          paymentMethod: methodCode,
+        );
+        _paymentLog('initiateDepositPayment result: $initResult');
+      }
 
       if (!mounted) return;
 
@@ -227,7 +246,41 @@ class _PaymentScreenState extends State<PaymentScreen>
 
   Future<void> _checkBookingFallback(
       {bool showPendingToastIfNotPaid = false}) async {
-    if (_bookingId.isEmpty || _hasHandledConfirmation) return;
+    if (_hasHandledConfirmation) return;
+
+    if (_isPackagePurchase) {
+      if (_packageId.isEmpty) return;
+      final activeSub =
+          await _paymentService.refreshPackageSubscriptionStatus(_packageId);
+      if (!mounted || _hasHandledConfirmation) return;
+      if (activeSub != null) {
+        _onPaymentConfirmed(
+          PaymentConfirmationResult(
+            isConfirmed: true,
+            status: activeSub.status,
+            message:
+                'Đăng ký gói dịch vụ "${activeSub.packageName}" thành công!',
+            transactionId: activeSub.subscriptionId,
+          ),
+        );
+      } else if (showPendingToastIfNotPaid) {
+        toastification.show(
+          context: context,
+          type: ToastificationType.info,
+          style: ToastificationStyle.flatColored,
+          title: const Text('Đang chờ xác nhận thanh toán gói'),
+          description: const Text(
+            'Nếu bạn đã hoàn tất trên cổng thanh toán VNPay, vui lòng kiểm tra lại trong tab Gói Đã Đăng Ký.',
+          ),
+          alignment: Alignment.topCenter,
+          autoCloseDuration: const Duration(seconds: 4),
+          showProgressBar: false,
+        );
+      }
+      return;
+    }
+
+    if (_bookingId.isEmpty) return;
 
     final updatedBooking = await _paymentService.refreshBookingStatus(_bookingId);
     if (!mounted || _hasHandledConfirmation) return;

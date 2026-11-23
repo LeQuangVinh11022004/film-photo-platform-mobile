@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
+import '../../auth/services/auth_service.dart';
 
 class ExpertHomeScreen extends StatelessWidget {
   const ExpertHomeScreen({super.key});
@@ -110,9 +111,17 @@ class ExpertHomeScreen extends StatelessWidget {
               const SizedBox(height: 14),
 
               _QuickAction(
+                icon: Icons.auto_awesome_rounded,
+                title: 'Trợ lý AI Nhiếp ảnh Film',
+                subtitle: 'Gợi ý thông số phơi sáng & công thức tráng film (API)',
+                onTap: () => Navigator.pushNamed(context, '/ai-assistant'),
+              ),
+              const SizedBox(height: 10),
+
+              _QuickAction(
                 icon: Icons.edit_note_rounded,
                 title: 'Viết bài chia sẻ',
-                subtitle: 'Chia sẻ kinh nghiệm nhiếp ảnh film',
+                subtitle: 'Chia sẻ kinh nghiệm nhiếp ảnh film trên Cộng đồng',
                 onTap: () => _showComingSoon(context),
               ),
               const SizedBox(height: 10),
@@ -120,7 +129,7 @@ class ExpertHomeScreen extends StatelessWidget {
               _QuickAction(
                 icon: Icons.question_answer_outlined,
                 title: 'Trả lời câu hỏi',
-                subtitle: 'Giúp cộng đồng giải quyết vấn đề',
+                subtitle: 'Giúp cộng đồng giải quyết vấn đề trong mục Hỏi đáp',
                 onTap: () => _showComingSoon(context),
               ),
             ],
@@ -131,6 +140,10 @@ class ExpertHomeScreen extends StatelessWidget {
   }
 
   Widget _buildWelcomeCard(BuildContext context) {
+    final expertName = AuthService().currentUser?.fullName.trim();
+    final greetingName =
+        (expertName != null && expertName.isNotEmpty) ? expertName : 'Minh';
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
@@ -176,9 +189,9 @@ class ExpertHomeScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 18),
-          const Text(
-            'Xin chào, Minh!',
-            style: TextStyle(
+          Text(
+            'Xin chào, $greetingName!',
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 24,
               fontWeight: FontWeight.w800,

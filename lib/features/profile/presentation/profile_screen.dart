@@ -1,11 +1,14 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import 'dart:io';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/device_image_picker.dart';
+import '../../auth/services/auth_service.dart';
+import '../../booking/models/booking_api_models.dart';
 import '../../booking/models/booking_item.dart';
 import '../../booking/models/booking_schedule.dart';
+import '../../booking/services/booking_api_service.dart';
 import '../../../app/main.dart'; // Import themeNotifier
 
 import '../../expert/models/expert_application_state.dart';
@@ -20,11 +23,66 @@ class ProfileScreen extends StatefulWidget {
 class _ProfileScreenState extends State<ProfileScreen> {
   String _name = 'Lê Hoàng Anh';
   String _phone = '0901 234 567';
-  final String _email = 'hoanganh.film@gmail.com';
+  String _email = 'hoanganh.film@gmail.com';
+  String _roleLabel = 'Nhiếp ảnh gia (Photographer)';
+  bool _isExpertRole = false;
+  int _totalBookingsCount = BookingSchedule.sampleSchedules.length;
+  int _totalSubscriptionsCount = 0;
+  List<BookingResponseDTO> _loadedBookings = [];
   String _bio =
       'Nhiếp ảnh gia chuyên nghiệp đam mê chất phim Analog 35mm & Medium Format.';
   String _avatarUrl =
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80';
+
+  @override
+  void initState() {
+    super.initState();
+    final user = AuthService().currentUser;
+    if (user != null) {
+      if (user.fullName.trim().isNotEmpty) {
+        _name = user.fullName.trim();
+      }
+      if (user.email.trim().isNotEmpty) {
+        _email = user.email.trim();
+      }
+      final rawRole = user.role.trim().toUpperCase();
+      if (rawRole.contains('EXPERT')) {
+        _isExpertRole = true;
+        _roleLabel = 'Chuyên gia (Film Expert)';
+        _bio =
+            'Chuyên gia Nhiếp ảnh Film & Phòng tối — hướng dẫn kỹ thuật tráng rọi và đo sáng.';
+      } else if (rawRole.contains('PROVIDER')) {
+        _roleLabel = 'Nhà cung cấp (Provider)';
+      } else {
+        _roleLabel = 'Nhiếp ảnh gia (Photographer)';
+      }
+    }
+    _loadProfileApiStats();
+  }
+
+  Future<void> _loadProfileApiStats() async {
+    if (_isExpertRole) return;
+    try {
+      final results = await Future.wait([
+        BookingApiService().getMyBookings(page: 1, pageSize: 50),
+        BookingApiService().getPackageSubscriptions(),
+      ]);
+      if (!mounted) return;
+      final page = results[0] as PagedResponseDTO<BookingResponseDTO>?;
+      final subs =
+          results[1] as List<PhotographerPackageSubscriptionResponseDTO>;
+
+      setState(() {
+        if (page != null) {
+          _loadedBookings = page.items;
+          _totalBookingsCount = page.totalCount > 0
+              ? page.totalCount
+              : page.items.length;
+        }
+        _totalSubscriptionsCount = subs.length;
+      });
+    } catch (_) {}
+  }
 
   void _showChangeAvatarModal() async {
     final pickedUrl = await DeviceImagePicker.pickImageFromDevice(
@@ -203,7 +261,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showBookingHistoryModal() {
+  void _showBookingHistoryModal() async {
+    List<BookingResponseDTO> apiBookings = List.from(_loadedBookings);
+    final role = (AuthService().currentUser?.role ?? '').toUpperCase();
+    if (!role.contains('EXPERT') && !role.contains('PROVIDER')) {
+      final page = await BookingApiService().getMyBookings(page: 1, pageSize: 50);
+      if (page != null && page.items.isNotEmpty) {
+        apiBookings = page.items;
+        if (mounted) {
+          setState(() {
+            _loadedBookings = page.items;
+            _totalBookingsCount =
+                page.totalCount > 0 ? page.totalCount : page.items.length;
+          });
+        }
+      }
+    }
+
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -237,7 +313,81 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SizedBox(height: 20),
             Expanded(
-              child: ListView.builder(
+              child: apiBookings.isNotEmpty
+                  ? ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: apiBookings.length,
+                      itemBuilder: (context, index) {
+                        final b = apiBookings[index];
+                        final priceFormatted =
+                            '${b.totalAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ';
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: context.cardColor,
+                            border: Border.all(color: context.borderColor),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      b.spaceName.isNotEmpty
+                                          ? b.spaceName
+                                          : 'Đơn đặt chỗ #${b.bookingId.substring(0, 6)}',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 15,
+                                        color: context.textColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${b.bookingDate} • ${b.startTime} - ${b.endTime}',
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: context.textSecColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.end,
+                                children: [
+                                  Text(
+                                    priceFormatted,
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.w800,
+                                      fontSize: 15,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    b.status,
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                      color: b.status.toUpperCase() ==
+                                              'CONFIRMED'
+                                          ? Colors.green
+                                          : AppColors.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    )
+                  : ListView.builder(
                 physics: const BouncingScrollPhysics(),
                 itemCount: BookingSchedule.sampleSchedules.length,
                 itemBuilder: (context, index) {
@@ -863,7 +1013,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
-                        'Nhiếp ảnh gia (Photographer)',
+                        _roleLabel,
                         style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.bold,
@@ -897,7 +1047,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           _StatItem(
-                            value: '${BookingSchedule.sampleSchedules.length}',
+                            value: '$_totalBookingsCount',
                             label: 'Lịch đặt',
                             onTap: _showBookingHistoryModal,
                           ),
@@ -907,9 +1057,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             color: context.borderColor,
                           ),
                           _StatItem(
-                            value: '12',
-                            label: 'Bài viết',
-                            onTap: _showMyPostsModal,
+                            value: _totalSubscriptionsCount > 0
+                                ? '$_totalSubscriptionsCount'
+                                : '12',
+                            label: _totalSubscriptionsCount > 0
+                                ? 'Gói đã mua'
+                                : 'Bài viết',
+                            onTap: _totalSubscriptionsCount > 0
+                                ? () => Navigator.pushNamed(
+                                      context,
+                                      '/service-packages',
+                                    )
+                                : _showMyPostsModal,
                           ),
                           Container(
                             width: 1,
@@ -934,9 +1093,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ValueListenableBuilder<ExpertApplicationStatus>(
                 valueListenable: ExpertApplicationState.instance.status,
                 builder: (context, status, child) {
-                  final isApproved = status == ExpertApplicationStatus.approved;
+                  final isApproved =
+                      _isExpertRole || status == ExpertApplicationStatus.approved;
 
-                  final isPending = status == ExpertApplicationStatus.pending;
+                  final isPending =
+                      !_isExpertRole && status == ExpertApplicationStatus.pending;
 
                   return Container(
                     width: double.infinity,
@@ -1087,6 +1248,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: context.inputColor,
                     ),
                     _ProfileTile(
+                      icon: Icons.card_membership_rounded,
+                      title: 'Gói dịch vụ & Subscription của tôi',
+                      onTap: () => Navigator.pushNamed(
+                        context,
+                        '/service-packages',
+                      ).then((_) => _loadProfileApiStats()),
+                    ),
+                    Divider(
+                      height: 1,
+                      indent: 60,
+                      endIndent: 20,
+                      color: context.inputColor,
+                    ),
+                    _ProfileTile(
                       icon: Icons.favorite_border_rounded,
                       title: 'Danh sách Studio đã lưu',
                       onTap: _showSavedListModal,
@@ -1127,6 +1302,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Đăng xuất tài khoản',
                       isDestructive: true,
                       onTap: () {
+                        AuthService().logout();
                         Navigator.pushNamedAndRemoveUntil(
                           context,
                           '/login',
