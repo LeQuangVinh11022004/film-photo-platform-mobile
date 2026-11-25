@@ -55,14 +55,31 @@ class _LoginScreenState extends State<LoginScreen> {
         showProgressBar: false,
       );
 
-      // Điều hướng dựa trên vai trò (Role) trả về từ Backend
+      // Điều hướng dựa trên vai trò (Role) trả về từ Backend (chỉ hỗ trợ PHOTOGRAPHER và EXPERT)
       final role = res.user?.role.toLowerCase() ?? '';
       debugPrint('Login Role: $role');
       
-      if (role.contains('expert') || role.contains('provider') || role.contains('chuyên gia')) {
+      if (role.contains('provider')) {
+        _authService.logout();
+        toastification.show(
+          context: context,
+          type: ToastificationType.error,
+          style: ToastificationStyle.flatColored,
+          title: const Text('Không hỗ trợ vai trò Provider'),
+          description: const Text(
+            'Ứng dụng di động chỉ hỗ trợ đăng nhập cho Photographer và Expert.',
+          ),
+          alignment: Alignment.topCenter,
+          autoCloseDuration: const Duration(seconds: 4),
+          showProgressBar: false,
+        );
+        return;
+      }
+
+      if (role.contains('expert') || role.contains('chuyên gia')) {
         Navigator.pushReplacementNamed(context, '/expert-workspace');
       } else {
-        // Mặc định Photographer / Customer vào Home
+        // Mặc định Photographer vào Home
         Navigator.pushReplacementNamed(context, '/home');
       }
       

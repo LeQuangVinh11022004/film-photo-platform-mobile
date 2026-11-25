@@ -2,9 +2,38 @@ import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../auth/services/auth_service.dart';
+import '../../community/presentation/community_screen.dart';
+import '../../community/services/article_api_service.dart';
 
-class ExpertHomeScreen extends StatelessWidget {
+class ExpertHomeScreen extends StatefulWidget {
   const ExpertHomeScreen({super.key});
+
+  @override
+  State<ExpertHomeScreen> createState() => _ExpertHomeScreenState();
+}
+
+class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
+  int _articleCount = 12;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchExpertArticleCount();
+  }
+
+  Future<void> _fetchExpertArticleCount() async {
+    try {
+      final page =
+          await ArticleApiService().getExpertArticles(page: 1, pageSize: 50);
+      if (!mounted) return;
+      if (page != null) {
+        setState(() {
+          _articleCount =
+              page.totalCount > 0 ? page.totalCount : page.items.length;
+        });
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -49,26 +78,26 @@ class ExpertHomeScreen extends StatelessWidget {
                 crossAxisSpacing: 12,
                 mainAxisSpacing: 12,
                 childAspectRatio: 1.45,
-                children: const [
+                children: [
                   _MetricCard(
                     title: 'Bài viết',
-                    value: '12',
-                    subtitle: 'Đã xuất bản',
+                    value: '$_articleCount',
+                    subtitle: 'Đã tạo (API)',
                     icon: Icons.article_outlined,
                   ),
-                  _MetricCard(
+                  const _MetricCard(
                     title: 'Câu trả lời',
                     value: '28',
                     subtitle: 'Đã đóng góp',
                     icon: Icons.forum_outlined,
                   ),
-                  _MetricCard(
+                  const _MetricCard(
                     title: 'Lượt tương tác',
                     value: '356',
                     subtitle: 'Trên các bài viết',
                     icon: Icons.favorite_border_rounded,
                   ),
-                  _MetricCard(
+                  const _MetricCard(
                     title: 'Đánh giá',
                     value: '4.8/5',
                     subtitle: 'Từ cộng đồng',
@@ -120,9 +149,14 @@ class ExpertHomeScreen extends StatelessWidget {
 
               _QuickAction(
                 icon: Icons.edit_note_rounded,
-                title: 'Viết bài chia sẻ',
-                subtitle: 'Chia sẻ kinh nghiệm nhiếp ảnh film trên Cộng đồng',
-                onTap: () => _showComingSoon(context),
+                title: 'Quản lý & Viết bài chia sẻ',
+                subtitle: 'Tạo, sửa, xuất bản bài viết chuyên gia (GET/POST/PUT/PATCH/DELETE)',
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const CommunityScreen()),
+                  ).then((_) => _fetchExpertArticleCount());
+                },
               ),
               const SizedBox(height: 10),
 
