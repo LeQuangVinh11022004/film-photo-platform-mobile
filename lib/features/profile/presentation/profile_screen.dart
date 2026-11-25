@@ -9,6 +9,8 @@ import '../../booking/models/booking_api_models.dart';
 import '../../booking/models/booking_item.dart';
 import '../../booking/models/booking_schedule.dart';
 import '../../booking/services/booking_api_service.dart';
+import '../../community/models/article_api_models.dart';
+import '../../community/services/article_api_service.dart';
 import '../../../app/main.dart'; // Import themeNotifier
 
 import '../../expert/models/expert_application_state.dart';
@@ -51,8 +53,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _roleLabel = 'Chuyên gia (Film Expert)';
         _bio =
             'Chuyên gia Nhiếp ảnh Film & Phòng tối — hướng dẫn kỹ thuật tráng rọi và đo sáng.';
-      } else if (rawRole.contains('PROVIDER')) {
-        _roleLabel = 'Nhà cung cấp (Provider)';
       } else {
         _roleLabel = 'Nhiếp ảnh gia (Photographer)';
       }
@@ -60,17 +60,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfileApiStats();
   }
 
+  List<ArticleResponseDTO> _loadedArticles = [];
+
   Future<void> _loadProfileApiStats() async {
-    if (_isExpertRole) return;
     try {
+      if (_isExpertRole) {
+        final articlesPage =
+            await ArticleApiService().getExpertArticles(page: 1, pageSize: 50);
+        if (!mounted) return;
+        if (articlesPage != null) {
+          setState(() {
+            _loadedArticles = articlesPage.items;
+          });
+        }
+        return;
+      }
+
       final results = await Future.wait([
         BookingApiService().getMyBookings(page: 1, pageSize: 50),
         BookingApiService().getPackageSubscriptions(),
+        ArticleApiService().getPublishedArticles(page: 1, pageSize: 50),
       ]);
       if (!mounted) return;
       final page = results[0] as PagedResponseDTO<BookingResponseDTO>?;
       final subs =
           results[1] as List<PhotographerPackageSubscriptionResponseDTO>;
+      final articlesPage = results[2] as PagedResponseDTO<ArticleResponseDTO>?;
 
       setState(() {
         if (page != null) {
@@ -80,6 +95,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
               : page.items.length;
         }
         _totalSubscriptionsCount = subs.length;
+        if (articlesPage != null) {
+          _loadedArticles = articlesPage.items;
+        }
       });
     } catch (_) {}
   }
@@ -479,7 +497,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showMyPostsModal() {
+  void _showMyPostsModal() async {
+    if (_loadedArticles.isEmpty) {
+      final page = _isExpertRole
+          ? await ArticleApiService().getExpertArticles(page: 1, pageSize: 50)
+          : await ArticleApiService()
+              .getPublishedArticles(page: 1, pageSize: 50);
+      if (page != null && mounted) {
+        setState(() => _loadedArticles = page.items);
+      }
+    }
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -504,7 +533,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SizedBox(height: 20),
             Text(
-              'Bài Viết Của Tôi (12)',
+              _isExpertRole
+                  ? 'Bài Viết Chuyên Môn Của Tôi (${_loadedArticles.length})'
+                  : 'Bài Viết Diễn Đàn (${_loadedArticles.isNotEmpty ? _loadedArticles.length : 3})',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -513,7 +544,45 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SizedBox(height: 16),
             Expanded(
-              child: ListView.builder(
+              child: _loadedArticles.isNotEmpty
+                  ? ListView.builder(
+                      physics: const BouncingScrollPhysics(),
+                      itemCount: _loadedArticles.length,
+                      itemBuilder: (context, index) {
+                        final art = _loadedArticles[index];
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          padding: const EdgeInsets.all(16),
+                          decoration: BoxDecoration(
+                            color: context.cardColor,
+                            border: Border.all(color: context.borderColor),
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                art.title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 15,
+                                  color: context.textColor,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                '${art.category} • ${art.expertName} • ${art.status}',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: context.textSecColor,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    )
+                  : ListView.builder(
                 physics: const BouncingScrollPhysics(),
                 itemCount: 3,
                 itemBuilder: (context, index) {

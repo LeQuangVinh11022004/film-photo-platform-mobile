@@ -1,4 +1,4 @@
-﻿<#
+<#
   Test tat ca API ma project Flutter dang goi (bao gom Package Subscription, Booking, Payment, AI Guide cho PHOTOGRAPHER & EXPERT)
   va ghi log RIENG cho tung API + file tong hop summary.log (100% PowerShell thuan).
   Chay:  powershell -ExecutionPolicy Bypass -File tools\api_test\run_api_tests.ps1
@@ -255,7 +255,53 @@ Invoke-ApiTest "Photographer_Booking_Cancel" PATCH "/api/photographer/bookings/$
 Invoke-ApiTest "Photographer_Booking_Cancel_NotFound" PATCH "/api/photographer/bookings/$guid/cancel" -Auth $true -Expect 404 `
   -UsedBy "schedule_screen.dart -> cancelBooking()" | Out-Null
 
-# ---------- 7. AI PHOTOGRAPHY GUIDE (PHOTOGRAPHER & EXPERT) ----------
+# ---------- 7. ARTICLES / COMMUNITY FORUM (PHOTOGRAPHER & EXPERT) ----------
+$expArticles = Invoke-ApiTest "Expert_Articles_List" GET "/api/expert/articles?page=1&pageSize=20" `
+  -CustomToken $script:expertToken -Expect 200 `
+  -Note "API MOI (EXPERT): Lay danh sach bai viet cua Expert" `
+  -UsedBy "community_screen.dart, expert_home_screen.dart -> getExpertArticles()"
+
+$createdArt = Invoke-ApiTest "Expert_Article_Create" POST "/api/expert/articles" `
+  @{ title = "Ky thuat Push ISO Film Kodak Tri-X 400"; content = "Huong dan chi tiet cach trang film Kodak Tri-X 400 o ISO 1600 voi thuoc D-76."; category = "Ky thuat chup Film" } `
+  -CustomToken $script:expertToken -Expect 201 `
+  -Note "API MOI (EXPERT): Tao bai viet moi (mac dinh status = DRAFT)" `
+  -UsedBy "community_screen.dart -> createExpertArticle()"
+
+$artId = if ($createdArt -and $createdArt.articleId) { $createdArt.articleId } else { $guid }
+
+Invoke-ApiTest "Expert_Article_Detail" GET "/api/expert/articles/$artId" `
+  -CustomToken $script:expertToken -Expect 200 `
+  -Note "API MOI (EXPERT): Xem chi tiet bai viet cua Expert" `
+  -UsedBy "community_screen.dart -> getExpertArticleDetail()" | Out-Null
+
+Invoke-ApiTest "Expert_Article_Update" PUT "/api/expert/articles/$artId" `
+  @{ title = "Ky thuat Push ISO Film Kodak Tri-X 400 (Cap nhat)"; content = "Noi dung da cap nhat chi tiet thoi gian ngam thuoc D-76 20 do C."; category = "Trang roi Phong toi" } `
+  -CustomToken $script:expertToken -Expect 200 `
+  -Note "API MOI (EXPERT): Cap nhat tieu de, danh muc va noi dung bai viet" `
+  -UsedBy "community_screen.dart -> updateExpertArticle()" | Out-Null
+
+Invoke-ApiTest "Expert_Article_Publish_Status" PATCH "/api/expert/articles/$artId/status" `
+  @{ status = "PUBLISHED" } `
+  -CustomToken $script:expertToken -Expect 200 `
+  -Note "API MOI (EXPERT): Chuyen trang thai bai viet sang PUBLISHED de hien thi len Dien dan" `
+  -UsedBy "community_screen.dart -> updateExpertArticleStatus()" | Out-Null
+
+Invoke-ApiTest "Photographer_Articles_List" GET "/api/articles?page=1&pageSize=20" `
+  -Auth $true -Expect 200 `
+  -Note "API MOI (PHOTOGRAPHER): Lay danh sach bai viet da PUBLISHED tren Dien dan Cong dong Film" `
+  -UsedBy "community_screen.dart, profile_screen.dart -> getPublishedArticles()" | Out-Null
+
+Invoke-ApiTest "Photographer_Article_Detail" GET "/api/articles/$artId" `
+  -Auth $true -Expect 200 `
+  -Note "API MOI (PHOTOGRAPHER): Xem chi tiet 1 bai viet da PUBLISHED tren Dien dan" `
+  -UsedBy "community_screen.dart -> getPublishedArticleDetail()" | Out-Null
+
+Invoke-ApiTest "Expert_Article_Delete" DELETE "/api/expert/articles/$artId" `
+  -CustomToken $script:expertToken -Expect 204 `
+  -Note "API MOI (EXPERT): Xoa bai viet chuyen mon -> 204 NoContent" `
+  -UsedBy "community_screen.dart -> deleteExpertArticle()" | Out-Null
+
+# ---------- 8. AI PHOTOGRAPHY GUIDE (PHOTOGRAPHER & EXPERT) ----------
 $aiPayload = @{ theme = "Chan dung vintage"; location = "Studio"; availableLight = "Anh sang cua so"; equipment = "May film 35mm"; experienceLevel = "Beginner" }
 
 Invoke-ApiTest "AI_Photography_Guide_Photographer" POST "/api/ai/photography-guide" `

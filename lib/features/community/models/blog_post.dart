@@ -1,12 +1,15 @@
 class BlogPost {
   final String id;
   final String authorName;
-  final String authorRole; // e.g., 'Chuyên gia Film', 'Nhà cung cấp Studio', 'Photographer'
+  final String authorRole; // e.g., 'Chuyên gia Film', 'Photographer'
   final String authorAvatar;
   final String timeAgo;
   final String title;
   final String content;
   final String? imageUrl;
+  final String category;
+  final String status; // 'PUBLISHED' or 'DRAFT'
+  final bool isApiArticle;
   int likes;
   int dislikes;
   int commentsCount;
@@ -22,6 +25,9 @@ class BlogPost {
     required this.title,
     required this.content,
     this.imageUrl,
+    this.category = 'Kỹ thuật Film',
+    this.status = 'PUBLISHED',
+    this.isApiArticle = false,
     this.likes = 0,
     this.dislikes = 0,
     this.commentsCount = 0,

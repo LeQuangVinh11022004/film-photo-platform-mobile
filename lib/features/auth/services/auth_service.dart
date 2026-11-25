@@ -28,6 +28,16 @@ class AuthService {
       if (response.statusCode == 200) {
         final loginResponse = LoginResponse.fromJson(json);
         if (loginResponse.success) {
+          final role = (loginResponse.user?.role ?? '').trim().toUpperCase();
+          if (role == 'PROVIDER') {
+            _apiClient.clearToken();
+            currentUser = null;
+            return LoginResponse(
+              success: false,
+              message:
+                  'Ứng dụng di động chỉ dành cho Nhiếp ảnh gia (Photographer) và Chuyên gia (Expert). Tài khoản Provider không được hỗ trợ đăng nhập.',
+            );
+          }
           // Lưu token vào ApiClient chung để dùng cho mọi request sau này
           _apiClient.setToken(loginResponse.token);
           currentUser = loginResponse.user;
@@ -44,15 +54,23 @@ class AuthService {
 
       // Fallback thử nghiệm offline nếu chưa bật server API hoặc bị ngắt mạng
       if (email.isNotEmpty && password.length >= 6) {
+        if (email.toLowerCase().contains('provider')) {
+          _apiClient.clearToken();
+          currentUser = null;
+          return LoginResponse(
+            success: false,
+            message:
+                'Ứng dụng di động chỉ dành cho Nhiếp ảnh gia (Photographer) và Chuyên gia (Expert).',
+          );
+        }
         _apiClient.setToken('mock_jwt_token_${DateTime.now().millisecondsSinceEpoch}');
         
         String mockRole = 'Photographer';
         if (email.toLowerCase().contains('expert')) mockRole = 'Expert';
-        if (email.toLowerCase().contains('provider')) mockRole = 'Provider';
 
         currentUser = UserDTO(
           userId: 'mock-user-id',
-          fullName: mockRole == 'Expert' ? 'Chuyên gia Film' : (mockRole == 'Provider' ? 'Nhà cung cấp' : 'Lê Hoàng Anh'),
+          fullName: mockRole == 'Expert' ? 'Chuyên gia Film' : 'Lê Hoàng Anh',
           email: email,
           role: mockRole,
           status: 'Active',
