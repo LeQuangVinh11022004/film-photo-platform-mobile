@@ -189,6 +189,58 @@ class PhotographerEquipmentAvailabilityResponseDTO {
   }
 }
 
+class PhotographerEquipmentResponseDTO {
+  final String equipmentId;
+  final String spaceId;
+  final String spaceType;
+  final String? equipmentAvailabilityId;
+  final String equipmentType;
+  final String name;
+  final String category;
+  final String? variant;
+  final String? description;
+  final String? specificationsJson;
+  final int quantityTotal;
+  final double? rentalPrice;
+  final double? priceForSelectedSlot;
+
+  PhotographerEquipmentResponseDTO({
+    required this.equipmentId,
+    required this.spaceId,
+    required this.spaceType,
+    this.equipmentAvailabilityId,
+    required this.equipmentType,
+    required this.name,
+    required this.category,
+    this.variant,
+    this.description,
+    this.specificationsJson,
+    required this.quantityTotal,
+    this.rentalPrice,
+    this.priceForSelectedSlot,
+  });
+
+  factory PhotographerEquipmentResponseDTO.fromJson(
+      Map<String, dynamic> json) {
+    return PhotographerEquipmentResponseDTO(
+      equipmentId: json['equipmentId']?.toString() ?? '',
+      spaceId: json['spaceId']?.toString() ?? '',
+      spaceType: json['spaceType']?.toString() ?? '',
+      equipmentAvailabilityId: json['equipmentAvailabilityId']?.toString(),
+      equipmentType: json['equipmentType']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      category: json['category']?.toString() ?? '',
+      variant: json['variant']?.toString(),
+      description: json['description']?.toString(),
+      specificationsJson: json['specificationsJson']?.toString(),
+      quantityTotal: (json['quantityTotal'] as num?)?.toInt() ?? 1,
+      rentalPrice: (json['rentalPrice'] as num?)?.toDouble(),
+      priceForSelectedSlot:
+          (json['priceForSelectedSlot'] as num?)?.toDouble(),
+    );
+  }
+}
+
 class PhotographerServicePackageItemResponseDTO {
   final String packageItemId;
   final String componentType; // STUDIO, DARKROOM, EQUIPMENT, CHEMICAL, SERVICE

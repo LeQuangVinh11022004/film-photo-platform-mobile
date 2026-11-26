@@ -166,8 +166,13 @@ $slotId = if ($slotCount -gt 0) { $space.availableSlots[$slotCount - 1].availabi
 Invoke-ApiTest "Photographer_Space_Availability" GET "/api/photographer/spaces/$spaceId/availability?fromDate=$from&toDate=$to" -Auth $true `
   -Note "Lay danh sach slot trong cua Studio/Darkroom" -UsedBy "booking_api_service.dart getAvailableSlots()" | Out-Null
 
-Invoke-ApiTest "Photographer_Equipment_Availability" GET "/api/photographer/equipment/40000000-0000-0000-0000-000000000001/availability?fromDate=$from&toDate=$to" -Auth $true `
-  -Note "API MOI: Lay khung gio trong cua thiet bi (Canon EOS 5D Mark IV)" -UsedBy "booking_api_service.dart getEquipmentAvailability()" | Out-Null
+$spaceEquip = Invoke-ApiTest "Photographer_Space_Equipment_List" GET "/api/photographer/spaces/$spaceId/equipment?page=1&pageSize=20" -Auth $true -Expect 200 `
+  -Note "Lay danh sach thiet bi thuoc Studio/Darkroom ($spaceId)" -UsedBy "booking_api_service.dart getEquipmentForSpace()"
+
+$realEquipId = if ($spaceEquip -and $spaceEquip.items -and @($spaceEquip.items).Count -gt 0) { @($spaceEquip.items)[0].equipmentId } else { "90a8d4cc-a5f6-47cd-979c-d984b381c856" }
+
+Invoke-ApiTest "Photographer_Equipment_Availability" GET "/api/photographer/equipment/$realEquipId/availability?fromDate=$from&toDate=$to" -Auth $true -Expect 200 `
+  -Note "API MOI: Lay khung gio trong cua thiet bi that ($realEquipId) thuoc Studio" -UsedBy "booking_api_service.dart getEquipmentAvailability()" | Out-Null
 
 Invoke-ApiTest "Photographer_Equipment_Availability_NotFound" GET "/api/photographer/equipment/$guid/availability" -Auth $true -Expect 404 `
   -Note "API MOI: Thiet bi khong ton tai tra ve 404" -UsedBy "booking_api_service.dart getEquipmentAvailability()" | Out-Null

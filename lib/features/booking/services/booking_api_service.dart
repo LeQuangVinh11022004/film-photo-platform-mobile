@@ -112,6 +112,41 @@ class BookingApiService {
     }
   }
 
+  /// Lấy danh sách Thiết bị của một Space (/api/photographer/spaces/{spaceId}/equipment)
+  Future<PagedResponseDTO<PhotographerEquipmentResponseDTO>?> getEquipmentForSpace({
+    required String spaceId,
+    String? availabilityId,
+    int page = 1,
+    int pageSize = 20,
+  }) async {
+    try {
+      String queryParams = '?page=$page&pageSize=$pageSize';
+      if (availabilityId != null && availabilityId.trim().isNotEmpty) {
+        queryParams += '&availabilityId=${availabilityId.trim()}';
+      }
+
+      final response = await _apiClient.get(
+        '/api/photographer/spaces/$spaceId/equipment$queryParams',
+      );
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        return PagedResponseDTO<PhotographerEquipmentResponseDTO>.fromJson(
+          json,
+          (item) => PhotographerEquipmentResponseDTO.fromJson(item),
+        );
+      }
+      if (kDebugMode) {
+        print(
+          'Failed to get space equipment (${response.statusCode}): ${response.body}',
+        );
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) print('getEquipmentForSpace API Error: $e');
+      return null;
+    }
+  }
+
   /// Lấy danh sách khung giờ trống của một Thiết bị (/api/photographer/equipment/{equipmentId}/availability)
   /// `fromDate` và `toDate` có định dạng 'YYYY-MM-DD'
   Future<List<PhotographerEquipmentAvailabilityResponseDTO>> getEquipmentAvailability({
