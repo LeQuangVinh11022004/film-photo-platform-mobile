@@ -1,11 +1,14 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import 'dart:io';
 
+import '../../../core/services/favorite_service.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/device_image_picker.dart';
 import '../../auth/services/auth_service.dart';
 import '../../booking/models/booking_api_models.dart';
+import '../../booking/models/booking_item.dart';
 import '../../booking/models/booking_schedule.dart';
 import '../../booking/models/review_api_models.dart';
 import '../../booking/services/booking_api_service.dart';
@@ -889,153 +892,307 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showSavedListModal() async {
-    if (_loadedMyCommunityPosts.isEmpty) {
-      final myPostsPage =
-          await CommunityPostApiService().getMyPosts(page: 1, pageSize: 50);
-      if (myPostsPage != null && mounted) {
-        setState(() => _loadedMyCommunityPosts = myPostsPage.items);
-      }
-    }
-    if (!mounted) return;
-    final posts = _loadedMyCommunityPosts;
-
+  void _showSavedListModal() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.75,
-        padding: EdgeInsets.all(24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.borderColor,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            SizedBox(height: 20),
-            Text(
-              'Danh Sách Đã Lưu (${posts.length})',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: context.textColor,
-              ),
-            ),
-            SizedBox(height: 20),
-            Expanded(
-              child: posts.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.favorite_border_rounded,
-                            size: 48,
-                            color: AppColors.textHint,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (sheetContext, setSheetState) {
+          return ValueListenableBuilder<List<BookingItem>>(
+            valueListenable: FavoriteService().favorites,
+            builder: (context, favoriteItems, _) {
+              return Container(
+                height: MediaQuery.of(context).size.height * 0.78,
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Handle bar
+                    Center(
+                      child: Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: context.borderColor,
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(10),
                           ),
-                          SizedBox(height: 12),
-                          Text(
-                            'Chưa có mục nào được lưu',
-                            style: TextStyle(
-                              color: context.textSecColor,
+                          child: const Icon(Icons.favorite_rounded,
+                              color: AppColors.primary, size: 20),
+                        ),
+                        const SizedBox(width: 12),
+                        Text(
+                          'Studio & Phòng Tối Đã Lưu',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            color: context.textColor,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary,
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Text(
+                            '${favoriteItems.length}',
+                            style: const TextStyle(
+                              color: Colors.white,
                               fontWeight: FontWeight.bold,
+                              fontSize: 12,
                             ),
                           ),
-                        ],
-                      ),
-                    )
-                  : ListView.builder(
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: posts.length,
-                      itemBuilder: (context, index) {
-                        final post = posts[index];
-                        return Container(
-                          margin: EdgeInsets.only(bottom: 12),
-                          padding: EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: context.cardColor,
-                            border: Border.all(color: context.borderColor),
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.02),
-                                blurRadius: 8,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: post.images.isNotEmpty
-                                    ? Image.network(
-                                        post.images.first.imageUrl,
-                                        width: 70,
-                                        height: 70,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (_, _, _) => Container(
-                                          width: 70,
-                                          height: 70,
-                                          color: context.borderColor,
-                                          child: const Icon(Icons.image_not_supported_outlined),
-                                        ),
-                                      )
-                                    : Container(
-                                        width: 70,
-                                        height: 70,
-                                        color: context.borderColor,
-                                        child: const Icon(Icons.article_outlined),
-                                      ),
-                              ),
-                              SizedBox(width: 14),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      post.title,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15,
-                                        color: context.textColor,
-                                      ),
-                                    ),
-                                    SizedBox(height: 4),
-                                    Text(
-                                      post.category ?? 'Cộng đồng Film',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: context.textSecColor,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              SizedBox(width: 8),
-                              Icon(Icons.favorite_rounded, color: Colors.red),
-                            ],
-                          ),
-                        );
-                      },
+                        ),
+                      ],
                     ),
-            ),
-          ],
-        ),
+                    const SizedBox(height: 20),
+                    Expanded(
+                      child: favoriteItems.isEmpty
+                          ? Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Container(
+                                    width: 88,
+                                    height: 88,
+                                    decoration: BoxDecoration(
+                                      color: context.inputColor,
+                                      shape: BoxShape.circle,
+                                      border: Border.all(color: context.borderColor),
+                                    ),
+                                    child: const Icon(
+                                      Icons.favorite_border_rounded,
+                                      size: 40,
+                                      color: AppColors.textHint,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    'Chưa có Studio nào được lưu',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: context.textColor,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    'Nhấn vào biểu tượng ♡ trên bất kỳ Studio hoặc Phòng Tối nào để lưu lại.',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: context.textSecColor,
+                                      height: 1.5,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : ListView.builder(
+                              physics: const BouncingScrollPhysics(),
+                              itemCount: favoriteItems.length,
+                              itemBuilder: (context, index) {
+                                final item = favoriteItems[index];
+                                return Container(
+                                  margin: const EdgeInsets.only(bottom: 12),
+                                  decoration: BoxDecoration(
+                                    color: context.cardColor,
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(color: context.borderColor),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withValues(alpha: 0.03),
+                                        blurRadius: 8,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Row(
+                                    children: [
+                                      // Thumbnail
+                                      ClipRRect(
+                                        borderRadius: const BorderRadius.only(
+                                          topLeft: Radius.circular(16),
+                                          bottomLeft: Radius.circular(16),
+                                        ),
+                                        child: SafeNetworkImage(
+                                          url: item.imageUrl,
+                                          width: 90,
+                                          height: 90,
+                                          fit: BoxFit.cover,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      // Info
+                                      Expanded(
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(vertical: 12),
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              // Category badge
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(
+                                                    horizontal: 7, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: item.category ==
+                                                          BookingCategory.darkroom
+                                                      ? const Color(0xFF1A237E)
+                                                          .withValues(alpha: 0.1)
+                                                      : AppColors.primarySoft,
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  item.category ==
+                                                          BookingCategory.darkroom
+                                                      ? '🎞️ Phòng Tối'
+                                                      : '📸 Studio',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.bold,
+                                                    color: item.category ==
+                                                            BookingCategory.darkroom
+                                                        ? const Color(0xFF3949AB)
+                                                        : AppColors.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Text(
+                                                item.name,
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: TextStyle(
+                                                  fontWeight: FontWeight.bold,
+                                                  fontSize: 14,
+                                                  color: context.textColor,
+                                                ),
+                                              ),
+                                              const SizedBox(height: 2),
+                                              Row(
+                                                children: [
+                                                  Icon(
+                                                    Icons.location_on_outlined,
+                                                    size: 12,
+                                                    color: context.textSecColor,
+                                                  ),
+                                                  const SizedBox(width: 2),
+                                                  Expanded(
+                                                    child: Text(
+                                                      item.location,
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: TextStyle(
+                                                        fontSize: 12,
+                                                        color: context.textSecColor,
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              const SizedBox(height: 4),
+                                              Row(
+                                                children: [
+                                                  const Icon(Icons.star_rounded,
+                                                      color: Colors.amber, size: 13),
+                                                  const SizedBox(width: 3),
+                                                  Text(
+                                                    item.rating.toString(),
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: context.textColor,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 8),
+                                                  Text(
+                                                    '${(item.pricePerHour / 1000).toStringAsFixed(0)}k/h',
+                                                    style: const TextStyle(
+                                                      fontSize: 12,
+                                                      fontWeight: FontWeight.w700,
+                                                      color: AppColors.primary,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ),
+                                      // Remove button
+                                      Padding(
+                                        padding: const EdgeInsets.only(right: 10),
+                                        child: GestureDetector(
+                                          onTap: () {
+                                            FavoriteService().remove(item.id);
+                                            // ValueListenableBuilder tự rebuild
+                                          },
+                                          child: Container(
+                                            width: 34,
+                                            height: 34,
+                                            decoration: BoxDecoration(
+                                              color: Colors.red.withValues(alpha: 0.08),
+                                              shape: BoxShape.circle,
+                                            ),
+                                            child: const Icon(
+                                              Icons.favorite_rounded,
+                                              color: Colors.red,
+                                              size: 18,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
+                    if (favoriteItems.isNotEmpty) ...[  
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () {
+                            // Xóa tất cả
+                            for (final item in List.from(favoriteItems)) {
+                              FavoriteService().remove(item.id);
+                            }
+                          },
+                          icon: const Icon(Icons.delete_sweep_rounded, size: 18),
+                          label: const Text('Xóa tất cả danh sách đã lưu'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.red,
+                            side: const BorderSide(color: Colors.red),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            minimumSize: const Size(0, 46),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          );
+        },
       ),
     );
   }

@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:toastification/toastification.dart';
+import '../../../core/services/favorite_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/primary_button.dart';
@@ -992,18 +993,43 @@ class _HomeScreenState extends State<HomeScreen> {
                 Positioned(
                   top: 10,
                   right: 10,
-                  child: GestureDetector(
-                    onTap: () => setState(() => item.isFavorite = !item.isFavorite),
-                    child: Container(
-                      width: 34,
-                      height: 34,
-                      decoration: BoxDecoration(color: context.cardColor, shape: BoxShape.circle),
-                      child: Icon(
-                        item.isFavorite ? Icons.favorite : Icons.favorite_border,
-                        color: item.isFavorite ? Colors.red : context.textSecColor,
-                        size: 18,
-                      ),
-                    ),
+                  child: ValueListenableBuilder<List<BookingItem>>(
+                    valueListenable: FavoriteService().favorites,
+                    builder: (context, _, __) {
+                      final isFav = FavoriteService().isFavorite(item.id);
+                      return GestureDetector(
+                        onTap: () {
+                          final nowFav = FavoriteService().toggle(item);
+                          setState(() {});
+                          toastification.show(
+                            context: context,
+                            type: nowFav
+                                ? ToastificationType.success
+                                : ToastificationType.warning,
+                            style: ToastificationStyle.flatColored,
+                            title: Text(nowFav ? 'Đã lưu' : 'Đã bỏ lưu'),
+                            description: Text(
+                              nowFav
+                                  ? '${item.name} đã thêm vào danh sách yêu thích.'
+                                  : '${item.name} đã xóa khỏi danh sách yêu thích.',
+                            ),
+                            alignment: Alignment.bottomCenter,
+                            autoCloseDuration: const Duration(seconds: 2),
+                            showProgressBar: false,
+                          );
+                        },
+                        child: Container(
+                          width: 34,
+                          height: 34,
+                          decoration: BoxDecoration(color: context.cardColor, shape: BoxShape.circle),
+                          child: Icon(
+                            isFav ? Icons.favorite : Icons.favorite_border,
+                            color: isFav ? Colors.red : context.textSecColor,
+                            size: 18,
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
               ],

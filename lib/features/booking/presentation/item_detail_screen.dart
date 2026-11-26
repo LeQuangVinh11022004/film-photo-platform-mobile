@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:toastification/toastification.dart';
+import '../../../core/services/favorite_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/primary_button.dart';
@@ -449,26 +450,37 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: IconButton(
-                    icon: Icon(
-                      _item.isFavorite ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: _item.isFavorite ? Colors.red : context.textColor,
+                    icon: ValueListenableBuilder<List<BookingItem>>(
+                      valueListenable: FavoriteService().favorites,
+                      builder: (context, _, __) {
+                        final isFav = FavoriteService().isFavorite(_item.id);
+                        return Icon(
+                          isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                          color: isFav ? Colors.red : context.textColor,
+                        );
+                      },
                     ),
                     onPressed: () {
+                      final nowFav = FavoriteService().toggle(_item);
                       setState(() {
-                        _item.isFavorite = !_item.isFavorite;
+                        _item.isFavorite = nowFav;
                       });
-                      if (_item.isFavorite) {
-                        toastification.show(
-                          context: context,
-                          type: ToastificationType.info,
-                          style: ToastificationStyle.flatColored,
-                          title: const Text('Đã lưu'),
-                          description: const Text('Đã thêm vào danh sách yêu thích.'),
-                          alignment: Alignment.bottomCenter,
-                          autoCloseDuration: const Duration(seconds: 2),
-                          showProgressBar: false,
-                        );
-                      }
+                      toastification.show(
+                        context: context,
+                        type: nowFav
+                            ? ToastificationType.success
+                            : ToastificationType.warning,
+                        style: ToastificationStyle.flatColored,
+                        title: Text(nowFav ? 'Đã lưu' : 'Đã bỏ lưu'),
+                        description: Text(
+                          nowFav
+                              ? 'Đã thêm vào danh sách yêu thích.'
+                              : 'Đã xóa khỏi danh sách yêu thích.',
+                        ),
+                        alignment: Alignment.bottomCenter,
+                        autoCloseDuration: const Duration(seconds: 2),
+                        showProgressBar: false,
+                      );
                     },
                   ),
                 ),
