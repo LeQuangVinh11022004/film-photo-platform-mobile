@@ -157,7 +157,9 @@ class BookingItem {
       lightingConditions: details?['lightingConditions']?.toString() ?? '',
       ventilationDetails: details?['ventilationDetails']?.toString() ?? '',
       acousticDetails: details?['acousticDetails']?.toString() ?? '',
-      operatingHours: details?['operatingHours']?.toString() ?? '',
+      operatingHours: ResourceDetailDTO.formatOperatingHours(
+        details?['operatingHours'],
+      ),
       usagePolicies: details?['usagePolicies']?.toString() ?? '',
       availableSlots: slotsList.whereType<Map<String, dynamic>>().toList(),
     );
