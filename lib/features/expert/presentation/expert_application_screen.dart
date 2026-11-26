@@ -258,40 +258,6 @@ class _ExpertApplicationScreenState extends State<ExpertApplicationScreen> {
               ),
               const SizedBox(height: 28),
 
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.07),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(
-                    color: AppColors.primary.withValues(alpha: 0.18),
-                  ),
-                ),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Icon(
-                      Icons.info_outline_rounded,
-                      color: AppColors.primary,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'Bản demo hiện tự động duyệt đơn đăng ký. '
-                        'Khi tích hợp backend, đơn sẽ được gửi đến '
-                        'Admin để xét duyệt.',
-                        style: TextStyle(
-                          color: context.textColor,
-                          fontSize: 12,
-                          height: 1.5,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
               SizedBox(
                 height: 54,
                 child: ElevatedButton.icon(

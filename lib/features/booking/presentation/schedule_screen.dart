@@ -4,9 +4,11 @@ import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../models/booking_api_models.dart';
+import '../models/booking_item.dart';
 import '../models/review_api_models.dart';
 import '../services/booking_api_service.dart';
 import '../services/review_api_service.dart';
+import 'item_detail_screen.dart';
 import 'payment_screen.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -777,6 +779,18 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                                 alignment: Alignment.topCenter,
                                 autoCloseDuration: const Duration(seconds: 4),
                                 showProgressBar: false,
+                              );
+                              final spaceItem = BookingItem.fromJson({
+                                'resourceId': booking.spaceId,
+                                'name': booking.spaceName,
+                                'resourceType': _resolveSpaceType(booking),
+                              });
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  settings: RouteSettings(arguments: spaceItem),
+                                  builder: (_) => const ItemDetailScreen(),
+                                ),
                               );
                             } else {
                               toastification.show(

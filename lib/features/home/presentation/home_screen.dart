@@ -47,7 +47,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       final studios = results[0].map((e) => e.toBookingItem()).toList();
       final darkrooms = results[1].map((e) => e.toBookingItem()).toList();
-      final List<BookingItem> combined = [...studios, ...darkrooms];
+      final equipment = await _bookingApiService.getAllEquipmentItems([...studios, ...darkrooms]);
+      final List<BookingItem> combined = [...studios, ...darkrooms, ...equipment];
 
       if (mounted) {
         setState(() {

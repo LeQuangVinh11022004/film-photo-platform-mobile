@@ -475,10 +475,12 @@ class _PaymentScreenState extends State<PaymentScreen>
               SizedBox(
                 width: double.infinity,
                 child: PrimaryButton(
-                  text: 'Hoàn tất & Về Trang chủ',
+                  text: _isPackagePurchase
+                      ? 'Xem Gói Đã Đăng Ký'
+                      : 'Hoàn tất & Về Trang chủ',
                   onPressed: () {
                     Navigator.pop(ctx);
-                    Navigator.pop(context);
+                    Navigator.pop(context, true);
                   },
                 ),
               ),
@@ -757,6 +759,12 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setNavigationDelegate(
         NavigationDelegate(
+          onNavigationRequest: (request) {
+            if (_isReturnUrl(request.url)) {
+              _scheduleReturnCheck(request.url);
+            }
+            return NavigationDecision.navigate;
+          },
           onPageStarted: (url) {
             if (mounted) {
               setState(() {
@@ -778,16 +786,21 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
             if (mounted) setState(() => _isLoading = false);
             await _tryResolveFromCurrentPage(url);
           },
-          onWebResourceError: (error) {
+          onWebResourceError: (error) async {
+            final failingUrl = error.url ?? '';
+            if (_isReturnUrl(failingUrl)) {
+              await _tryResolveFromCurrentPage(failingUrl);
+              return;
+            }
             if (error.errorCode == -202 ||
                 error.description.toLowerCase().contains('cert') ||
                 error.description.toLowerCase().contains('ssl') ||
                 error.errorCode < 0) {
-              if (mounted) {
+              if (mounted && !_hasPopped) {
                 setState(() {
                   _hasWebError = true;
                   _webErrorMessage =
-                  'Lỗi SSL (${error.errorCode}: ${error.description})';
+                      'Lỗi SSL (${error.errorCode}: ${error.description})';
                 });
               }
             }
@@ -816,6 +829,33 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
     _isResolvingReturn = true;
 
     try {
+      // Nếu là URL callback từ VNPay (/api/payments/vnpay/return), gọi verifyReturnEndpoint
+      // để tự động kích hoạt IPN cập nhật DB sang ACTIVE/CONFIRMED rồi đóng WebView ngay
+      if (_isReturnUrl(url)) {
+        final uri = Uri.tryParse(url);
+        if (uri != null) {
+          final verified =
+              await widget.paymentService.verifyReturnEndpoint(uri);
+          if (verified != null && verified.isConfirmed) {
+            _popWithResult(verified);
+            return;
+          }
+          final qp = uri.queryParameters;
+          if (qp['vnp_ResponseCode'] != null &&
+              qp['vnp_ResponseCode'] != '00') {
+            _popWithResult(
+              PaymentConfirmationResult(
+                isConfirmed: false,
+                status: 'Failed',
+                message:
+                    'Giao dịch VNPay không thành công (Mã: ${qp['vnp_ResponseCode']}).',
+              ),
+            );
+            return;
+          }
+        }
+      }
+
       final rawBody = await _controller.runJavaScriptReturningResult(
         '(document.querySelector("pre") ? document.querySelector("pre").innerText : (document.body ? document.body.innerText : ""))',
       );
@@ -823,16 +863,6 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
       if (parsedFromDom != null && parsedFromDom.isConfirmed) {
         _popWithResult(parsedFromDom);
         return;
-      }
-
-      if (_isReturnUrl(url)) {
-        final uri = Uri.tryParse(url);
-        if (uri != null) {
-          final verified = await widget.paymentService.verifyReturnEndpoint(uri);
-          if (verified != null && verified.isConfirmed) {
-            _popWithResult(verified);
-          }
-        }
       }
     } catch (e, stackTrace) {
       _paymentLog('_tryResolveFromCurrentPage error: $e\n$stackTrace');

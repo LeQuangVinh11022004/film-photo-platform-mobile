@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -9,19 +10,20 @@ import '../theme/app_colors.dart';
 
 class _DevFriendlyCacheManager extends CacheManager with ImageCacheManager {
   static const key = 'filmPhotoDevCacheKey';
-  static final _DevFriendlyCacheManager _instance = _DevFriendlyCacheManager._();
+  static final _DevFriendlyCacheManager _instance =
+      _DevFriendlyCacheManager._();
 
   factory _DevFriendlyCacheManager() => _instance;
 
   _DevFriendlyCacheManager._()
       : super(
-    Config(
-      key,
-      fileService: HttpFileService(
-        httpClient: _createHttpClient(),
-      ),
-    ),
-  );
+          Config(
+            key,
+            fileService: HttpFileService(
+              httpClient: _createHttpClient(),
+            ),
+          ),
+        );
 
   static IOClient _createHttpClient() {
     final httpClient = HttpClient();
@@ -49,15 +51,86 @@ class SafeNetworkImage extends StatelessWidget {
     this.borderRadius,
   });
 
-  String _resolveUrl(String raw) {
+  /// Kiểm tra xem chuỗi có phải đường dẫn file cục bộ trên Android / iOS / Windows không
+  static String? extractLocalFilePath(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return null;
+
+    // 1. Trường hợp file:// URI (VD: file:///data/user/0/... hoặc file:///C:/Users/...)
+    if (trimmed.startsWith('file://')) {
+      try {
+        return Uri.parse(trimmed).toFilePath();
+      } catch (_) {
+        return trimmed.replaceFirst(RegExp(r'^file://'), '');
+      }
+    }
+
+    // 2. Trường hợp Backend ImageUrlResolver ghép nhầm domain https://... vào đường dẫn local (/data/..., /storage/..., /var/..., /Users/...)
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+      final uri = Uri.tryParse(trimmed);
+      if (uri != null) {
+        final path = Uri.decodeFull(uri.path);
+        if (path.startsWith('/data/') ||
+            path.startsWith('/storage/') ||
+            path.startsWith('/sdcard/') ||
+            path.startsWith('/mnt/') ||
+            path.startsWith('/var/') ||
+            path.startsWith('/private/') ||
+            path.startsWith('/Users/') ||
+            RegExp(r'^/[a-zA-Z]:[\\/]').hasMatch(path)) {
+          final cleanPath = RegExp(r'^/[a-zA-Z]:[\\/]').hasMatch(path)
+              ? path.substring(1)
+              : path;
+          return cleanPath;
+        }
+      }
+      return null;
+    }
+
+    // 3. Đường dẫn tuyệt đối trên Android / iOS / macOS / Linux
+    if (trimmed.startsWith('/data/') ||
+        trimmed.startsWith('/storage/') ||
+        trimmed.startsWith('/sdcard/') ||
+        trimmed.startsWith('/mnt/') ||
+        trimmed.startsWith('/var/') ||
+        trimmed.startsWith('/private/') ||
+        trimmed.startsWith('/Users/') ||
+        trimmed.startsWith('/tmp/')) {
+      return trimmed;
+    }
+
+    // 4. Đường dẫn Windows (VD: C:\Users\... hoặc D:/...)
+    if (RegExp(r'^[a-zA-Z]:[\\/]').hasMatch(trimmed)) {
+      return trimmed;
+    }
+
+    // 5. Kiểm tra trực tiếp file tồn tại trên thiết bị
+    try {
+      final f = File(trimmed);
+      if (f.existsSync()) {
+        return f.path;
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  String _resolveNetworkUrl(String raw) {
     final trimmed = raw.trim();
     if (trimmed.isEmpty) return '';
+
+    // Thay thế domain demo giả (images.example.com) từ dữ liệu seed của Backend bằng ảnh film thật
+    if (trimmed.contains('images.example.com')) {
+      if (trimmed.contains('print')) {
+        return 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80';
+      }
+      return 'https://images.unsplash.com/photo-1513694203232-719a280e022f?w=800&auto=format&fit=crop&q=80';
+    }
+
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return trimmed;
     }
-    if (trimmed.startsWith('/data/') || trimmed.startsWith('/storage/')) {
-      return trimmed;
-    }
+
     final base = ApiClient().baseUrl.endsWith('/')
         ? ApiClient().baseUrl.substring(0, ApiClient().baseUrl.length - 1)
         : ApiClient().baseUrl;
@@ -67,50 +140,80 @@ class SafeNetworkImage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final resolved = _resolveUrl(url);
+    final trimmed = url.trim();
     Widget imageWidget;
 
-    if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
-      imageWidget = CachedNetworkImage(
-        imageUrl: resolved,
-        cacheManager: kDebugMode ? _DevFriendlyCacheManager() : DefaultCacheManager(),
-        width: width,
-        height: height,
-        fit: fit,
-        placeholder: (context, _) => Container(
+    // Hỗ trợ Data URL base64 (data:image/jpeg;base64,...)
+    if (trimmed.startsWith('data:image/')) {
+      final commaIdx = trimmed.indexOf(',');
+      if (commaIdx != -1 && commaIdx + 1 < trimmed.length) {
+        try {
+          final bytes = base64Decode(trimmed.substring(commaIdx + 1));
+          imageWidget = Image.memory(
+            bytes,
+            width: width,
+            height: height,
+            fit: fit,
+            errorBuilder: (_, _, _) => _buildErrorPlaceholder(),
+          );
+        } catch (_) {
+          imageWidget = _buildErrorPlaceholder();
+        }
+      } else {
+        imageWidget = _buildErrorPlaceholder();
+      }
+    } else {
+      final localPath = extractLocalFilePath(trimmed);
+      if (localPath != null && localPath.isNotEmpty) {
+        imageWidget = Image.file(
+          File(localPath),
           width: width,
           height: height,
-          color: AppColors.inputFill,
-          child: const Center(
-            child: SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primary),
+          fit: fit,
+          errorBuilder: (context, error, stackTrace) {
+            if (kDebugMode) {
+              debugPrint('SafeNetworkImage local file error ($localPath): $error');
+            }
+            return _buildErrorPlaceholder();
+          },
+        );
+      } else {
+        final resolved = _resolveNetworkUrl(trimmed);
+        if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
+          imageWidget = CachedNetworkImage(
+            imageUrl: resolved,
+            cacheManager: kDebugMode
+                ? _DevFriendlyCacheManager()
+                : DefaultCacheManager(),
+            width: width,
+            height: height,
+            fit: fit,
+            placeholder: (context, _) => Container(
+              width: width,
+              height: height,
+              color: AppColors.inputFill,
+              child: const Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
             ),
-          ),
-        ),
-        errorWidget: (context, _, error) {
-          if (kDebugMode) {
-            debugPrint('SafeNetworkImage error ($resolved): $error');
-          }
-          return _buildErrorPlaceholder();
-        },
-      );
-    } else if (resolved.isNotEmpty) {
-      imageWidget = Image.file(
-        File(resolved),
-        width: width,
-        height: height,
-        fit: fit,
-        errorBuilder: (context, error, stackTrace) {
-          if (kDebugMode) {
-            debugPrint('SafeNetworkImage local file error ($resolved): $error');
-          }
-          return _buildErrorPlaceholder();
-        },
-      );
-    } else {
-      imageWidget = _buildErrorPlaceholder();
+            errorWidget: (context, _, error) {
+              if (kDebugMode) {
+                debugPrint('SafeNetworkImage error ($resolved): $error');
+              }
+              return _buildErrorPlaceholder();
+            },
+          );
+        } else {
+          imageWidget = _buildErrorPlaceholder();
+        }
+      }
     }
 
     if (borderRadius != null) {
@@ -138,7 +241,11 @@ class SafeNetworkImage extends StatelessWidget {
           SizedBox(height: 4),
           Text(
             'Film Image',
-            style: TextStyle(fontSize: 10, color: AppColors.textSecondary, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 10,
+              color: AppColors.textSecondary,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ],
       ),

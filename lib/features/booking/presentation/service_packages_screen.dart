@@ -117,7 +117,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
       route: '/payment',
     );
 
-    await Navigator.push(
+    final paid = await Navigator.push<bool>(
       context,
       MaterialPageRoute(
         builder: (_) => PaymentScreen(
@@ -131,6 +131,9 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
 
     if (mounted) {
       await _fetchSubscriptions();
+      if (paid == true && mounted) {
+        _tabController.animateTo(1);
+      }
     }
   }
 
@@ -304,6 +307,39 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
     );
   }
 
+  /// Slot phòng chỉ hợp lệ khi mỗi nhóm thiết bị của bước đều có lịch phủ trọn khung giờ đó.
+  bool _isRoomSlotCoveredByEquipment(
+    ProviderSpaceAvailabilityResponseDTO slot,
+    List<List<PhotographerEquipmentAvailabilityResponseDTO>> equipmentAvailability,
+  ) {
+    final roomStart = _combineDateAndTime(slot.date, slot.startTime);
+    final roomEnd = _combineDateAndTime(slot.date, slot.endTime);
+    if (roomStart == null || roomEnd == null) return false;
+
+    return equipmentAvailability.every((availabilities) => availabilities.any((a) {
+          final start = a.startAt;
+          final end = a.endAt;
+          if (start == null || end == null) return false;
+          return !_wallClock(start).isAfter(roomStart) &&
+              !_wallClock(end).isBefore(roomEnd);
+        }));
+  }
+
+  /// So sánh theo giờ hiển thị (bỏ múi giờ) vì backend trả DateOnly/TimeOnly cho phòng.
+  DateTime _wallClock(DateTime dt) =>
+      DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
+
+  DateTime? _combineDateAndTime(String date, String time) {
+    final day = DateTime.tryParse(date.length >= 10 ? date.substring(0, 10) : date);
+    final parts = time.split(':');
+    if (day == null || parts.length < 2) return null;
+    final hour = int.tryParse(parts[0]);
+    final minute = int.tryParse(parts[1]);
+    final second = parts.length > 2 ? int.tryParse(parts[2].split('.').first) ?? 0 : 0;
+    if (hour == null || minute == null) return null;
+    return DateTime(day.year, day.month, day.day, hour, minute, second);
+  }
+
   Future<void> _showRedeemSubscriptionSheet(
       PhotographerPackageSubscriptionResponseDTO sub) async {
     // Group items by stepOrder
@@ -353,14 +389,24 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
 
       equipmentIdsByStep[step] = equipItems;
 
-      // Also query equipment availability to warm up / verify equipment slots
+      final equipAvailability = <String, List<PhotographerEquipmentAvailabilityResponseDTO>>{};
       for (final eqId in equipItems) {
-        await _apiService.getEquipmentAvailability(equipmentId: eqId);
+        equipAvailability[eqId] =
+            await _apiService.getEquipmentAvailability(equipmentId: eqId);
       }
 
-      final slots = await _apiService.getAvailableSlots(
+      final roomSlots = await _apiService.getAvailableSlots(
         spaceId: roomItem.resourceId,
       );
+      // Backend chỉ nhận slot phòng mà mọi thiết bị của bước đều có lịch phủ trọn khung giờ đó
+      final slots = equipItems.isEmpty
+          ? roomSlots
+          : roomSlots
+              .where((slot) => _isRoomSlotCoveredByEquipment(
+                    slot,
+                    equipItems.map((id) => equipAvailability[id] ?? const []).toList(),
+                  ))
+              .toList();
       stepSlots[step] = slots;
       selectedAvailabilityByStep[step] =
           slots.isNotEmpty ? slots.first.availabilityId : null;
@@ -452,8 +498,10 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                           ),
                           const SizedBox(height: 8),
                           if (slots.isEmpty)
-                            const Text(
-                              'Hiện chưa có khung giờ trống cho phòng này.',
+                            Text(
+                              equipmentIdsByStep[step]?.isNotEmpty ?? false
+                                  ? 'Không có khung giờ nào còn đủ phòng và thiết bị cho bước này.'
+                                  : 'Hiện chưa có khung giờ trống cho phòng này.',
                               style: TextStyle(
                                 fontSize: 12,
                                 color: Colors.redAccent,

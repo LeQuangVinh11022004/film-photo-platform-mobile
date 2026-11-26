@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/device_image_picker.dart';
 import '../../auth/services/auth_service.dart';
 import '../../booking/models/booking_api_models.dart';
-import '../../booking/models/booking_item.dart';
 import '../../booking/models/booking_schedule.dart';
 import '../../booking/models/review_api_models.dart';
 import '../../booking/services/booking_api_service.dart';
@@ -890,10 +889,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  void _showSavedListModal() {
-    final favorites = BookingItem.sampleItems
-        .where((i) => i.isFavorite)
-        .toList();
+  void _showSavedListModal() async {
+    if (_loadedMyCommunityPosts.isEmpty) {
+      final myPostsPage =
+          await CommunityPostApiService().getMyPosts(page: 1, pageSize: 50);
+      if (myPostsPage != null && mounted) {
+        setState(() => _loadedMyCommunityPosts = myPostsPage.items);
+      }
+    }
+    if (!mounted) return;
+    final posts = _loadedMyCommunityPosts;
 
     showModalBottomSheet(
       context: context,
@@ -919,7 +924,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SizedBox(height: 20),
             Text(
-              'Danh Sách Đã Lưu (${favorites.length})',
+              'Danh Sách Đã Lưu (${posts.length})',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -928,7 +933,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SizedBox(height: 20),
             Expanded(
-              child: favorites.isEmpty
+              child: posts.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -951,9 +956,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     )
                   : ListView.builder(
                       physics: const BouncingScrollPhysics(),
-                      itemCount: favorites.length,
+                      itemCount: posts.length,
                       itemBuilder: (context, index) {
-                        final item = favorites[index];
+                        final post = posts[index];
                         return Container(
                           margin: EdgeInsets.only(bottom: 12),
                           padding: EdgeInsets.all(12),
@@ -973,12 +978,25 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             children: [
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
-                                child: Image.network(
-                                  item.imageUrl,
-                                  width: 70,
-                                  height: 70,
-                                  fit: BoxFit.cover,
-                                ),
+                                child: post.images.isNotEmpty
+                                    ? Image.network(
+                                        post.images.first.imageUrl,
+                                        width: 70,
+                                        height: 70,
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, _, _) => Container(
+                                          width: 70,
+                                          height: 70,
+                                          color: context.borderColor,
+                                          child: const Icon(Icons.image_not_supported_outlined),
+                                        ),
+                                      )
+                                    : Container(
+                                        width: 70,
+                                        height: 70,
+                                        color: context.borderColor,
+                                        child: const Icon(Icons.article_outlined),
+                                      ),
                               ),
                               SizedBox(width: 14),
                               Expanded(
@@ -986,7 +1004,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      item.name,
+                                      post.title,
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
@@ -997,7 +1015,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                     ),
                                     SizedBox(height: 4),
                                     Text(
-                                      item.location,
+                                      post.category ?? 'Cộng đồng Film',
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                       style: TextStyle(
@@ -1173,9 +1191,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: CircleAvatar(
                             radius: 52,
                             backgroundColor: context.inputColor,
-                            backgroundImage: _avatarUrl.startsWith('http')
+                            backgroundImage: (_avatarUrl.startsWith('http://') ||
+                                    _avatarUrl.startsWith('https://'))
                                 ? NetworkImage(_avatarUrl) as ImageProvider
-                                : FileImage(File(_avatarUrl)),
+                                : FileImage(
+                                    File(
+                                      _avatarUrl.startsWith('file://')
+                                          ? Uri.parse(_avatarUrl).toFilePath()
+                                          : _avatarUrl,
+                                    ),
+                                  ),
                           ),
                         ),
                         Positioned(
@@ -1491,10 +1516,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       color: context.inputColor,
                     ),
                     _ProfileTile(
-                      icon: Icons.photo_album_outlined,
-                      title: 'Album ảnh Film số hóa',
-                      onTap: () =>
-                          Navigator.pushNamed(context, '/digital-collections'),
+                      icon: Icons.history_rounded,
+                      title: 'Lịch sử bài đăng',
+                      onTap: _showMyPostsModal,
                     ),
                     Divider(
                       height: 1,

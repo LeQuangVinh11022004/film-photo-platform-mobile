@@ -519,6 +519,20 @@ class ResourceDetailDTO {
     this.usagePolicies = '',
   });
 
+  static String formatOperatingHours(Object? value) {
+    if (value is Map) {
+      final open = value['open'];
+      final close = value['close'];
+      if (open is String &&
+          open.trim().isNotEmpty &&
+          close is String &&
+          close.trim().isNotEmpty) {
+        return '${open.trim()} - ${close.trim()}';
+      }
+    }
+    return value?.toString() ?? '';
+  }
+
   factory ResourceDetailDTO.fromJson(Map<String, dynamic>? json) {
     if (json == null) return ResourceDetailDTO();
 
@@ -539,7 +553,7 @@ class ResourceDetailDTO {
       ventilationDetails: parseToString(json['ventilationDetails']),
       acousticDetails: parseToString(json['acousticDetails']),
       amenities: parseToString(json['amenities']),
-      operatingHours: parseToString(json['operatingHours']),
+      operatingHours: formatOperatingHours(json['operatingHours']),
       usagePolicies: parseToString(json['usagePolicies']),
     );
   }
