@@ -16,14 +16,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
-
-  final List<Widget> _screens = [
-    HomeScreen(),
-    ScheduleScreen(),
-    AIToolsHubScreen(),
-    CommunityScreen(),
-    ProfileScreen(),
-  ];
+  int _scheduleReloadCount = 0;
 
   @override
   void initState() {
@@ -35,37 +28,54 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      extendBody: true, // Cho phép nội dung trượt luồn dưới Bottom Navigation Bar
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
-      // Cải tiến Navbar dạng Floating Floating Capsule (Viên nhộng nổi)
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          margin: EdgeInsets.only(left: 20, right: 20, bottom: 20),
-          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: context.cardColor,
-            borderRadius: BorderRadius.circular(32), // Bo tròn cực độ dạng viên nhộng
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(index: 0, icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Khám phá'),
-              _buildNavItem(index: 1, icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_month_rounded, label: 'Lịch đặt'),
-              _buildNavItem(index: 2, icon: Icons.auto_awesome_outlined, activeIcon: Icons.auto_awesome_rounded, label: 'AI Tools'),
-              _buildNavItem(index: 3, icon: Icons.forum_outlined, activeIcon: Icons.forum_rounded, label: 'Diễn đàn'),
-              _buildNavItem(index: 4, icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Cá nhân'),
-            ],
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setState(() {
+            _currentIndex = 0;
+          });
+        }
+      },
+      child: Scaffold(
+        extendBody: true, // Cho phép nội dung trượt luồn dưới Bottom Navigation Bar
+        body: IndexedStack(
+          index: _currentIndex,
+          children: [
+            const HomeScreen(),
+            ScheduleScreen(key: ValueKey('schedule_$_scheduleReloadCount')),
+            const AIToolsHubScreen(),
+            const CommunityScreen(),
+            ProfileScreen(),
+          ],
+        ),
+        // Cải tiến Navbar dạng Floating Floating Capsule (Viên nhộng nổi)
+        bottomNavigationBar: SafeArea(
+          child: Container(
+            margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: context.cardColor,
+              borderRadius: BorderRadius.circular(32), // Bo tròn cực độ dạng viên nhộng
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(index: 0, icon: Icons.home_outlined, activeIcon: Icons.home_rounded, label: 'Khám phá'),
+                _buildNavItem(index: 1, icon: Icons.calendar_today_outlined, activeIcon: Icons.calendar_month_rounded, label: 'Lịch đặt'),
+                _buildNavItem(index: 2, icon: Icons.auto_awesome_outlined, activeIcon: Icons.auto_awesome_rounded, label: 'AI Tools'),
+                _buildNavItem(index: 3, icon: Icons.forum_outlined, activeIcon: Icons.forum_rounded, label: 'Diễn đàn'),
+                _buildNavItem(index: 4, icon: Icons.person_outline_rounded, activeIcon: Icons.person_rounded, label: 'Cá nhân'),
+              ],
+            ),
           ),
         ),
       ),
@@ -83,6 +93,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     return GestureDetector(
       onTap: () {
         setState(() {
+          if (index == 1) {
+            _scheduleReloadCount++;
+          }
           _currentIndex = index;
         });
       },
