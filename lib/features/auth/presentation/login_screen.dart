@@ -21,6 +21,39 @@ class _LoginScreenState extends State<LoginScreen> {
   final _authService = AuthService();
 
   bool _isLoading = false;
+  bool _checkingAuth = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkExistingSession();
+  }
+
+  Future<void> _checkExistingSession() async {
+    final isLoggedIn = await _authService.tryAutoLogin();
+    if (!mounted) return;
+
+    if (isLoggedIn && _authService.currentUser != null) {
+      final role = (_authService.currentUser?.role ?? '').toLowerCase();
+      if (role.contains('expert') || role.contains('chuyên gia')) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/expert-workspace',
+          (route) => false,
+        );
+      } else {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/home',
+          (route) => false,
+        );
+      }
+    } else {
+      setState(() {
+        _checkingAuth = false;
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -77,10 +110,18 @@ class _LoginScreenState extends State<LoginScreen> {
       }
 
       if (role.contains('expert') || role.contains('chuyên gia')) {
-        Navigator.pushReplacementNamed(context, '/expert-workspace');
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/expert-workspace',
+          (route) => false,
+        );
       } else {
         // Mặc định Photographer vào Home
-        Navigator.pushReplacementNamed(context, '/home');
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/home',
+          (route) => false,
+        );
       }
       
     } else {
@@ -117,7 +158,11 @@ class _LoginScreenState extends State<LoginScreen> {
         autoCloseDuration: const Duration(seconds: 3),
         showProgressBar: false,
       );
-      Navigator.pushReplacementNamed(context, '/home');
+      Navigator.pushNamedAndRemoveUntil(
+        context,
+        '/home',
+        (route) => false,
+      );
     } else {
       toastification.show(
         context: context,
@@ -134,6 +179,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_checkingAuth) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(

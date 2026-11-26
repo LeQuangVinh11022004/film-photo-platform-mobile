@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
@@ -23,7 +24,13 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   final PageController _pageController = PageController();
   bool _isSubmitting = false;
 
-  // Step 1: Add-ons state
+  // Step 1: Add-ons & Equipment state
+  bool _isLoadingEquipment = false;
+  List<PhotographerEquipmentResponseDTO> _spaceEquipmentList = [];
+  final Set<String> _selectedEquipmentIds = {};
+  final Map<String, List<PhotographerEquipmentAvailabilityResponseDTO>>
+      _equipmentAvailabilityMap = {};
+
   final List<String> _selectedAddons = [];
   late List<Map<String, dynamic>> _availableAddons;
 
@@ -101,9 +108,17 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
 
   double _calculateAddonPrice() {
     double addonPrice = 0;
-    for (var a in _availableAddons) {
-      if (_selectedAddons.contains(a['name'])) {
-        addonPrice += (a['price'] as num).toDouble();
+    if (_spaceEquipmentList.isNotEmpty) {
+      for (final eq in _spaceEquipmentList) {
+        if (_selectedEquipmentIds.contains(eq.equipmentId)) {
+          addonPrice += eq.priceForSelectedSlot ?? eq.rentalPrice ?? 0.0;
+        }
+      }
+    } else {
+      for (var a in _availableAddons) {
+        if (_selectedAddons.contains(a['name'])) {
+          addonPrice += (a['price'] as num).toDouble();
+        }
       }
     }
     return addonPrice;
@@ -116,6 +131,95 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     _initAddons();
     _initSelectedDate();
     _syncLiveSlotsAndSubscriptions();
+    _fetchSpaceEquipment();
+  }
+
+  Future<void> _fetchSpaceEquipment() async {
+    final spaceId = widget.item.id.trim();
+    if (spaceId.length < 32) return; // Skip mock non-UUID items
+
+    setState(() {
+      _isLoadingEquipment = true;
+    });
+
+    try {
+      final pagedRes = await BookingApiService().getEquipmentForSpace(
+        spaceId: spaceId,
+      );
+      if (pagedRes != null && pagedRes.items.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _spaceEquipmentList = pagedRes.items;
+          });
+        }
+        _fetchEquipmentAvailabilities(pagedRes.items);
+      }
+    } catch (e) {
+      if (kDebugMode) print('Error fetching space equipment: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoadingEquipment = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _fetchEquipmentAvailabilities(
+      List<PhotographerEquipmentResponseDTO> items) async {
+    final fromDateStr = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final toDateStr =
+        DateFormat('yyyy-MM-dd').format(_selectedDate.add(const Duration(days: 7)));
+
+    for (final eq in items) {
+      try {
+        final availList = await BookingApiService().getEquipmentAvailability(
+          equipmentId: eq.equipmentId,
+          fromDate: fromDateStr,
+          toDate: toDateStr,
+        );
+        if (availList.isNotEmpty && mounted) {
+          setState(() {
+            _equipmentAvailabilityMap[eq.equipmentId] = availList;
+          });
+        }
+      } catch (_) {}
+    }
+  }
+
+  IconData _getEquipmentIcon(PhotographerEquipmentResponseDTO eq) {
+    final cat = eq.category.toLowerCase();
+    final type = eq.equipmentType.toLowerCase();
+    final name = eq.name.toLowerCase();
+
+    if (cat.contains('flash') ||
+        cat.contains('light') ||
+        type.contains('light') ||
+        name.contains('đèn') ||
+        name.contains('flash')) {
+      return Icons.flash_on_rounded;
+    } else if (cat.contains('camera') ||
+        type.contains('camera') ||
+        name.contains('máy ảnh') ||
+        name.contains('lens') ||
+        name.contains('ống kính')) {
+      return Icons.camera_alt_rounded;
+    } else if (cat.contains('chem') ||
+        type.contains('chem') ||
+        name.contains('hóa chất') ||
+        name.contains('tráng')) {
+      return Icons.science_rounded;
+    } else if (cat.contains('paper') ||
+        type.contains('paper') ||
+        name.contains('giấy')) {
+      return Icons.insert_drive_file_rounded;
+    } else if (cat.contains('stand') ||
+        type.contains('stand') ||
+        name.contains('chân') ||
+        name.contains('tripod')) {
+      return Icons.camera_rounded;
+    }
+    return Icons.build_circle_rounded;
   }
 
   Future<void> _syncLiveSlotsAndSubscriptions() async {
@@ -326,6 +430,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final addonPrice = _calculateAddonPrice();
     final totalPrice = basePrice + addonPrice;
 
+    final selectedEquipIds = _spaceEquipmentList.isNotEmpty
+        ? _selectedEquipmentIds.toList()
+        : <String>[];
+
     final BookingCreateRequestDTO request;
     if (_selectedSubscription != null) {
       final stepItem = _selectedSubscription!.items.firstWhere(
@@ -345,13 +453,14 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           PackageBookingSegmentRequestDTO(
             stepOrder: stepItem.stepOrder,
             availabilityId: availabilityId,
-            equipmentIds: equipIds,
+            equipmentIds: equipIds.isNotEmpty ? equipIds : selectedEquipIds,
           ),
         ],
       );
     } else {
       request = BookingCreateRequestDTO(
         availabilityId: availabilityId,
+        equipmentIds: selectedEquipIds,
       );
     }
 
@@ -553,84 +662,227 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           ),
         ).animate().fadeIn(delay: 100.ms),
         const SizedBox(height: 24),
-        ..._availableAddons.map((addon) {
-          final isSelected = _selectedAddons.contains(addon['name']);
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                if (isSelected) {
-                  _selectedAddons.remove(addon['name']);
-                } else {
-                  _selectedAddons.add(addon['name']);
-                }
-              });
-            },
-            child: AnimatedContainer(
-              duration: 200.ms,
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary.withValues(alpha: 0.05)
-                    : AppColors.cardBg,
-                border: Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.border,
-                  width: isSelected ? 2 : 1,
+        if (_isLoadingEquipment)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 40),
+            child: Center(
+              child: CircularProgressIndicator(color: AppColors.primary),
+            ),
+          )
+        else if (_spaceEquipmentList.isNotEmpty)
+          ..._spaceEquipmentList.map((eq) {
+            final isSelected = _selectedEquipmentIds.contains(eq.equipmentId);
+            final price = eq.priceForSelectedSlot ?? eq.rentalPrice ?? 0.0;
+            final availSlots = _equipmentAvailabilityMap[eq.equipmentId] ?? [];
+
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _selectedEquipmentIds.remove(eq.equipmentId);
+                  } else {
+                    _selectedEquipmentIds.add(eq.equipmentId);
+                  }
+                });
+              },
+              child: AnimatedContainer(
+                duration: 200.ms,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primary.withValues(alpha: 0.05)
+                      : AppColors.cardBg,
+                  border: Border.all(
+                    color: isSelected ? AppColors.primary : AppColors.border,
+                    width: isSelected ? 2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
                 ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  Icon(
-                    addon['icon'],
-                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                    size: 28,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          addon['name'],
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '+${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(addon['price'])}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
+                child: Row(
+                  children: [
+                    Icon(
+                      _getEquipmentIcon(eq),
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                      size: 28,
                     ),
-                  ),
-                  Container(
-                    width: 24,
-                    height: 24,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isSelected ? AppColors.primary : Colors.transparent,
-                      border: Border.all(
-                        color: isSelected ? AppColors.primary : AppColors.border,
-                        width: 2,
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  eq.name,
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              if (availSlots.isNotEmpty) ...[
+                                const SizedBox(width: 6),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.shade50,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    '${availSlots.length} slot trống',
+                                    style: TextStyle(
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.green.shade700,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          if (eq.category.isNotEmpty ||
+                              eq.equipmentType.isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              eq.category.isNotEmpty
+                                  ? eq.category
+                                  : eq.equipmentType,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ],
+                          const SizedBox(height: 4),
+                          Text(
+                            '+${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(price)}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    child: isSelected
-                        ? const Icon(Icons.check, size: 16, color: Colors.white)
-                        : null,
-                  ),
-                ],
+                    const SizedBox(width: 12),
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected
+                            ? AppColors.primary
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.border,
+                          width: 2,
+                        ),
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check,
+                              size: 16, color: Colors.white)
+                          : null,
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        }).toList().animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
+            );
+          }).toList().animate().fadeIn(delay: 200.ms).slideY(begin: 0.1)
+        else
+          ..._availableAddons.map((addon) {
+            final isSelected = _selectedAddons.contains(addon['name']);
+            return GestureDetector(
+              onTap: () {
+                setState(() {
+                  if (isSelected) {
+                    _selectedAddons.remove(addon['name']);
+                  } else {
+                    _selectedAddons.add(addon['name']);
+                  }
+                });
+              },
+              child: AnimatedContainer(
+                duration: 200.ms,
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.primary.withValues(alpha: 0.05)
+                      : AppColors.cardBg,
+                  border: Border.all(
+                    color: isSelected ? AppColors.primary : AppColors.border,
+                    width: isSelected ? 2 : 1,
+                  ),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      addon['icon'],
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            addon['name'],
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.bold,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '+${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(addon['price'])}',
+                            style: const TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 24,
+                      height: 24,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: isSelected
+                            ? AppColors.primary
+                            : Colors.transparent,
+                        border: Border.all(
+                          color: isSelected
+                              ? AppColors.primary
+                              : AppColors.border,
+                          width: 2,
+                        ),
+                      ),
+                      child: isSelected
+                          ? const Icon(Icons.check,
+                              size: 16, color: Colors.white)
+                          : null,
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }).toList().animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
       ],
     );
   }
@@ -871,7 +1123,47 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                   ),
                 ],
               ),
-              if (_selectedAddons.isNotEmpty) ...[
+              if (_spaceEquipmentList.isNotEmpty &&
+                  _selectedEquipmentIds.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                const Text(
+                  'Trang thiết bị kèm theo:',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
+                const SizedBox(height: 8),
+                ..._spaceEquipmentList
+                    .where((eq) => _selectedEquipmentIds.contains(eq.equipmentId))
+                    .map((eq) {
+                  final price =
+                      eq.priceForSelectedSlot ?? eq.rentalPrice ?? 0.0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4, left: 8),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            '• ${eq.name}',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          NumberFormat.currency(locale: 'vi', symbol: 'đ')
+                              .format(price),
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ] else if (_selectedAddons.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Text(
                   'Dịch vụ thêm:',

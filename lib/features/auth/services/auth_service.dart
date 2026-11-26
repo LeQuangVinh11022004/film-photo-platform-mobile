@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/network/api_client.dart';
 import '../models/auth_models.dart';
 
@@ -12,6 +13,25 @@ class AuthService {
 
   final ApiClient _apiClient = ApiClient();
   UserDTO? currentUser;
+
+  /// Thử tự động đăng nhập khi mở ứng dụng từ Token lưu trong SharedPreferences
+  Future<bool> tryAutoLogin() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString('auth_token');
+      final userJsonStr = prefs.getString('current_user');
+
+      if (token != null && token.isNotEmpty && userJsonStr != null && userJsonStr.isNotEmpty) {
+        final Map<String, dynamic> userMap = jsonDecode(userJsonStr);
+        currentUser = UserDTO.fromJson(userMap);
+        _apiClient.setToken(token);
+        return true;
+      }
+    } catch (e) {
+      if (kDebugMode) print('Auto login error: $e');
+    }
+    return false;
+  }
 
   /// Gọi API thực tế: POST /api/auth/login
   Future<LoginResponse> login(String email, String password) async {
@@ -30,17 +50,27 @@ class AuthService {
         if (loginResponse.success) {
           final role = (loginResponse.user?.role ?? '').trim().toUpperCase();
           if (role == 'PROVIDER') {
-            _apiClient.clearToken();
-            currentUser = null;
+            await logout();
             return LoginResponse(
               success: false,
               message:
                   'Ứng dụng di động chỉ dành cho Nhiếp ảnh gia (Photographer) và Chuyên gia (Expert). Tài khoản Provider không được hỗ trợ đăng nhập.',
             );
           }
-          // Lưu token vào ApiClient chung để dùng cho mọi request sau này
+          // Lưu token vào ApiClient & SharedPreferences
           _apiClient.setToken(loginResponse.token);
           currentUser = loginResponse.user;
+
+          final prefs = await SharedPreferences.getInstance();
+          if (loginResponse.token != null) {
+            await prefs.setString('auth_token', loginResponse.token!);
+          }
+          if (loginResponse.user != null) {
+            await prefs.setString(
+              'current_user',
+              jsonEncode(loginResponse.user!.toJson()),
+            );
+          }
         }
         return loginResponse;
       } else {
@@ -55,15 +85,15 @@ class AuthService {
       // Fallback thử nghiệm offline nếu chưa bật server API hoặc bị ngắt mạng
       if (email.isNotEmpty && password.length >= 6) {
         if (email.toLowerCase().contains('provider')) {
-          _apiClient.clearToken();
-          currentUser = null;
+          await logout();
           return LoginResponse(
             success: false,
             message:
                 'Ứng dụng di động chỉ dành cho Nhiếp ảnh gia (Photographer) và Chuyên gia (Expert).',
           );
         }
-        _apiClient.setToken('mock_jwt_token_${DateTime.now().millisecondsSinceEpoch}');
+        final mockToken = 'mock_jwt_token_${DateTime.now().millisecondsSinceEpoch}';
+        _apiClient.setToken(mockToken);
         
         String mockRole = 'Photographer';
         if (email.toLowerCase().contains('expert')) mockRole = 'Expert';
@@ -76,6 +106,11 @@ class AuthService {
           status: 'Active',
           createdAt: DateTime.now(),
         );
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('auth_token', mockToken);
+        await prefs.setString('current_user', jsonEncode(currentUser!.toJson()));
+
         return LoginResponse(
           success: true,
           message: 'Đăng nhập thành công (Thử nghiệm offline)',
@@ -151,10 +186,15 @@ class AuthService {
     }
   }
 
-  /// Giả lập đăng xuất (Xóa token trong Generic API Client)
-  void logout() {
+  /// Đăng xuất (Xóa token trong Generic API Client & SharedPreferences)
+  Future<void> logout() async {
     _apiClient.clearToken();
     currentUser = null;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('auth_token');
+      await prefs.remove('current_user');
+    } catch (_) {}
   }
 
   /// Giả lập gửi yêu cầu quên mật khẩu

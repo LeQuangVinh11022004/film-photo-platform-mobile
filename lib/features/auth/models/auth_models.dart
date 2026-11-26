@@ -42,6 +42,16 @@ class UserDTO {
           : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'userId': userId,
+        'fullName': fullName,
+        'email': email,
+        'role': role,
+        'status': status,
+        'providerApprovalStatus': providerApprovalStatus,
+        'createdAt': createdAt?.toIso8601String(),
+      };
 }
 
 class LoginResponse {
