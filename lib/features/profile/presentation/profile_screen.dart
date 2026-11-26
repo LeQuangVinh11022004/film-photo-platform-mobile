@@ -1173,9 +1173,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           child: CircleAvatar(
                             radius: 52,
                             backgroundColor: context.inputColor,
-                            backgroundImage: _avatarUrl.startsWith('http')
+                            backgroundImage: (_avatarUrl.startsWith('http://') ||
+                                    _avatarUrl.startsWith('https://'))
                                 ? NetworkImage(_avatarUrl) as ImageProvider
-                                : FileImage(File(_avatarUrl)),
+                                : FileImage(
+                                    File(
+                                      _avatarUrl.startsWith('file://')
+                                          ? Uri.parse(_avatarUrl).toFilePath()
+                                          : _avatarUrl,
+                                    ),
+                                  ),
                           ),
                         ),
                         Positioned(

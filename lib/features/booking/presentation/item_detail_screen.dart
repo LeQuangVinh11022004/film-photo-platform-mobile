@@ -30,6 +30,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   SpaceReviewPageResponseDTO? _reviewPage;
   List<SpaceReviewResponseDTO> _apiReviews = [];
   List<BookingResponseDTO> _mySpaceBookings = [];
+  List<PhotographerEquipmentResponseDTO> _spaceEquipment = [];
   bool _isLoadingReviews = false;
 
   final List<Map<String, dynamic>> _sampleReviews = [
@@ -123,23 +124,32 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       final results = await Future.wait([
         reviewFuture,
         _bookingApiService.getMyBookings(page: 1, pageSize: 50),
+        _bookingApiService.getEquipmentForSpace(
+          spaceId: spaceId,
+          page: 1,
+          pageSize: 20,
+        ),
       ]);
 
       if (!mounted) return;
 
       final page = results[0] as SpaceReviewPageResponseDTO?;
       final bookingsPage = results[1] as PagedResponseDTO<BookingResponseDTO>?;
+      final equipPage =
+          results[2] as PagedResponseDTO<PhotographerEquipmentResponseDTO>?;
 
       final matchingBookings = (bookingsPage?.items ?? [])
-          .where((b) => b.spaceId.toLowerCase() == spaceId.toLowerCase())
+          .where((b) =>
+              b.spaceId.toLowerCase() == spaceId.toLowerCase() &&
+              (b.status.toUpperCase() == 'CONFIRMED' ||
+                  b.status.toUpperCase() == 'COMPLETED'))
           .toList();
 
       setState(() {
         _reviewPage = page;
         _apiReviews = page?.items ?? [];
-        _mySpaceBookings = matchingBookings.isNotEmpty
-            ? matchingBookings
-            : (bookingsPage?.items ?? []);
+        _mySpaceBookings = matchingBookings;
+        _spaceEquipment = equipPage?.items ?? [];
         if (page != null && page.totalReviews > 0 && page.averageRating > 0) {
           _item = BookingItem(
             id: _item.id,
@@ -184,11 +194,30 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   }
 
   /// POST /api/photographer/bookings/{bookingId}/review
+  /// Tự động kiểm tra khách hàng đã có đơn đặt chỗ CONFIRMED (hoặc COMPLETED) tại không gian này chưa
+  /// mà không bắt khách hàng phải tự chọn đơn đặt chỗ.
   void _showWriteReviewModal(BuildContext context) {
+    final BookingResponseDTO? confirmedBooking =
+        _mySpaceBookings.isNotEmpty ? _mySpaceBookings.first : null;
+
+    if (confirmedBooking == null && _item.id.trim().length >= 32) {
+      toastification.show(
+        context: context,
+        type: ToastificationType.warning,
+        style: ToastificationStyle.flatColored,
+        title: const Text('Chưa đủ điều kiện đánh giá'),
+        description: Text(
+          'Bạn cần có ít nhất 1 đơn đặt chỗ Đã xác nhận (CONFIRMED) tại "${_item.name}" để gửi đánh giá.',
+        ),
+        alignment: Alignment.topCenter,
+        autoCloseDuration: const Duration(seconds: 4),
+        showProgressBar: false,
+      );
+      return;
+    }
+
     int selectedRating = 5;
     final commentController = TextEditingController();
-    String? selectedBookingId =
-        _mySpaceBookings.isNotEmpty ? _mySpaceBookings.first.bookingId : null;
     bool isSubmitting = false;
 
     showModalBottomSheet(
@@ -230,38 +259,28 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     color: context.textColor,
                   ),
                 ),
-                const SizedBox(height: 14),
-                if (_mySpaceBookings.isNotEmpty) ...[
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedBookingId,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: 'Chọn đơn đặt chỗ của bạn',
-                      filled: true,
-                      fillColor: context.inputColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.verified_rounded,
+                      size: 16,
+                      color: Colors.green,
+                    ),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Đã xác thực có đơn đặt chỗ CONFIRMED tại không gian này',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.green.shade700,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ),
-                    items: _mySpaceBookings.map((b) {
-                      final shortId = b.bookingId.length > 8
-                          ? b.bookingId.substring(0, 8).toUpperCase()
-                          : b.bookingId;
-                      return DropdownMenuItem<String>(
-                        value: b.bookingId,
-                        child: Text(
-                          '#$shortId • ${b.bookingDate} (${b.status})',
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      );
-                    }).toList(),
-                    onChanged: (val) {
-                      setModalState(() => selectedBookingId = val);
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                ],
+                  ],
+                ),
+                const SizedBox(height: 14),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: List.generate(
@@ -307,13 +326,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         ? null
                         : () async {
                             final comment = commentController.text.trim();
-                            if (_item.id.trim().length >= 32 &&
-                                selectedBookingId != null &&
-                                selectedBookingId!.isNotEmpty) {
+                            if (confirmedBooking != null &&
+                                _item.id.trim().length >= 32) {
                               setModalState(() => isSubmitting = true);
                               final res = await _reviewApiService
                                   .createBookingReview(
-                                bookingId: selectedBookingId!,
+                                bookingId: confirmedBooking.bookingId,
                                 request: SpaceReviewWriteRequestDTO(
                                   spaceType: _resolvedSpaceType,
                                   spaceId: _item.id.trim(),
@@ -344,13 +362,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                 );
                               } else {
                                 toastification.show(
-                                  context: this.context,
+                                  context: modalCtx,
                                   type: ToastificationType.warning,
                                   style: ToastificationStyle.flatColored,
                                   title: const Text('Chưa thể gửi đánh giá'),
                                   description: Text(
                                     res['message']?.toString() ??
-                                        'Chỉ đơn đã thanh toán và đã kết thúc mới có thể đánh giá.',
+                                        'Vui lòng thử lại sau.',
                                   ),
                                   alignment: Alignment.topCenter,
                                   autoCloseDuration:
@@ -358,20 +376,6 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                                   showProgressBar: false,
                                 );
                               }
-                            } else {
-                              Navigator.pop(modalCtx);
-                              toastification.show(
-                                context: this.context,
-                                type: ToastificationType.info,
-                                style: ToastificationStyle.flatColored,
-                                title: const Text('Chưa có đơn đặt hoàn tất'),
-                                description: const Text(
-                                  'Bạn cần có đơn đặt chỗ đã thanh toán và hoàn tất tại không gian này để gửi đánh giá.',
-                                ),
-                                alignment: Alignment.topCenter,
-                                autoCloseDuration: const Duration(seconds: 4),
-                                showProgressBar: false,
-                              );
                             }
                           },
                     style: ElevatedButton.styleFrom(
@@ -801,6 +805,87 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         );
                       }).toList(),
                     ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.1),
+
+                    if (_spaceEquipment.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      Text(
+                        'Thiết bị cho thuê tại không gian (${_spaceEquipment.length})',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: context.textColor,
+                        ),
+                      ).animate().fadeIn(delay: 340.ms),
+                      const SizedBox(height: 12),
+                      ..._spaceEquipment.map((eq) {
+                        final price =
+                            (eq.priceForSelectedSlot ?? eq.rentalPrice ?? 0)
+                                .round();
+                        final priceFormatted = price.toString().replaceAllMapped(
+                          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                          (Match m) => '${m[1]}.',
+                        );
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: context.cardColor,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: context.borderColor),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.camera_alt_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      eq.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: context.textColor,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 3),
+                                    Text(
+                                      '${eq.category}${eq.variant != null && eq.variant!.isNotEmpty ? " • ${eq.variant}" : ""} • SL: ${eq.quantityTotal}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: context.textSecColor,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (price > 0)
+                                Text(
+                                  '+$priceFormattedđ/h',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
 
                     const SizedBox(height: 28),
 

@@ -1,4 +1,4 @@
-﻿<#
+<#
   Test tat ca API ma project Flutter dang goi (bao gom Package Subscription, Booking, Payment, AI Guide cho PHOTOGRAPHER & EXPERT)
   va ghi log RIENG cho tung API + file tong hop summary.log (100% PowerShell thuan).
   Chay:  powershell -ExecutionPolicy Bypass -File tools\api_test\run_api_tests.ps1

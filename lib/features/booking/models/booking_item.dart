@@ -1,3 +1,5 @@
+import 'booking_api_models.dart';
+
 enum BookingCategory { studio, darkroom, equipment }
 
 class BookingItem {
@@ -158,6 +160,38 @@ class BookingItem {
       operatingHours: details?['operatingHours']?.toString() ?? '',
       usagePolicies: details?['usagePolicies']?.toString() ?? '',
       availableSlots: slotsList.whereType<Map<String, dynamic>>().toList(),
+    );
+  }
+
+  /// Chuyển thiết bị của một Studio/Darkroom (GET /api/photographer/spaces/{id}/equipment) thành BookingItem
+  factory BookingItem.fromEquipmentDto(
+    PhotographerEquipmentResponseDTO dto, {
+    required String spaceName,
+  }) {
+    final price = dto.priceForSelectedSlot ?? dto.rentalPrice ?? 0;
+    final description = dto.description?.trim() ?? '';
+    final variant = dto.variant?.trim() ?? '';
+
+    return BookingItem(
+      id: dto.equipmentId,
+      name: dto.name.isNotEmpty ? dto.name : 'Thiết bị film',
+      category: BookingCategory.equipment,
+      location: spaceName.isNotEmpty ? 'Thuộc: $spaceName' : 'Thiết bị cho thuê',
+      pricePerHour: price,
+      rating: 4.9,
+      imageUrl:
+          'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800&auto=format&fit=crop&q=80',
+      description: description.isNotEmpty
+          ? description
+          : 'Thiết bị ${dto.category} cho thuê${variant.isNotEmpty ? ' - $variant' : ''}.',
+      amenities: [
+        if (dto.category.isNotEmpty) dto.category,
+        if (variant.isNotEmpty) variant,
+        'Số lượng: ${dto.quantityTotal}',
+      ],
+      previewImages: const [
+        'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&auto=format&fit=crop&q=80',
+      ],
     );
   }
 

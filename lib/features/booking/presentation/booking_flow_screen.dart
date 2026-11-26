@@ -23,9 +23,12 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   final PageController _pageController = PageController();
   bool _isSubmitting = false;
 
-  // Step 1: Add-ons state
+  // Step 1: Add-ons / Space Equipment state
   final List<String> _selectedAddons = [];
   late List<Map<String, dynamic>> _availableAddons;
+  List<PhotographerEquipmentResponseDTO> _liveEquipment = [];
+  bool _isLoadingEquipment = false;
+  bool _hasLoadedLiveEquipment = false;
 
   // Step 2: Date & Time state
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
@@ -99,14 +102,68 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     return widget.item.pricePerHour * hours;
   }
 
-  double _calculateAddonPrice() {
+  double _calculateAddonPrice([int hours = 1]) {
     double addonPrice = 0;
     for (var a in _availableAddons) {
       if (_selectedAddons.contains(a['name'])) {
-        addonPrice += (a['price'] as num).toDouble();
+        final unitPrice = (a['price'] as num).toDouble();
+        final isPerHour = a['isPerHour'] == true;
+        addonPrice += isPerHour ? unitPrice * hours : unitPrice;
       }
     }
     return addonPrice;
+  }
+
+  List<String> _getSelectedEquipmentIds() {
+    final ids = <String>[];
+    for (final a in _availableAddons) {
+      if (_selectedAddons.contains(a['name'])) {
+        final eqId = a['equipmentId']?.toString() ?? '';
+        if (eqId.length >= 32 && !ids.contains(eqId)) {
+          ids.add(eqId);
+        }
+      }
+    }
+    return ids;
+  }
+
+  IconData _resolveEquipmentIcon(PhotographerEquipmentResponseDTO eq) {
+    final lowerCat = eq.category.toLowerCase();
+    final lowerType = eq.equipmentType.toLowerCase();
+    final lowerName = eq.name.toLowerCase();
+    if (lowerCat.contains('light') ||
+        lowerType.contains('light') ||
+        lowerName.contains('đèn') ||
+        lowerName.contains('flash') ||
+        lowerName.contains('strobe')) {
+      return Icons.flash_on_rounded;
+    }
+    if (lowerCat.contains('camera') ||
+        lowerType.contains('camera') ||
+        lowerName.contains('máy ảnh') ||
+        lowerName.contains('leica') ||
+        lowerName.contains('hasselblad') ||
+        lowerName.contains('nikon') ||
+        lowerName.contains('canon')) {
+      return Icons.camera_alt_rounded;
+    }
+    if (lowerCat.contains('lens') || lowerName.contains('lens')) {
+      return Icons.camera_rounded;
+    }
+    if (lowerCat.contains('chemical') ||
+        lowerCat.contains('darkroom') ||
+        lowerType.contains('enlarger') ||
+        lowerName.contains('enlarger') ||
+        lowerName.contains('tráng') ||
+        lowerName.contains('rọi')) {
+      return Icons.science_rounded;
+    }
+    if (lowerCat.contains('backdrop') ||
+        lowerName.contains('phông') ||
+        lowerName.contains('background')) {
+      return Icons.format_paint_rounded;
+    }
+    return Icons.precision_manufacturing_rounded;
   }
 
   @override
@@ -115,23 +172,32 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     _liveAvailableSlots = List<Map<String, dynamic>>.from(widget.item.availableSlots);
     _initAddons();
     _initSelectedDate();
-    _syncLiveSlotsAndSubscriptions();
+    _syncLiveSlotsSubscriptionsAndEquipment();
   }
 
-  Future<void> _syncLiveSlotsAndSubscriptions() async {
+  Future<void> _syncLiveSlotsSubscriptionsAndEquipment() async {
     final spaceId = widget.item.id.trim();
     if (spaceId.length < 32) return; // Skip mock non-UUID items
+
+    setState(() => _isLoadingEquipment = true);
 
     try {
       final results = await Future.wait([
         BookingApiService().getAvailableSlots(spaceId: spaceId),
         BookingApiService().getPackageSubscriptions(),
+        BookingApiService().getEquipmentForSpace(
+          spaceId: spaceId,
+          page: 1,
+          pageSize: 50,
+        ),
       ]);
 
       if (!mounted) return;
 
       final apiSlots = results[0] as List<ProviderSpaceAvailabilityResponseDTO>;
       final apiSubs = results[1] as List<PhotographerPackageSubscriptionResponseDTO>;
+      final equipPage =
+          results[2] as PagedResponseDTO<PhotographerEquipmentResponseDTO>?;
 
       if (apiSlots.isNotEmpty) {
         final converted = <Map<String, dynamic>>[];
@@ -153,6 +219,23 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         }
       }
 
+      if (equipPage != null) {
+        _applyLiveEquipmentList(equipPage.items);
+      }
+
+      // Now if there is an active selected slot, refresh equipment filtered by availabilityId
+      final currentSlots = _timeSlots;
+      if (currentSlots.isNotEmpty) {
+        final safeIdx = _selectedTimeSlotIndex < currentSlots.length
+            ? _selectedTimeSlotIndex
+            : 0;
+        final currentAvailId =
+            currentSlots[safeIdx]['availabilityId']?.toString() ?? '';
+        if (currentAvailId.length >= 32) {
+          await _refreshEquipmentForAvailabilitySlot(currentAvailId);
+        }
+      }
+
       final activeMatching = apiSubs.where((sub) {
         if (sub.status.toUpperCase() != 'ACTIVE' ||
             sub.remainingUsesThisPeriod <= 0) {
@@ -163,10 +246,79 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         );
       }).toList();
 
-      if (activeMatching.isNotEmpty) {
+      if (activeMatching.isNotEmpty && mounted) {
         setState(() {
           _matchingSubscriptions = activeMatching;
         });
+      }
+    } catch (_) {
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingEquipment = false);
+      }
+    }
+  }
+
+  void _applyLiveEquipmentList(List<PhotographerEquipmentResponseDTO> items) {
+    if (!mounted) return;
+    if (items.isEmpty) {
+      setState(() {
+        _liveEquipment = [];
+        _hasLoadedLiveEquipment = true;
+      });
+      return;
+    }
+
+    final mapped = items.map((eq) {
+      final price = eq.priceForSelectedSlot ?? eq.rentalPrice ?? 0.0;
+      return <String, dynamic>{
+        'equipmentId': eq.equipmentId,
+        'equipmentAvailabilityId': eq.equipmentAvailabilityId,
+        'name': eq.name,
+        'category': eq.category,
+        'equipmentType': eq.equipmentType,
+        'variant': eq.variant,
+        'description': eq.description,
+        'quantityTotal': eq.quantityTotal,
+        'price': price,
+        'isPerHour': true,
+        'icon': _resolveEquipmentIcon(eq),
+      };
+    }).toList();
+
+    setState(() {
+      _liveEquipment = items;
+      _availableAddons = mapped;
+      _hasLoadedLiveEquipment = true;
+      // Keep only selections that still exist in available equipment
+      final validNames = mapped.map((m) => m['name'] as String).toSet();
+      _selectedAddons.removeWhere((name) => !validNames.contains(name));
+    });
+  }
+
+  /// Gọi GET /api/photographer/spaces/{spaceId}/equipment?availabilityId={availabilityId}
+  /// và GET /api/photographer/equipment/{equipmentId}/availability để đồng bộ thiết bị trống theo khung giờ
+  Future<void> _refreshEquipmentForAvailabilitySlot(
+      String availabilityId) async {
+    final spaceId = widget.item.id.trim();
+    if (spaceId.length < 32 || availabilityId.length < 32) return;
+
+    try {
+      final equipPage = await BookingApiService().getEquipmentForSpace(
+        spaceId: spaceId,
+        availabilityId: availabilityId,
+        page: 1,
+        pageSize: 50,
+      );
+      if (!mounted) return;
+      if (equipPage != null && equipPage.items.isNotEmpty) {
+        _applyLiveEquipmentList(equipPage.items);
+        // Warm up / verify individual equipment availability API
+        for (final eq in equipPage.items.take(5)) {
+          BookingApiService().getEquipmentAvailability(
+            equipmentId: eq.equipmentId,
+          );
+        }
       }
     } catch (_) {}
   }
@@ -323,8 +475,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final availabilityId = slot['availabilityId'] as String;
 
     final basePrice = _calculateBasePrice(slot, hours);
-    final addonPrice = _calculateAddonPrice();
+    final addonPrice = _calculateAddonPrice(hours);
     final totalPrice = basePrice + addonPrice;
+    final selectedEquipmentIds = _getSelectedEquipmentIds();
 
     final BookingCreateRequestDTO request;
     if (_selectedSubscription != null) {
@@ -352,6 +505,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     } else {
       request = BookingCreateRequestDTO(
         availabilityId: availabilityId,
+        equipmentIds: selectedEquipmentIds,
       );
     }
 
@@ -535,17 +689,50 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        const Text(
-          'Nâng cấp trải nghiệm',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
-          ),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Expanded(
+              child: Text(
+                'Trang thiết bị đi kèm',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ),
+            if (_isLoadingEquipment)
+              const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              )
+            else if (_hasLoadedLiveEquipment && _liveEquipment.isNotEmpty)
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${_liveEquipment.length} thiết bị sẵn sàng',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+          ],
         ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
         const SizedBox(height: 8),
         Text(
-          'Chọn thêm các trang thiết bị hoặc dịch vụ đi kèm phù hợp với nhu cầu của bạn.',
+          'Chọn thêm các trang thiết bị của không gian này để đính kèm trực tiếp vào đơn đặt chỗ.',
           style: TextStyle(
             fontSize: 14,
             color: AppColors.textSecondary,
@@ -553,8 +740,43 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           ),
         ).animate().fadeIn(delay: 100.ms),
         const SizedBox(height: 24),
+        if (_hasLoadedLiveEquipment &&
+            _liveEquipment.isEmpty &&
+            widget.item.id.trim().length >= 32)
+          Container(
+            margin: const EdgeInsets.only(bottom: 16),
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.inputFill,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded,
+                    color: AppColors.primary, size: 18),
+                SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    'Không gian này hiện chưa cấu hình thiết bị riêng trên máy chủ. Đang hiển thị phụ kiện tiêu chuẩn.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         ..._availableAddons.map((addon) {
           final isSelected = _selectedAddons.contains(addon['name']);
+          final category = addon['category']?.toString() ?? '';
+          final variant = addon['variant']?.toString() ?? '';
+          final description = addon['description']?.toString() ?? '';
+          final quantityTotal = (addon['quantityTotal'] as num?)?.toInt();
+          final isPerHour = addon['isPerHour'] == true;
+          final priceStr = NumberFormat.currency(locale: 'vi', symbol: 'đ')
+              .format(addon['price']);
+
           return GestureDetector(
             onTap: () {
               setState(() {
@@ -580,13 +802,25 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(
-                    addon['icon'],
-                    color: isSelected ? AppColors.primary : AppColors.textSecondary,
-                    size: 28,
+                  Container(
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.primary.withValues(alpha: 0.12)
+                          : AppColors.inputFill,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      addon['icon'],
+                      color: isSelected
+                          ? AppColors.primary
+                          : AppColors.textSecondary,
+                      size: 24,
+                    ),
                   ),
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -599,26 +833,95 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                             color: AppColors.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        if (category.isNotEmpty || variant.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Wrap(
+                            spacing: 6,
+                            runSpacing: 4,
+                            children: [
+                              if (category.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.inputFill,
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    category,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.textSecondary,
+                                    ),
+                                  ),
+                                ),
+                              if (variant.isNotEmpty)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 8, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary
+                                        .withValues(alpha: 0.08),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text(
+                                    variant,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                      color: AppColors.primary,
+                                    ),
+                                  ),
+                                ),
+                              if (quantityTotal != null && quantityTotal > 0)
+                                Text(
+                                  '• SL: $quantityTotal',
+                                  style: const TextStyle(
+                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                        if (description.isNotEmpty) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            description,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 6),
                         Text(
-                          '+${NumberFormat.currency(locale: 'vi', symbol: 'đ').format(addon['price'])}',
+                          isPerHour ? '+$priceStr / giờ' : '+$priceStr',
                           style: const TextStyle(
                             fontSize: 14,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w700,
                             color: AppColors.primary,
                           ),
                         ),
                       ],
                     ),
                   ),
+                  const SizedBox(width: 8),
                   Container(
                     width: 24,
                     height: 24,
+                    margin: const EdgeInsets.only(top: 4),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: isSelected ? AppColors.primary : Colors.transparent,
+                      color:
+                          isSelected ? AppColors.primary : Colors.transparent,
                       border: Border.all(
-                        color: isSelected ? AppColors.primary : AppColors.border,
+                        color:
+                            isSelected ? AppColors.primary : AppColors.border,
                         width: 2,
                       ),
                     ),
@@ -684,6 +987,14 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                 _selectedDate = picked;
                 _selectedTimeSlotIndex = 0;
               });
+              final nextSlots = _timeSlots;
+              if (nextSlots.isNotEmpty) {
+                final availId =
+                    nextSlots.first['availabilityId']?.toString() ?? '';
+                if (availId.length >= 32) {
+                  _refreshEquipmentForAvailabilitySlot(availId);
+                }
+              }
             }
           },
           borderRadius: BorderRadius.circular(16),
@@ -747,7 +1058,13 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               final slot = slots[index];
               final isSelected = _selectedTimeSlotIndex == index;
               return GestureDetector(
-                onTap: () => setState(() => _selectedTimeSlotIndex = index),
+                onTap: () {
+                  setState(() => _selectedTimeSlotIndex = index);
+                  final availId = slot['availabilityId']?.toString() ?? '';
+                  if (availId.length >= 32) {
+                    _refreshEquipmentForAvailabilitySlot(availId);
+                  }
+                },
                 child: AnimatedContainer(
                   duration: 200.ms,
                   padding:
@@ -799,7 +1116,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final slot = slots[safeIndex];
     final hours = slot['hours'] as int;
     final basePrice = _calculateBasePrice(slot, hours);
-    final addonPrice = _calculateAddonPrice();
+    final addonPrice = _calculateAddonPrice(hours);
     final totalPrice = basePrice + addonPrice;
 
     return ListView(
@@ -874,13 +1191,16 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               if (_selectedAddons.isNotEmpty) ...[
                 const SizedBox(height: 12),
                 const Text(
-                  'Dịch vụ thêm:',
+                  'Thiết bị đi kèm:',
                   style: TextStyle(color: AppColors.textSecondary),
                 ),
                 const SizedBox(height: 8),
                 ..._selectedAddons.map((name) {
-                  final price = _availableAddons
-                      .firstWhere((a) => a['name'] == name)['price'];
+                  final addon =
+                      _availableAddons.firstWhere((a) => a['name'] == name);
+                  final unitPrice = (addon['price'] as num).toDouble();
+                  final isPerHour = addon['isPerHour'] == true;
+                  final lineTotal = isPerHour ? unitPrice * hours : unitPrice;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 4, left: 8),
                     child: Row(
@@ -888,7 +1208,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            '• $name',
+                            isPerHour ? '• $name (x${hours}h)' : '• $name',
                             style: const TextStyle(
                               fontSize: 13,
                               color: AppColors.textSecondary,
@@ -897,7 +1217,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                         ),
                         Text(
                           NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                              .format(price),
+                              .format(lineTotal),
                           style: const TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,

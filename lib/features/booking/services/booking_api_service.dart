@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../models/booking_api_models.dart';
+import '../models/booking_item.dart';
 import '../models/review_api_models.dart';
 
 class BookingApiService {
@@ -145,6 +146,34 @@ class BookingApiService {
       if (kDebugMode) print('getEquipmentForSpace API Error: $e');
       return null;
     }
+  }
+
+  /// Gom toàn bộ thiết bị từ các Studio/Darkroom đã tải (gọi /spaces/{id}/equipment, đọc hết các trang).
+  /// Thiết bị trùng equipmentId giữa các không gian chỉ xuất hiện một lần.
+  Future<List<BookingItem>> getAllEquipmentItems(List<BookingItem> spaces) async {
+    final results = await Future.wait(spaces.map((space) => _getAllEquipmentForSpace(space)));
+    final seen = <String>{};
+    final items = <BookingItem>[];
+    for (final list in results) {
+      for (final item in list) {
+        if (seen.add(item.id)) items.add(item);
+      }
+    }
+    return items;
+  }
+
+  Future<List<BookingItem>> _getAllEquipmentForSpace(BookingItem space) async {
+    const pageSize = 50;
+    final items = <BookingItem>[];
+    var page = 1;
+    while (true) {
+      final result = await getEquipmentForSpace(spaceId: space.id, page: page, pageSize: pageSize);
+      if (result == null || result.items.isEmpty) break;
+      items.addAll(result.items.map((dto) => BookingItem.fromEquipmentDto(dto, spaceName: space.name)));
+      if (items.length >= result.totalCount || result.items.length < pageSize) break;
+      page++;
+    }
+    return items;
   }
 
   /// Lấy danh sách khung giờ trống của một Thiết bị (/api/photographer/equipment/{equipmentId}/availability)
