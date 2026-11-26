@@ -727,7 +727,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             onTap: () => Navigator.pushNamed(context, banner['route']),
                             child: Container(
                               width: MediaQuery.of(context).size.width,
-                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                               decoration: BoxDecoration(
                                 gradient: banner['gradient'] as Gradient,
                                 borderRadius: BorderRadius.circular(20),
@@ -742,14 +742,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               child: Row(
                                 children: [
                                   Container(
-                                    padding: const EdgeInsets.all(12),
+                                    padding: const EdgeInsets.all(10),
                                     decoration: BoxDecoration(
                                       color: Colors.white.withValues(alpha: 0.2),
                                       shape: BoxShape.circle,
                                     ),
-                                    child: Icon(banner['icon'] as IconData, color: Colors.white, size: 28),
+                                    child: Icon(banner['icon'] as IconData, color: Colors.white, size: 24),
                                   ),
-                                  const SizedBox(width: 14),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
                                       mainAxisAlignment: MainAxisAlignment.center,
@@ -757,20 +757,24 @@ class _HomeScreenState extends State<HomeScreen> {
                                       children: [
                                         Row(
                                           children: [
-                                            Text(
-                                              banner['title'],
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.w800,
-                                                fontSize: 15,
+                                            Flexible(
+                                              child: Text(
+                                                banner['title'],
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontWeight: FontWeight.w800,
+                                                  fontSize: 14,
+                                                ),
                                               ),
                                             ),
-                                            const SizedBox(width: 8),
+                                            const SizedBox(width: 6),
                                             Container(
                                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                               decoration: BoxDecoration(
                                                 color: Colors.white.withValues(alpha: 0.3),
-                                                borderRadius: BorderRadius.circular(8),
+                                                borderRadius: BorderRadius.circular(6),
                                               ),
                                               child: Text(
                                                 banner['badge'],
@@ -783,22 +787,22 @@ class _HomeScreenState extends State<HomeScreen> {
                                             ),
                                           ],
                                         ),
-                                        const SizedBox(height: 4),
+                                        const SizedBox(height: 3),
                                         Text(
                                           banner['subtitle'],
                                           maxLines: 2,
                                           overflow: TextOverflow.ellipsis,
                                           style: TextStyle(
                                             color: Colors.white.withValues(alpha: 0.85),
-                                            fontSize: 12,
-                                            height: 1.3,
+                                            fontSize: 11.5,
+                                            height: 1.25,
                                           ),
                                         ),
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
-                                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 16),
+                                  const SizedBox(width: 6),
+                                  const Icon(Icons.arrow_forward_ios_rounded, color: Colors.white70, size: 14),
                                 ],
                               ),
                             ),
@@ -885,7 +889,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _selectedCategoryIndex = 0;
                           _searchController.clear();
                           _searchQuery = '';
-                          _maxPriceFilter = 500000;
+                          _maxPriceFilter = 2500000;
                           _minRatingFilter = 0.0;
                           _sortBy = 'default';
                         });

@@ -29,6 +29,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   List<PhotographerEquipmentResponseDTO> _liveEquipment = [];
   bool _isLoadingEquipment = false;
   bool _hasLoadedLiveEquipment = false;
+  final Map<String, int> _equipmentAvailabilityCounts = {};
+  int _equipmentRequestGeneration = 0;
 
   // Step 2: Date & Time state
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
@@ -265,6 +267,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     if (items.isEmpty) {
       setState(() {
         _liveEquipment = [];
+        _initAddons();
+        _selectedAddons.clear();
         _hasLoadedLiveEquipment = true;
       });
       return;
@@ -303,6 +307,11 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       String availabilityId) async {
     final spaceId = widget.item.id.trim();
     if (spaceId.length < 32 || availabilityId.length < 32) return;
+    final generation = ++_equipmentRequestGeneration;
+    final fromDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
+    final toDate = DateFormat('yyyy-MM-dd')
+        .format(_selectedDate.add(const Duration(days: 7)));
+    setState(() => _equipmentAvailabilityCounts.clear());
 
     try {
       final equipPage = await BookingApiService().getEquipmentForSpace(
@@ -311,17 +320,23 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         page: 1,
         pageSize: 50,
       );
-      if (!mounted) return;
-      if (equipPage != null && equipPage.items.isNotEmpty) {
+      if (!mounted || generation != _equipmentRequestGeneration) return;
+      if (equipPage != null) {
         _applyLiveEquipmentList(equipPage.items);
-        // Warm up / verify individual equipment availability API
-        for (final eq in equipPage.items.take(5)) {
-          BookingApiService().getEquipmentAvailability(
+        final counts = await Future.wait(equipPage.items.map((eq) async {
+          final slots = await BookingApiService().getEquipmentAvailability(
             equipmentId: eq.equipmentId,
+            fromDate: fromDate,
+            toDate: toDate,
           );
-        }
+          return MapEntry(eq.equipmentId, slots.length);
+        }));
+        if (!mounted || generation != _equipmentRequestGeneration) return;
+        setState(() => _equipmentAvailabilityCounts.addEntries(counts));
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Error refreshing space equipment: $e');
+    }
   }
 
   @override
@@ -416,7 +431,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   }
 
   void _nextStep() {
-    if (_currentStep == 1 && _timeSlots.isEmpty) {
+    if (_currentStep == 0 && _timeSlots.isEmpty) {
       toastification.show(
         context: context,
         type: ToastificationType.warning,
@@ -500,7 +515,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           PackageBookingSegmentRequestDTO(
             stepOrder: stepItem.stepOrder,
             availabilityId: availabilityId,
-            equipmentIds: equipIds,
+            equipmentIds: equipIds.isNotEmpty ? equipIds : selectedEquipmentIds,
           ),
         ],
       );
@@ -610,9 +625,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
             child: Row(
               children: [
-                _buildStepIndicator(0, 'Dịch vụ thêm'),
+                _buildStepIndicator(0, 'Ngày & Giờ'),
                 _buildStepDivider(),
-                _buildStepIndicator(1, 'Ngày & Giờ'),
+                _buildStepIndicator(1, 'Dịch vụ thêm'),
                 _buildStepDivider(),
                 _buildStepIndicator(2, 'Thanh toán'),
               ],
@@ -627,8 +642,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                _buildStep1Addons(),
                 _buildStep2DateTime(),
+                _buildStep1Addons(),
                 _buildStep3Checkout(),
               ],
             ),
@@ -775,6 +790,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           final variant = addon['variant']?.toString() ?? '';
           final description = addon['description']?.toString() ?? '';
           final quantityTotal = (addon['quantityTotal'] as num?)?.toInt();
+          final availabilityCount =
+              _equipmentAvailabilityCounts[addon['equipmentId']];
           final isPerHour = addon['isPerHour'] == true;
           final priceStr = NumberFormat.currency(locale: 'vi', symbol: 'đ')
               .format(addon['price']);
@@ -835,6 +852,18 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                             color: AppColors.textPrimary,
                           ),
                         ),
+                        if (availabilityCount != null &&
+                            availabilityCount > 0) ...[
+                          const SizedBox(height: 4),
+                          Text(
+                            '$availabilityCount slot trống',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.green.shade700,
+                            ),
+                          ),
+                        ],
                         if (category.isNotEmpty || variant.isNotEmpty) ...[
                           const SizedBox(height: 4),
                           Wrap(
@@ -988,6 +1017,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               setState(() {
                 _selectedDate = picked;
                 _selectedTimeSlotIndex = 0;
+                _equipmentRequestGeneration++;
+                _equipmentAvailabilityCounts.clear();
               });
               final nextSlots = _timeSlots;
               if (nextSlots.isNotEmpty) {

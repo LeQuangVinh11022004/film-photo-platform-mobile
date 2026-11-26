@@ -16,79 +16,90 @@ class ExpertNavigationScreen extends StatefulWidget {
 
 class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
   int _currentIndex = 0;
+  int _scheduleReloadCount = 0;
 
   // Màu nhận diện riêng của Expert.
   static const Color _expertAccent = Color(0xFF7C5CFC);
 
-  late final List<Widget> _screens = [
-    const ExpertHomeScreen(),
-
-    const ExpertScheduleScreen(),
-
-    const CommunityScreen(),
-
-    const ExpertQaScreen(),
-
-    ProfileScreen(),
-  ];
-
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      // Nội dung có thể chạy phía dưới thanh điều hướng nổi.
-      extendBody: true,
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setState(() {
+            _currentIndex = 0;
+          });
+        }
+      },
+      child: Scaffold(
+        // Nội dung có thể chạy phía dưới thanh điều hướng nổi.
+        extendBody: true,
 
-      body: IndexedStack(index: _currentIndex, children: _screens),
+        body: IndexedStack(
+          index: _currentIndex,
+          children: [
+            const ExpertHomeScreen(),
+            ExpertScheduleScreen(
+              key: ValueKey('expert_schedule_$_scheduleReloadCount'),
+            ),
+            const CommunityScreen(),
+            const ExpertQaScreen(),
+            ProfileScreen(),
+          ],
+        ),
 
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: context.cardColor,
-            borderRadius: BorderRadius.circular(32),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.08),
-                blurRadius: 24,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(
-                index: 0,
-                icon: Icons.home_outlined,
-                activeIcon: Icons.home_rounded,
-                label: 'Home',
-              ),
-              _buildNavItem(
-                index: 1,
-                icon: Icons.calendar_today_outlined,
-                activeIcon: Icons.calendar_month_rounded,
-                label: 'Lịch trình',
-              ),
-              _buildNavItem(
-                index: 2,
-                icon: Icons.article_outlined,
-                activeIcon: Icons.article_rounded,
-                label: 'Bài viết',
-              ),
-              _buildNavItem(
-                index: 3,
-                icon: Icons.forum_outlined,
-                activeIcon: Icons.forum_rounded,
-                label: 'Hỏi đáp',
-              ),
-              _buildNavItem(
-                index: 4,
-                icon: Icons.person_outline_rounded,
-                activeIcon: Icons.person_rounded,
-                label: 'Hồ sơ',
-              ),
-            ],
+        bottomNavigationBar: SafeArea(
+          child: Container(
+            margin: const EdgeInsets.only(left: 20, right: 20, bottom: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              color: context.cardColor,
+              borderRadius: BorderRadius.circular(32),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 8),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildNavItem(
+                  index: 0,
+                  icon: Icons.home_outlined,
+                  activeIcon: Icons.home_rounded,
+                  label: 'Home',
+                ),
+                _buildNavItem(
+                  index: 1,
+                  icon: Icons.calendar_today_outlined,
+                  activeIcon: Icons.calendar_month_rounded,
+                  label: 'Lịch trình',
+                ),
+                _buildNavItem(
+                  index: 2,
+                  icon: Icons.article_outlined,
+                  activeIcon: Icons.article_rounded,
+                  label: 'Bài viết',
+                ),
+                _buildNavItem(
+                  index: 3,
+                  icon: Icons.forum_outlined,
+                  activeIcon: Icons.forum_rounded,
+                  label: 'Hỏi đáp',
+                ),
+                _buildNavItem(
+                  index: 4,
+                  icon: Icons.person_outline_rounded,
+                  activeIcon: Icons.person_rounded,
+                  label: 'Hồ sơ',
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -106,6 +117,9 @@ class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
     return GestureDetector(
       onTap: () {
         setState(() {
+          if (index == 1) {
+            _scheduleReloadCount++;
+          }
           _currentIndex = index;
         });
       },
