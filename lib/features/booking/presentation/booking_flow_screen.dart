@@ -138,6 +138,12 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final spaceId = widget.item.id.trim();
     if (spaceId.length < 32) return; // Skip mock non-UUID items
 
+    String? currentAvailId;
+    final slots = _timeSlots;
+    if (slots.isNotEmpty && _selectedTimeSlotIndex < slots.length) {
+      currentAvailId = slots[_selectedTimeSlotIndex]['availabilityId'] as String?;
+    }
+
     setState(() {
       _isLoadingEquipment = true;
     });
@@ -145,6 +151,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     try {
       final pagedRes = await BookingApiService().getEquipmentForSpace(
         spaceId: spaceId,
+        availabilityId: currentAvailId,
       );
       if (pagedRes != null && pagedRes.items.isNotEmpty) {
         if (mounted) {
@@ -153,6 +160,12 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           });
         }
         _fetchEquipmentAvailabilities(pagedRes.items);
+      } else {
+        if (mounted) {
+          setState(() {
+            _spaceEquipmentList = [];
+          });
+        }
       }
     } catch (e) {
       if (kDebugMode) print('Error fetching space equipment: $e');
@@ -367,7 +380,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   }
 
   void _nextStep() {
-    if (_currentStep == 1 && _timeSlots.isEmpty) {
+    if (_currentStep == 0 && _timeSlots.isEmpty) {
       toastification.show(
         context: context,
         type: ToastificationType.warning,
@@ -381,6 +394,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         showProgressBar: false,
       );
       return;
+    }
+
+    if (_currentStep == 0) {
+      _fetchSpaceEquipment();
     }
 
     if (_currentStep < 2) {
@@ -563,9 +580,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
             child: Row(
               children: [
-                _buildStepIndicator(0, 'Dịch vụ thêm'),
+                _buildStepIndicator(0, 'Ngày & Giờ'),
                 _buildStepDivider(),
-                _buildStepIndicator(1, 'Ngày & Giờ'),
+                _buildStepIndicator(1, 'Dịch vụ thêm'),
                 _buildStepDivider(),
                 _buildStepIndicator(2, 'Thanh toán'),
               ],
@@ -580,8 +597,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                _buildStep1Addons(),
                 _buildStep2DateTime(),
+                _buildStep1Addons(),
                 _buildStep3Checkout(),
               ],
             ),
@@ -936,6 +953,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                 _selectedDate = picked;
                 _selectedTimeSlotIndex = 0;
               });
+              _fetchSpaceEquipment();
             }
           },
           borderRadius: BorderRadius.circular(16),
@@ -999,7 +1017,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               final slot = slots[index];
               final isSelected = _selectedTimeSlotIndex == index;
               return GestureDetector(
-                onTap: () => setState(() => _selectedTimeSlotIndex = index),
+                onTap: () {
+                  setState(() => _selectedTimeSlotIndex = index);
+                  _fetchSpaceEquipment();
+                },
                 child: AnimatedContainer(
                   duration: 200.ms,
                   padding:
