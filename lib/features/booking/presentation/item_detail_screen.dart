@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:carousel_slider/carousel_slider.dart';
 import 'package:toastification/toastification.dart';
-import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
+import '../models/review_api_models.dart';
+import '../services/booking_api_service.dart';
+import '../services/review_api_service.dart';
 import 'booking_flow_screen.dart';
 
 class ItemDetailScreen extends StatefulWidget {
@@ -21,40 +24,65 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   bool _isInitialized = false;
   int _currentImageIndex = 0;
 
-  // Booking Modal State
-  DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
-  int _selectedTimeSlotIndex = 0;
-  final List<Map<String, dynamic>> _timeSlots = [
-  {'slot': '08:00 - 10:00', 'hours': 2},
-  {'slot': '10:00 - 12:00', 'hours': 2},
-  {'slot': '13:00 - 16:00', 'hours': 3},
-  {'slot': '16:00 - 19:00', 'hours': 3},
-  {'slot': '19:00 - 22:00', 'hours': 3},
+  final ReviewApiService _reviewApiService = ReviewApiService();
+  final BookingApiService _bookingApiService = BookingApiService();
+
+  SpaceReviewPageResponseDTO? _reviewPage;
+  List<SpaceReviewResponseDTO> _apiReviews = [];
+  List<BookingResponseDTO> _mySpaceBookings = [];
+  bool _isLoadingReviews = false;
+
+  final List<Map<String, dynamic>> _sampleReviews = [
+    {
+      'name': 'Nguyễn Văn Minh',
+      'avatar':
+          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+      'rating': 5.0,
+      'date': '2 ngày trước',
+      'comment':
+          'Studio trang bị ánh sáng cực đỉnh! Đèn Profoto hoạt động rất ổn định, phông nền film vintage chụp portrait lên màu rất mịn. Rất đáng tiền!',
+    },
+    {
+      'name': 'Trần Thị Thu Hà',
+      'avatar':
+          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
+      'rating': 5.0,
+      'date': '1 tuần trước',
+      'comment':
+          'Không gian sạch sẽ, yên tĩnh, chủ studio thân thiện và nhiệt tình hỗ trợ kê đặt thiết bị. Chắc chắn sẽ quay lại đặt thường xuyên!',
+    },
+    {
+      'name': 'Lê Quốc Bảo',
+      'avatar':
+          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
+      'rating': 4.8,
+      'date': '2 tuần trước',
+      'comment':
+          'Thiết bị rất mới, có sẵn nước uống và wifi nhanh. Trải nghiệm tuyệt vời cho nhiếp ảnh gia tự do.',
+    },
   ];
 
-  final List<Map<String, dynamic>> _reviews = [
-  {
-  'name': 'Nguyễn Văn Minh',
-  'avatar': 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-  'rating': 5.0,
-  'date': '2 ngày trước',
-  'comment': 'Studio trang bị ánh sáng cực đỉnh! Đèn Profoto hoạt động rất ổn định, phông nền film vintage chụp portrait lên màu rất mịn. Rất đáng tiền!',
-  },
-  {
-  'name': 'Trần Thị Thu Hà',
-  'avatar': 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-  'rating': 5.0,
-  'date': '1 tuần trước',
-  'comment': 'Không gian sạch sẽ, yên tĩnh, chủ studio thân thiện và nhiệt tình hỗ trợ kê đặt thiết bị. Chắc chắn sẽ quay lại đặt thường xuyên!',
-  },
-  {
-  'name': 'Lê Quốc Bảo',
-  'avatar': 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
-  'rating': 4.8,
-  'date': '2 tuần trước',
-  'comment': 'Thiết bị rất mới, có sẵn nước uống và wifi nhanh. Trải nghiệm tuyệt vời cho nhiếp ảnh gia tự do.',
-  },
-  ];
+  String get _resolvedSpaceType =>
+      _item.category == BookingCategory.darkroom ? 'DARKROOM' : 'STUDIO';
+
+  List<Map<String, dynamic>> get _reviews {
+    final apiMapped = _apiReviews
+        .map((r) => <String, dynamic>{
+              'name': r.customerName.isNotEmpty
+                  ? r.customerName
+                  : 'Nhiếp ảnh gia',
+              'avatar':
+                  'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
+              'rating': r.rating.toDouble(),
+              'date': SpaceReviewResponseDTO.formatTimeAgo(r.createdAt),
+              'comment': (r.comment != null && r.comment!.trim().isNotEmpty)
+                  ? r.comment!.trim()
+                  : 'Không gian tuyệt vời, trải nghiệm rất hài lòng!',
+              'isApi': true,
+            })
+        .toList();
+    return [...apiMapped, ..._sampleReviews];
+  }
 
   @override
   void didChangeDependencies() {
@@ -67,6 +95,84 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         _item = BookingItem.sampleItems[0];
       }
       _isInitialized = true;
+      _loadSpaceReviewsAndBookings();
+    }
+  }
+
+  /// Gọi GET /api/photographer/studios/{studioId}/reviews
+  /// hoặc GET /api/photographer/darkrooms/{darkroomId}/reviews
+  Future<void> _loadSpaceReviewsAndBookings() async {
+    final spaceId = _item.id.trim();
+    if (spaceId.length < 32) return;
+
+    setState(() => _isLoadingReviews = true);
+    try {
+      final Future<SpaceReviewPageResponseDTO?> reviewFuture =
+          _item.category == BookingCategory.darkroom
+              ? _reviewApiService.getDarkroomReviews(
+                  darkroomId: spaceId,
+                  page: 1,
+                  pageSize: 20,
+                )
+              : _reviewApiService.getStudioReviews(
+                  studioId: spaceId,
+                  page: 1,
+                  pageSize: 20,
+                );
+
+      final results = await Future.wait([
+        reviewFuture,
+        _bookingApiService.getMyBookings(page: 1, pageSize: 50),
+      ]);
+
+      if (!mounted) return;
+
+      final page = results[0] as SpaceReviewPageResponseDTO?;
+      final bookingsPage = results[1] as PagedResponseDTO<BookingResponseDTO>?;
+
+      final matchingBookings = (bookingsPage?.items ?? [])
+          .where((b) => b.spaceId.toLowerCase() == spaceId.toLowerCase())
+          .toList();
+
+      setState(() {
+        _reviewPage = page;
+        _apiReviews = page?.items ?? [];
+        _mySpaceBookings = matchingBookings.isNotEmpty
+            ? matchingBookings
+            : (bookingsPage?.items ?? []);
+        if (page != null && page.totalReviews > 0 && page.averageRating > 0) {
+          _item = BookingItem(
+            id: _item.id,
+            name: _item.name,
+            category: _item.category,
+            location: _item.location,
+            pricePerHour: _item.pricePerHour,
+            rating: page.averageRating,
+            imageUrl: _item.imageUrl,
+            description: _item.description,
+            amenities: _item.amenities,
+            previewImages: _item.previewImages,
+            isFavorite: _item.isFavorite,
+            capacity: _item.capacity,
+            providerName: _item.providerName,
+            lengthM: _item.lengthM,
+            widthM: _item.widthM,
+            heightM: _item.heightM,
+            artisticStyle: _item.artisticStyle,
+            supportedProcesses: _item.supportedProcesses,
+            lightingConditions: _item.lightingConditions,
+            ventilationDetails: _item.ventilationDetails,
+            acousticDetails: _item.acousticDetails,
+            operatingHours: _item.operatingHours,
+            usagePolicies: _item.usagePolicies,
+            availableSlots: _item.availableSlots,
+          );
+        }
+        _isLoadingReviews = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _isLoadingReviews = false);
     }
   }
 
@@ -77,7 +183,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     );
   }
 
+  /// POST /api/photographer/bookings/{bookingId}/review
   void _showWriteReviewModal(BuildContext context) {
+    int selectedRating = 5;
+    final commentController = TextEditingController();
+    String? selectedBookingId =
+        _mySpaceBookings.isNotEmpty ? _mySpaceBookings.first.bookingId : null;
+    bool isSubmitting = false;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -85,73 +198,211 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (context) => Padding(
-        padding: EdgeInsets.only(
-          bottom: MediaQuery.of(context).viewInsets.bottom,
-          left: 24,
-          right: 24,
-          top: 24,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.borderColor,
-                  borderRadius: BorderRadius.circular(2),
+      builder: (modalCtx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(modalCtx).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.borderColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Viết đánh giá của bạn',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textColor),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                5,
-                    (index) => IconButton(
-                  icon: const Icon(Icons.star_border_rounded, size: 40, color: Colors.amber),
-                  onPressed: () {},
+                const SizedBox(height: 20),
+                Text(
+                  'Đánh Giá ${_item.name}',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: context.textColor,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 14),
+                if (_mySpaceBookings.isNotEmpty) ...[
+                  DropdownButtonFormField<String>(
+                    initialValue: selectedBookingId,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      labelText: 'Chọn đơn đặt chỗ của bạn',
+                      filled: true,
+                      fillColor: context.inputColor,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
+                      ),
+                    ),
+                    items: _mySpaceBookings.map((b) {
+                      final shortId = b.bookingId.length > 8
+                          ? b.bookingId.substring(0, 8).toUpperCase()
+                          : b.bookingId;
+                      return DropdownMenuItem<String>(
+                        value: b.bookingId,
+                        child: Text(
+                          '#$shortId • ${b.bookingDate} (${b.status})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setModalState(() => selectedBookingId = val);
+                    },
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    5,
+                    (index) {
+                      final starValue = index + 1;
+                      return IconButton(
+                        icon: Icon(
+                          starValue <= selectedRating
+                              ? Icons.star_rounded
+                              : Icons.star_border_rounded,
+                          size: 40,
+                          color: Colors.amber,
+                        ),
+                        onPressed: () {
+                          setModalState(() => selectedRating = starValue);
+                        },
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: commentController,
+                  maxLines: 4,
+                  maxLength: 2000,
+                  decoration: InputDecoration(
+                    hintText: 'Chia sẻ trải nghiệm thực tế của bạn tại đây...',
+                    filled: true,
+                    fillColor: context.inputColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            final comment = commentController.text.trim();
+                            if (_item.id.trim().length >= 32 &&
+                                selectedBookingId != null &&
+                                selectedBookingId!.isNotEmpty) {
+                              setModalState(() => isSubmitting = true);
+                              final res = await _reviewApiService
+                                  .createBookingReview(
+                                bookingId: selectedBookingId!,
+                                request: SpaceReviewWriteRequestDTO(
+                                  spaceType: _resolvedSpaceType,
+                                  spaceId: _item.id.trim(),
+                                  rating: selectedRating,
+                                  comment: comment,
+                                ),
+                              );
+                              if (!modalCtx.mounted) return;
+                              setModalState(() => isSubmitting = false);
+
+                              if (res['success'] == true) {
+                                Navigator.pop(modalCtx);
+                                await _loadSpaceReviewsAndBookings();
+                                if (!mounted) return;
+                                toastification.show(
+                                  context: this.context,
+                                  type: ToastificationType.success,
+                                  style: ToastificationStyle.flatColored,
+                                  title: const Text('Cảm ơn bạn!'),
+                                  description: const Text(
+                                    'Đánh giá của bạn đã được lưu lên hệ thống.',
+                                  ),
+                                  alignment: Alignment.topCenter,
+                                  autoCloseDuration:
+                                      const Duration(seconds: 4),
+                                  icon: const Icon(Icons.star_rounded),
+                                  showProgressBar: false,
+                                );
+                              } else {
+                                toastification.show(
+                                  context: this.context,
+                                  type: ToastificationType.warning,
+                                  style: ToastificationStyle.flatColored,
+                                  title: const Text('Chưa thể gửi đánh giá'),
+                                  description: Text(
+                                    res['message']?.toString() ??
+                                        'Chỉ đơn đã thanh toán và đã kết thúc mới có thể đánh giá.',
+                                  ),
+                                  alignment: Alignment.topCenter,
+                                  autoCloseDuration:
+                                      const Duration(seconds: 4),
+                                  showProgressBar: false,
+                                );
+                              }
+                            } else {
+                              Navigator.pop(modalCtx);
+                              toastification.show(
+                                context: this.context,
+                                type: ToastificationType.info,
+                                style: ToastificationStyle.flatColored,
+                                title: const Text('Chưa có đơn đặt hoàn tất'),
+                                description: const Text(
+                                  'Bạn cần có đơn đặt chỗ đã thanh toán và hoàn tất tại không gian này để gửi đánh giá.',
+                                ),
+                                alignment: Alignment.topCenter,
+                                autoCloseDuration: const Duration(seconds: 4),
+                                showProgressBar: false,
+                              );
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Gửi Đánh Giá',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              maxLines: 4,
-              decoration: InputDecoration(
-                hintText: 'Chia sẻ trải nghiệm của bạn tại đây...',
-                filled: true,
-                fillColor: context.inputColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                toastification.show(
-                  context: context,
-                  type: ToastificationType.success,
-                  style: ToastificationStyle.flatColored,
-                  title: const Text('Cảm ơn bạn!'),
-                  description: const Text('Đánh giá của bạn đã được gửi thành công.'),
-                  alignment: Alignment.topCenter,
-                  autoCloseDuration: const Duration(seconds: 4),
-                  icon: const Icon(Icons.star_rounded),
-                  showProgressBar: false,
-                );
-              },
-              child: const Text('Gửi đánh giá'),
-            ),
-            const SizedBox(height: 24),
-          ],
+          ),
         ),
       ),
     );
@@ -620,7 +871,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       children: [
                         Expanded(
                           child: Text(
-                            'Đánh giá & Nhận xét',
+                            _reviewPage != null && _reviewPage!.totalReviews > 0
+                                ? 'Đánh giá & Nhận xét (${_reviewPage!.totalReviews})'
+                                : 'Đánh giá & Nhận xét',
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
@@ -630,6 +883,18 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             ),
                           ),
                         ),
+                        if (_isLoadingReviews)
+                          const Padding(
+                            padding: EdgeInsets.only(right: 8),
+                            child: SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: AppColors.primary,
+                              ),
+                            ),
+                          ),
                         const SizedBox(width: 8),
                         TextButton.icon(
                           onPressed: () => _showWriteReviewModal(context),

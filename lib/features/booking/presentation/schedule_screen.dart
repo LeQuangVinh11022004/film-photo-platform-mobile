@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../models/booking_api_models.dart';
+import '../models/review_api_models.dart';
 import '../services/booking_api_service.dart';
+import '../services/review_api_service.dart';
 import 'payment_screen.dart';
 
 class ScheduleScreen extends StatefulWidget {
@@ -15,6 +18,7 @@ class ScheduleScreen extends StatefulWidget {
 
 class _ScheduleScreenState extends State<ScheduleScreen> {
   final BookingApiService _bookingApiService = BookingApiService();
+  final ReviewApiService _reviewApiService = ReviewApiService();
 
   DateTime _currentMonth = DateTime(2026, 11, 1);
   DateTime _selectedDate = DateTime(2026, 11, 20);
@@ -22,6 +26,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   List<BookingResponseDTO> _bookings = [];
   Map<String, String> _spaceImageMap = {};
+  Map<String, String> _spaceTypeMap = {};
   bool _isLoading = true;
   String? _errorMessage;
   bool _isCancelling = false;
@@ -60,9 +65,21 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final darkrooms = results[2] as List<ResourceItemResponseDTO>;
 
       final imgMap = <String, String>{};
-      for (final r in [...studios, ...darkrooms]) {
-        if (r.resourceId.isNotEmpty && r.images.isNotEmpty) {
-          imgMap[r.resourceId.toLowerCase()] = r.images.first.imageUrl;
+      final typeMap = <String, String>{};
+      for (final r in studios) {
+        if (r.resourceId.isNotEmpty) {
+          typeMap[r.resourceId.toLowerCase()] = 'STUDIO';
+          if (r.images.isNotEmpty) {
+            imgMap[r.resourceId.toLowerCase()] = r.images.first.imageUrl;
+          }
+        }
+      }
+      for (final r in darkrooms) {
+        if (r.resourceId.isNotEmpty) {
+          typeMap[r.resourceId.toLowerCase()] = 'DARKROOM';
+          if (r.images.isNotEmpty) {
+            imgMap[r.resourceId.toLowerCase()] = r.images.first.imageUrl;
+          }
         }
       }
 
@@ -101,6 +118,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         setState(() {
           _bookings = loaded;
           _spaceImageMap = imgMap;
+          _spaceTypeMap = typeMap;
           _selectedDate = nextSelected;
           _currentMonth = nextMonth;
           _isLoading = false;
@@ -109,6 +127,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         setState(() {
           _bookings = [];
           _spaceImageMap = imgMap;
+          _spaceTypeMap = typeMap;
           _isLoading = false;
           _errorMessage = 'Không thể tải danh sách lịch đặt.';
         });
@@ -533,6 +552,36 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   ),
                   const SizedBox(height: 12),
                 ],
+                if (booking.status.toUpperCase() == 'CONFIRMED' ||
+                    booking.status.toUpperCase() == 'COMPLETED') ...[
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.pop(sheetContext);
+                        _showReviewBookingModal(booking);
+                      },
+                      icon: const Icon(Icons.star_rate_rounded, size: 20),
+                      label: const Text(
+                        'Đánh Giá Không Gian',
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                ],
                 Row(
                   children: [
                     Expanded(
@@ -588,6 +637,192 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
             ),
             const SizedBox(height: 12),
           ],
+        ),
+      ),
+    );
+  }
+
+  String _resolveSpaceType(BookingResponseDTO booking) {
+    final mapped = _spaceTypeMap[booking.spaceId.toLowerCase()];
+    if (mapped != null && mapped.isNotEmpty) return mapped;
+    final lowerName = booking.spaceName.toLowerCase();
+    if (lowerName.contains('darkroom') || lowerName.contains('phòng tối')) {
+      return 'DARKROOM';
+    }
+    return 'STUDIO';
+  }
+
+  /// POST /api/photographer/bookings/{bookingId}/review
+  void _showReviewBookingModal(BookingResponseDTO booking) {
+    int selectedRating = 5;
+    final commentController = TextEditingController();
+    bool isSubmitting = false;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: context.cardColor,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (modalCtx) => StatefulBuilder(
+        builder: (modalCtx, setModalState) => Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.of(modalCtx).viewInsets.bottom,
+            left: 24,
+            right: 24,
+            top: 24,
+          ),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.borderColor,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Text(
+                  'Đánh Giá Không Gian Đặt Chỗ',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: context.textColor,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${booking.spaceName} • ${_formatDateDisplay(booking.bookingDate)}',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: context.textSecColor,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    final star = index + 1;
+                    return IconButton(
+                      icon: Icon(
+                        star <= selectedRating
+                            ? Icons.star_rounded
+                            : Icons.star_border_rounded,
+                        size: 40,
+                        color: Colors.amber,
+                      ),
+                      onPressed: () {
+                        setModalState(() => selectedRating = star);
+                      },
+                    );
+                  }),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: commentController,
+                  maxLines: 4,
+                  maxLength: 2000,
+                  decoration: InputDecoration(
+                    hintText:
+                        'Chia sẻ nhận xét về không gian, thiết bị và chất lượng phục vụ...',
+                    filled: true,
+                    fillColor: context.inputColor,
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: BorderSide.none,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            setModalState(() => isSubmitting = true);
+                            final res =
+                                await _reviewApiService.createBookingReview(
+                              bookingId: booking.bookingId,
+                              request: SpaceReviewWriteRequestDTO(
+                                spaceType: _resolveSpaceType(booking),
+                                spaceId: booking.spaceId,
+                                rating: selectedRating,
+                                comment: commentController.text.trim(),
+                              ),
+                            );
+                            if (!modalCtx.mounted) return;
+                            setModalState(() => isSubmitting = false);
+
+                            if (res['success'] == true) {
+                              Navigator.pop(modalCtx);
+                              if (!mounted) return;
+                              toastification.show(
+                                context: context,
+                                type: ToastificationType.success,
+                                style: ToastificationStyle.flatColored,
+                                title: const Text('Đã gửi đánh giá!'),
+                                description: Text(
+                                  'Cảm ơn bạn đã đánh giá ${booking.spaceName}.',
+                                ),
+                                alignment: Alignment.topCenter,
+                                autoCloseDuration: const Duration(seconds: 4),
+                                showProgressBar: false,
+                              );
+                            } else {
+                              toastification.show(
+                                context: context,
+                                type: ToastificationType.warning,
+                                style: ToastificationStyle.flatColored,
+                                title: const Text('Chưa thể gửi đánh giá'),
+                                description: Text(
+                                  res['message']?.toString() ??
+                                      'Vui lòng thử lại sau khi kết thúc buổi chụp.',
+                                ),
+                                alignment: Alignment.topCenter,
+                                autoCloseDuration: const Duration(seconds: 4),
+                                showProgressBar: false,
+                              );
+                            }
+                          },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: isSubmitting
+                        ? const SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(
+                              color: Colors.white,
+                              strokeWidth: 2,
+                            ),
+                          )
+                        : const Text(
+                            'Gửi Đánh Giá',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
         ),
       ),
     );

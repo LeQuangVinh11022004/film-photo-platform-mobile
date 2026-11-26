@@ -8,9 +8,13 @@ import '../../auth/services/auth_service.dart';
 import '../../booking/models/booking_api_models.dart';
 import '../../booking/models/booking_item.dart';
 import '../../booking/models/booking_schedule.dart';
+import '../../booking/models/review_api_models.dart';
 import '../../booking/services/booking_api_service.dart';
+import '../../booking/services/review_api_service.dart';
 import '../../community/models/article_api_models.dart';
+import '../../community/models/community_post_api_models.dart';
 import '../../community/services/article_api_service.dart';
+import '../../community/services/community_post_api_service.dart';
 import '../../../app/main.dart'; // Import themeNotifier
 
 import '../../expert/models/expert_application_state.dart';
@@ -61,18 +65,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   List<ArticleResponseDTO> _loadedArticles = [];
+  List<CommunityPostResponseDTO> _loadedMyCommunityPosts = [];
+  List<SpaceReviewResponseDTO> _loadedSpaceReviews = [];
 
   Future<void> _loadProfileApiStats() async {
     try {
       if (_isExpertRole) {
-        final articlesPage =
-            await ArticleApiService().getExpertArticles(page: 1, pageSize: 50);
+        final results = await Future.wait([
+          ArticleApiService().getExpertArticles(page: 1, pageSize: 50),
+          CommunityPostApiService().getMyPosts(page: 1, pageSize: 50),
+        ]);
         if (!mounted) return;
-        if (articlesPage != null) {
-          setState(() {
+        final articlesPage = results[0] as PagedResponseDTO<ArticleResponseDTO>?;
+        final myPostsPage =
+            results[1] as PagedResponseDTO<CommunityPostResponseDTO>?;
+        setState(() {
+          if (articlesPage != null) {
             _loadedArticles = articlesPage.items;
-          });
-        }
+          }
+          if (myPostsPage != null) {
+            _loadedMyCommunityPosts = myPostsPage.items;
+          }
+        });
         return;
       }
 
@@ -80,13 +94,43 @@ class _ProfileScreenState extends State<ProfileScreen> {
         BookingApiService().getMyBookings(page: 1, pageSize: 50),
         BookingApiService().getPackageSubscriptions(),
         ArticleApiService().getPublishedArticles(page: 1, pageSize: 50),
+        CommunityPostApiService().getMyPosts(page: 1, pageSize: 50),
+        BookingApiService().getStudios(),
+        BookingApiService().getDarkrooms(),
       ]);
       if (!mounted) return;
       final page = results[0] as PagedResponseDTO<BookingResponseDTO>?;
       final subs =
           results[1] as List<PhotographerPackageSubscriptionResponseDTO>;
       final articlesPage = results[2] as PagedResponseDTO<ArticleResponseDTO>?;
+      final myPostsPage =
+          results[3] as PagedResponseDTO<CommunityPostResponseDTO>?;
+      final studios = results[4] as List<ResourceItemResponseDTO>;
+      final darkrooms = results[5] as List<ResourceItemResponseDTO>;
 
+      final List<SpaceReviewResponseDTO> collectedReviews = [];
+      if (studios.isNotEmpty) {
+        final studioRev = await ReviewApiService().getStudioReviews(
+          studioId: studios.first.resourceId,
+          page: 1,
+          pageSize: 10,
+        );
+        if (studioRev != null) {
+          collectedReviews.addAll(studioRev.items);
+        }
+      }
+      if (darkrooms.isNotEmpty) {
+        final darkroomRev = await ReviewApiService().getDarkroomReviews(
+          darkroomId: darkrooms.first.resourceId,
+          page: 1,
+          pageSize: 10,
+        );
+        if (darkroomRev != null) {
+          collectedReviews.addAll(darkroomRev.items);
+        }
+      }
+
+      if (!mounted) return;
       setState(() {
         if (page != null) {
           _loadedBookings = page.items;
@@ -98,6 +142,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (articlesPage != null) {
           _loadedArticles = articlesPage.items;
         }
+        if (myPostsPage != null) {
+          _loadedMyCommunityPosts = myPostsPage.items;
+        }
+        _loadedSpaceReviews = collectedReviews;
       });
     } catch (_) {}
   }
@@ -498,6 +546,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showMyPostsModal() async {
+    if (_loadedMyCommunityPosts.isEmpty) {
+      final myPostsPage =
+          await CommunityPostApiService().getMyPosts(page: 1, pageSize: 50);
+      if (myPostsPage != null && mounted) {
+        setState(() => _loadedMyCommunityPosts = myPostsPage.items);
+      }
+    }
     if (_loadedArticles.isEmpty) {
       final page = _isExpertRole
           ? await ArticleApiService().getExpertArticles(page: 1, pageSize: 50)
@@ -509,6 +564,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
     if (!mounted) return;
 
+    final int totalCount =
+        _loadedMyCommunityPosts.length + _loadedArticles.length;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -516,7 +574,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.7,
+        height: MediaQuery.of(context).size.height * 0.72,
         padding: EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -534,8 +592,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SizedBox(height: 20),
             Text(
               _isExpertRole
-                  ? 'Bài Viết Chuyên Môn Của Tôi (${_loadedArticles.length})'
-                  : 'Bài Viết Diễn Đàn (${_loadedArticles.isNotEmpty ? _loadedArticles.length : 3})',
+                  ? 'Bài Đăng & Bài Viết Chuyên Môn ($totalCount)'
+                  : 'Bài Đăng Cộng Đồng & Diễn Đàn (${totalCount > 0 ? totalCount : 3})',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -544,43 +602,75 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SizedBox(height: 16),
             Expanded(
-              child: _loadedArticles.isNotEmpty
-                  ? ListView.builder(
+              child: totalCount > 0
+                  ? ListView(
                       physics: const BouncingScrollPhysics(),
-                      itemCount: _loadedArticles.length,
-                      itemBuilder: (context, index) {
-                        final art = _loadedArticles[index];
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: context.cardColor,
-                            border: Border.all(color: context.borderColor),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                art.title,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: context.textColor,
+                      children: [
+                        ..._loadedMyCommunityPosts.map(
+                          (post) => Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: context.cardColor,
+                              border: Border.all(color: context.borderColor),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  post.title,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: context.textColor,
+                                  ),
                                 ),
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '${art.category} • ${art.expertName} • ${art.status}',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: context.textSecColor,
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${post.category ?? 'Cộng đồng Film'} • ${post.likeCount} thích • ${post.commentCount} bình luận',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: context.textSecColor,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        );
-                      },
+                        ),
+                        ..._loadedArticles.map(
+                          (art) => Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: context.cardColor,
+                              border: Border.all(color: context.borderColor),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  art.title,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 15,
+                                    color: context.textColor,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${art.category} • ${art.expertName} • ${art.status}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: context.textSecColor,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
                     )
                   : ListView.builder(
                 physics: const BouncingScrollPhysics(),
@@ -657,7 +747,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.5,
+        height: MediaQuery.of(context).size.height * 0.65,
         padding: EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -674,7 +764,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SizedBox(height: 20),
             Text(
-              'Đánh Giá Nhận Được',
+              'Đánh Giá Không Gian (${_loadedSpaceReviews.isNotEmpty ? _loadedSpaceReviews.length : 15})',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -722,7 +812,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         SizedBox(height: 6),
                         Text(
-                          'Dựa trên 15 lượt đánh giá từ khách hàng & đối tác.',
+                          _loadedSpaceReviews.isNotEmpty
+                              ? 'Đã đồng bộ ${_loadedSpaceReviews.length} đánh giá trực tiếp từ hệ thống Studio & Phòng tối.'
+                              : 'Dựa trên 15 lượt đánh giá từ khách hàng & đối tác.',
                           style: TextStyle(
                             fontSize: 13,
                             color: context.textSecColor,
@@ -735,6 +827,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
             ),
+            if (_loadedSpaceReviews.isNotEmpty) ...[
+              const SizedBox(height: 16),
+              Expanded(
+                child: ListView.builder(
+                  physics: const BouncingScrollPhysics(),
+                  itemCount: _loadedSpaceReviews.length,
+                  itemBuilder: (context, index) {
+                    final r = _loadedSpaceReviews[index];
+                    return Container(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(
+                        color: context.cardColor,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: context.borderColor),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                r.customerName,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: context.textColor,
+                                ),
+                              ),
+                              Text(
+                                '${r.rating} ⭐ • ${r.spaceType}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          if (r.comment != null &&
+                              r.comment!.trim().isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            Text(
+                              r.comment!,
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: context.textSecColor,
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
           ],
         ),
       ),

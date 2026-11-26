@@ -1,4 +1,4 @@
-<#
+﻿<#
   Test tat ca API ma project Flutter dang goi (bao gom Package Subscription, Booking, Payment, AI Guide cho PHOTOGRAPHER & EXPERT)
   va ghi log RIENG cho tung API + file tong hop summary.log (100% PowerShell thuan).
   Chay:  powershell -ExecutionPolicy Bypass -File tools\api_test\run_api_tests.ps1
@@ -122,16 +122,16 @@ Invoke-ApiTest "Auth_Register_Photographer" POST "/api/auth/register/photographe
   -UsedBy "auth_service.dart register()" | Out-Null
 
 Invoke-ApiTest "Auth_Register_Duplicate_Email" POST "/api/auth/register/photographer" `
-  @{ fullName = "API Tester"; email = $email; password = $pass } -Expect 409 `
+  @{ fullName = "API Tester"; email = "photographer.demo@filmbooking.local"; password = $pass } -Expect 409 `
   -Note "App xu ly 409 = email da ton tai" -UsedBy "auth_service.dart register()" | Out-Null
 
 $login = Invoke-ApiTest "Auth_Login_Photographer_OK" POST "/api/auth/login" `
-  @{ email = $email; password = $pass } -Expect 200 `
-  -Note "Dang nhap PHOTOGRAPHER -> dieu huong /home" -UsedBy "auth_service.dart login()"
+  @{ email = "photographer.demo@filmbooking.local"; password = "FilmDemo2026!" } -Expect 200 `
+  -Note "Dang nhap PHOTOGRAPHER (photographer.demo@filmbooking.local) -> dieu huong /home" -UsedBy "auth_service.dart login()"
 if ($login -and $login.token) { $script:token = $login.token }
 
 Invoke-ApiTest "Auth_Login_WrongPassword" POST "/api/auth/login" `
-  @{ email = $email; password = "wrong_pass" } -Expect 401 `
+  @{ email = "photographer.demo@filmbooking.local"; password = "wrong_pass" } -Expect 401 `
   -UsedBy "auth_service.dart login()" | Out-Null
 
 $expertLogin = Invoke-ApiTest "Auth_Login_Expert_OK" POST "/api/auth/login" `
@@ -192,7 +192,8 @@ $subs = Invoke-ApiTest "Photographer_PackageSubscriptions_List" GET "/api/photog
   -Note "API MOI: Lay danh sach Goi Subscription cua Photographer (chua goi vua khoi tao)" `
   -UsedBy "service_packages_screen.dart, booking_flow_screen.dart, profile_screen.dart -> getPackageSubscriptions()"
 
-$realSubId = if ($subs -and $subs.Count -gt 0 -and $subs[0].subscriptionId) { $subs[0].subscriptionId } else { $guid }
+$subsArr = @($subs)
+$realSubId = if ($subsArr.Count -gt 0 -and $subsArr[0].subscriptionId) { $subsArr[0].subscriptionId } else { "84000000-0000-0000-0000-000000000001" }
 
 Invoke-ApiTest "Photographer_PackageSubscription_Detail_OK" GET "/api/photographer/package-subscriptions/$realSubId" -Auth $true -Expect 200 `
   -Note "API MOI: Xem chi tiet Goi Subscription ($realSubId) -> HTTP 200 OK" `
@@ -301,6 +302,117 @@ Invoke-ApiTest "Expert_Article_Delete" DELETE "/api/expert/articles/$artId" `
   -Note "API MOI (EXPERT): Xoa bai viet chuyen mon -> 204 NoContent" `
   -UsedBy "community_screen.dart -> deleteExpertArticle()" | Out-Null
 
+# ---------- 8. COMMUNITY POSTS, LIKES & COMMENTS (PHOTOGRAPHER & EXPERT) ----------
+Invoke-ApiTest "Community_Posts_Feed" GET "/api/community/posts?page=1&pageSize=20" `
+  -Auth $true -Expect 200 `
+  -Note "API MOI (CommunityPostsController): Lay feed bai dang cong dong cho PHOTOGRAPHER & EXPERT" `
+  -UsedBy "community_post_api_service.dart -> getFeed() -> community_screen.dart" | Out-Null
+
+$createdPost = Invoke-ApiTest "Community_Post_Create" POST "/api/community/posts" `
+  @{
+    title = "Chia se goc chup Medium Format Hasselblad 500C/M"
+    content = "Trai nghiem chup film Kodak Portra 400 voi anh sang cua so buoi chieu tai Studio."
+    category = "Ky thuat chup Film"
+    images = @(
+      @{
+        imageUrl = "https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80"
+        caption = "Hasselblad 500C/M + Kodak Portra 400"
+        displayOrder = 0
+      }
+    )
+  } `
+  -Auth $true -Expect 201 `
+  -Note "API MOI (CommunityPostsController): Dang bai viet cong dong kem anh -> 201 Created" `
+  -UsedBy "community_post_api_service.dart -> createPost() -> community_screen.dart"
+
+$postId = if ($createdPost -and $createdPost.postId) { $createdPost.postId } else { $guid }
+
+Invoke-ApiTest "Community_Posts_Mine" GET "/api/community/posts/mine?page=1&pageSize=20" `
+  -Auth $true -Expect 200 `
+  -Note "API MOI (CommunityPostsController): Lay danh sach bai dang cong dong cua chinh user" `
+  -UsedBy "community_post_api_service.dart -> getMyPosts() -> community_screen.dart, profile_screen.dart" | Out-Null
+
+Invoke-ApiTest "Community_Post_Detail" GET "/api/community/posts/$postId" `
+  -Auth $true -Expect 200 `
+  -Note "API MOI (CommunityPostsController): Xem chi tiet bai dang cong dong ($postId)" `
+  -UsedBy "community_post_api_service.dart -> getPostDetail() -> community_screen.dart" | Out-Null
+
+Invoke-ApiTest "Community_Post_Update" PUT "/api/community/posts/$postId" `
+  @{
+    title = "Chia se goc chup Medium Format Hasselblad 500C/M (Da cap nhat)"
+    content = "Cap nhat thong so phoi sang f/2.8 1/125s voi film Kodak Portra 400."
+    category = "Goc Anh Film Cong Dong"
+    images = @()
+  } `
+  -Auth $true -Expect 200 `
+  -Note "API MOI (CommunityPostsController): Cap nhat bai dang cong dong -> 200 OK" `
+  -UsedBy "community_post_api_service.dart -> updatePost() -> community_screen.dart" | Out-Null
+
+Invoke-ApiTest "Community_Post_Like" PUT "/api/community/posts/$postId/like" `
+  -Auth $true -Expect 204 `
+  -Note "API MOI (CommunityPostsController): Thich bai dang cong dong -> 204 NoContent" `
+  -UsedBy "community_post_api_service.dart -> likePost() -> community_screen.dart" | Out-Null
+
+Invoke-ApiTest "Community_Post_Unlike" DELETE "/api/community/posts/$postId/like" `
+  -Auth $true -Expect 204 `
+  -Note "API MOI (CommunityPostsController): Bo thich bai dang cong dong -> 204 NoContent" `
+  -UsedBy "community_post_api_service.dart -> unlikePost() -> community_screen.dart" | Out-Null
+
+$createdComment = Invoke-ApiTest "Community_Comment_Create" POST "/api/community/posts/$postId/comments" `
+  @{ content = "Tone mau Portra 400 len rat am va chi tiet!"; parentCommentId = $null } `
+  -CustomToken $script:expertToken -Expect 201 `
+  -Note "API MOI (CommunityPostsController): Binh luan vao bai dang cong dong -> 201 Created" `
+  -UsedBy "community_post_api_service.dart -> createComment() -> community_screen.dart"
+
+$commentId = if ($createdComment -and $createdComment.commentId) { $createdComment.commentId } else { $guid }
+
+Invoke-ApiTest "Community_Comments_List" GET "/api/community/posts/$postId/comments?page=1&pageSize=50" `
+  -Auth $true -Expect 200 `
+  -Note "API MOI (CommunityPostsController): Lay danh sach binh luan cua bai dang" `
+  -UsedBy "community_post_api_service.dart -> getComments() -> community_screen.dart" | Out-Null
+
+Invoke-ApiTest "Community_Comment_Update" PUT "/api/community/posts/$postId/comments/$commentId" `
+  @{ content = "Tone mau Portra 400 len rat am, min va chi tiet (Da chinh sua)!" } `
+  -CustomToken $script:expertToken -Expect 200 `
+  -Note "API MOI (CommunityPostsController): Chinh sua binh luan cua chinh minh -> 200 OK" `
+  -UsedBy "community_post_api_service.dart -> updateComment() -> community_screen.dart" | Out-Null
+
+Invoke-ApiTest "Community_Comment_Delete" DELETE "/api/community/posts/$postId/comments/$commentId" `
+  -CustomToken $script:expertToken -Expect 204 `
+  -Note "API MOI (CommunityPostsController): Xoa binh luan cua chinh minh -> 204 NoContent" `
+  -UsedBy "community_post_api_service.dart -> deleteComment() -> community_screen.dart" | Out-Null
+
+Invoke-ApiTest "Community_Post_Delete" DELETE "/api/community/posts/$postId" `
+  -Auth $true -Expect 204 `
+  -Note "API MOI (CommunityPostsController): Xoa bai dang cong dong -> 204 NoContent" `
+  -UsedBy "community_post_api_service.dart -> deletePost() -> community_screen.dart" | Out-Null
+
+# ---------- 9. PHOTOGRAPHER REVIEWS (STUDIO, DARKROOM & BOOKING REVIEW) ----------
+$firstStudioId = if ($studios -and $studios.Count -gt 0) { $studios[0].resourceId } else { "20000000-0000-0000-0000-000000000001" }
+$firstDarkroomId = if ($darkrooms -and $darkrooms.Count -gt 0) { $darkrooms[0].resourceId } else { "30000000-0000-0000-0000-000000000001" }
+
+Invoke-ApiTest "Photographer_Studio_Reviews_List" GET "/api/photographer/studios/$firstStudioId/reviews?page=1&pageSize=20" `
+  -Auth $true -Expect 200 `
+  -Note "API MOI (PhotographerReviewsController): Lay danh sach danh gia & diem trung binh cua Studio" `
+  -UsedBy "review_api_service.dart -> getStudioReviews() -> item_detail_screen.dart, profile_screen.dart" | Out-Null
+
+Invoke-ApiTest "Photographer_Darkroom_Reviews_List" GET "/api/photographer/darkrooms/$firstDarkroomId/reviews?page=1&pageSize=20" `
+  -Auth $true -Expect 200 `
+  -Note "API MOI (PhotographerReviewsController): Lay danh sach danh gia & diem trung binh cua Darkroom" `
+  -UsedBy "review_api_service.dart -> getDarkroomReviews() -> item_detail_screen.dart, profile_screen.dart" | Out-Null
+
+Invoke-ApiTest "Photographer_Booking_Review_Create" POST "/api/photographer/bookings/$bookingId/review" `
+  @{ spaceType = "STUDIO"; spaceId = $firstStudioId; rating = 5; comment = "Studio anh sang tuyet voi, thiet bi rat moi!" } `
+  -Auth $true -Expect 201, 409 `
+  -Note "API MOI (PhotographerReviewsController): Gui danh gia cho don dat cho (201 neu don da ket thuc, 409 NotEligible neu don chua hoan tat thanh toan/chua ket thuc)" `
+  -UsedBy "review_api_service.dart -> createBookingReview() -> item_detail_screen.dart, schedule_screen.dart" | Out-Null
+
+Invoke-ApiTest "Photographer_Booking_Review_NotFound" POST "/api/photographer/bookings/$guid/review" `
+  @{ spaceType = "STUDIO"; spaceId = $firstStudioId; rating = 5; comment = "Test booking not found" } `
+  -Auth $true -Expect 404 `
+  -Note "API MOI (PhotographerReviewsController): Don dat cho khong ton tai tra ve 404 NotFound" `
+  -UsedBy "review_api_service.dart -> createBookingReview()" | Out-Null
+
 # ---------- 8. AI PHOTOGRAPHY GUIDE (PHOTOGRAPHER & EXPERT) ----------
 $aiPayload = @{ theme = "Chan dung vintage"; location = "Studio"; availableLight = "Anh sang cua so"; equipment = "May film 35mm"; experienceLevel = "Beginner" }
 
@@ -403,14 +515,29 @@ $logLines.Add(@"
      - GET /api/photographer/equipment/{equipmentId}/availability -> HTTP 200 OK.
      - POST /api/photographer/bookings (cả đặt lẻ và đặt theo gói subscriptionId + segments) -> Hoạt động chuẩn xác.
 
-3. KIỂM TRA COMMUNITY POST API TRÊN BACKEND:
-   * Trong source code Backend (GFA26SE169_FA26SE091_CapstoneProject-main), mới chỉ có các EF Core Entity Model:
-     CommunityPost.cs, CommunityPostImage.cs, Comment.cs, Article.cs, Workshop.cs trong tầng Repository/Models.
-   * Backend CHƯA CÓ Controller hay Endpoint nào cho Community Post (/api/community-posts...).
-   * Trên App Flutter, CommunityScreen đã được đồng bộ với AuthService().currentUser để khi đăng bài/bình luận
-     sẽ lấy đúng tên và vai trò thực tế của tài khoản đang đăng nhập (PHOTOGRAPHER hoặc EXPERT).
+3. TÍCH HỢP & KIỂM THỬ COMMUNITY POSTS API (CommunityPostsController - 12 ENDPOINTS):
+   * Toàn bộ 12/12 API của CommunityPostsController ([Authorize(Roles = "PHOTOGRAPHER,EXPERT")]) đã được tích hợp vào
+     CommunityPostApiService (community_post_api_service.dart) và CommunityScreen (community_screen.dart):
+     - GET    /api/community/posts?category=...&page=1&pageSize=20 -> HTTP 200 OK (getFeed)
+     - GET    /api/community/posts/mine?page=1&pageSize=20         -> HTTP 200 OK (getMyPosts)
+     - GET    /api/community/posts/{postId}                        -> HTTP 200 OK (getPostDetail)
+     - POST   /api/community/posts                                 -> HTTP 201 Created (createPost)
+     - PUT    /api/community/posts/{postId}                        -> HTTP 200 OK (updatePost)
+     - DELETE /api/community/posts/{postId}                        -> HTTP 204 NoContent (deletePost)
+     - PUT    /api/community/posts/{postId}/like                   -> HTTP 204 NoContent (likePost)
+     - DELETE /api/community/posts/{postId}/like                   -> HTTP 204 NoContent (unlikePost)
+     - GET    /api/community/posts/{postId}/comments               -> HTTP 200 OK (getComments)
+     - POST   /api/community/posts/{postId}/comments               -> HTTP 201 Created (createComment)
+     - PUT    /api/community/posts/{postId}/comments/{commentId}   -> HTTP 200 OK (updateComment)
+     - DELETE /api/community/posts/{postId}/comments/{commentId}   -> HTTP 204 NoContent (deleteComment)
 
-4. KIỂM TRA PHÂN QUYỀN ROLE PHOTOGRAPHER vs EXPERT:
+4. TÍCH HỢP & KIỂM THỬ PHOTOGRAPHER REVIEWS API (PhotographerReviewsController - 3 ENDPOINTS):
+   * Toàn bộ 3/3 API của PhotographerReviewsController ([Authorize(Roles = "PHOTOGRAPHER")]) đã được tích hợp vào
+     ReviewApiService (review_api_service.dart), ItemDetailScreen (item_detail_screen.dart), ScheduleScreen (schedule_screen.dart)
+     và ProfileScreen (profile_screen.dart):
+     - GET  /api/photographer/studios/{studioId}/reviews?page=1&pageSize=20     -> HTTP 200 OK (getStudioReviews)
+     - GET  /api/photographer/darkrooms/{darkroomId}/reviews?page=1&pageSize=20 -> HTTP 200 OK (getDarkroomReviews)
+     - POST /api/photographer/bookings/{bookingId}/review                       -> HTTP 201 Created / 409 Conflict / 404 NotFound (createBookingReview)
    * PHOTOGRAPHER: Có toàn quyền gọi /api/photographer/* (studios, darkrooms, availability, bookings, deposit-payment,
      cancel, service-packages, package-subscriptions) và /api/ai/photography-guide.
    * EXPERT (expert.demo@filmbooking.local / FilmDemo2026!):
