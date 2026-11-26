@@ -82,6 +82,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     formattedSlots.add({
     'slot': '$startFormatted - $endFormatted',
     'hours': hours > 0 ? hours : 1,
+    'durationHours': diffMinutes / 60,
     'price': slotMap['price'],
     'availabilityId': availabilityId,
     'startAt': utcStart,
@@ -94,21 +95,21 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     return formattedSlots;
   }
 
-  double _calculateBasePrice(Map<String, dynamic> slot, int hours) {
+  double _calculateBasePrice(Map<String, dynamic> slot, double durationHours) {
     final slotPrice = (slot['price'] as num?)?.toDouble();
     if (slotPrice != null) {
       return slotPrice;
     }
-    return widget.item.pricePerHour * hours;
+    return widget.item.pricePerHour * durationHours;
   }
 
-  double _calculateAddonPrice([int hours = 1]) {
+  double _calculateAddonPrice([double durationHours = 1]) {
     double addonPrice = 0;
     for (var a in _availableAddons) {
       if (_selectedAddons.contains(a['name'])) {
         final unitPrice = (a['price'] as num).toDouble();
         final isPerHour = a['isPerHour'] == true;
-        addonPrice += isPerHour ? unitPrice * hours : unitPrice;
+        addonPrice += isPerHour ? unitPrice * durationHours : unitPrice;
       }
     }
     return addonPrice;
@@ -474,8 +475,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final hours = slot['hours'] as int;
     final availabilityId = slot['availabilityId'] as String;
 
-    final basePrice = _calculateBasePrice(slot, hours);
-    final addonPrice = _calculateAddonPrice(hours);
+    final durationHours = slot['durationHours'] as double;
+    final basePrice = _calculateBasePrice(slot, durationHours);
+    final addonPrice = _calculateAddonPrice(durationHours);
     final totalPrice = basePrice + addonPrice;
     final selectedEquipmentIds = _getSelectedEquipmentIds();
 
@@ -1115,8 +1117,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
     final slot = slots[safeIndex];
     final hours = slot['hours'] as int;
-    final basePrice = _calculateBasePrice(slot, hours);
-    final addonPrice = _calculateAddonPrice(hours);
+    final durationHours = slot['durationHours'] as double;
+    final basePrice = _calculateBasePrice(slot, durationHours);
+    final addonPrice = _calculateAddonPrice(durationHours);
     final totalPrice = basePrice + addonPrice;
 
     return ListView(
@@ -1200,7 +1203,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                       _availableAddons.firstWhere((a) => a['name'] == name);
                   final unitPrice = (addon['price'] as num).toDouble();
                   final isPerHour = addon['isPerHour'] == true;
-                  final lineTotal = isPerHour ? unitPrice * hours : unitPrice;
+                  final lineTotal =
+                      isPerHour ? unitPrice * durationHours : unitPrice;
                   return Padding(
                     padding: const EdgeInsets.only(bottom: 4, left: 8),
                     child: Row(
