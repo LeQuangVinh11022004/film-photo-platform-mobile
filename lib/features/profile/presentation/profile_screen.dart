@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'dart:io';
 
+import '../../../core/services/app_update_service.dart';
 import '../../../core/services/favorite_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
@@ -1111,6 +1112,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         onTap: () {
                           Navigator.pop(context);
                           Navigator.pushNamed(context, '/forgot-password');
+                        },
+                      ),
+                      Divider(height: 1, indent: 16, endIndent: 16),
+                      ListTile(
+                        title: const Text(
+                          'Kiểm tra cập nhật ứng dụng',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 15,
+                          ),
+                        ),
+                        subtitle: const Text(
+                          'Phiên bản hiện tại: v${AppUpdateService.currentAppVersion}',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                        trailing: const Icon(Icons.system_update_rounded, color: AppColors.primary),
+                        onTap: () {
+                          final rootCtx = this.context;
+                          Navigator.pop(context);
+                          AppUpdateService().checkAndPromptUpdate(rootCtx, force: true);
                         },
                       ),
                     ],
