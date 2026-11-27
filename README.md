@@ -158,15 +158,15 @@ The app is pre-configured to communicate with the deployed Azure cloud backend:
 
 ---
 
-### Default Test Credentials
+### Authentication and Community
 
-For quick evaluation and testing, you can use the pre-seeded accounts:
+Sign in with a username and password. Photographer registration requires a
+username, email address, and an 8–72 character password. Use the credentials
+provided by the backend team for existing accounts.
 
-| Role | Email | Password | Access Scope |
-|---|---|---|---|
-| **Photographer** | `photographer.demo@filmbooking.local` | `FilmDemo2026!` | Search spaces, book darkrooms, VNPay checkout |
-| **Film Expert** | `expert.demo@filmbooking.local` | `FilmDemo2026!` | Host workshops, answer consultations |
-| **New Register** | Self-register via App Register Screen | Minimum 6 characters | Full photographer features |
+Photographers and experts share the community post feed and can manage their
+own posts. Post images currently require an accessible HTTP(S) URL; the
+backend does not provide an image upload endpoint.
 
 ---
 

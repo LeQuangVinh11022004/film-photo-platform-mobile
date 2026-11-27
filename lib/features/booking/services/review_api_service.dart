@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
-import '../../auth/services/auth_service.dart';
 import '../models/review_api_models.dart';
 
 class ReviewApiService {
@@ -10,44 +9,6 @@ class ReviewApiService {
   ReviewApiService._internal();
 
   final ApiClient _apiClient = ApiClient();
-
-  /// Bộ nhớ đệm giữ các đánh giá của Photographer cho không gian đã có đơn CONFIRMED
-  /// (trong trường hợp khung giờ đặt trên Backend chưa qua thời điểm EndAt).
-  final Map<String, List<SpaceReviewResponseDTO>> _localSpaceReviewsOverride =
-      {};
-
-  SpaceReviewPageResponseDTO _mergeLocalReviews(
-    SpaceReviewPageResponseDTO page,
-    String spaceId,
-  ) {
-    final key = spaceId.trim().toLowerCase();
-    final extras = _localSpaceReviewsOverride[key];
-    if (extras == null || extras.isEmpty) return page;
-
-    final existingIds = page.items.map((e) => e.reviewId).toSet();
-    final mergedItems = [
-      ...extras.where((e) => !existingIds.contains(e.reviewId)),
-      ...page.items,
-    ];
-    final total = mergedItems.length > page.totalReviews
-        ? mergedItems.length
-        : page.totalReviews;
-    final avg = mergedItems.isEmpty
-        ? page.averageRating
-        : mergedItems.fold<double>(0, (s, r) => s + r.rating) /
-            mergedItems.length;
-
-    return SpaceReviewPageResponseDTO(
-      spaceType: page.spaceType,
-      spaceId: page.spaceId,
-      averageRating: double.parse(avg.toStringAsFixed(1)),
-      totalReviews: total,
-      page: page.page,
-      pageSize: page.pageSize,
-      totalPages: page.totalPages == 0 ? 1 : page.totalPages,
-      items: mergedItems,
-    );
-  }
 
   /// GET /api/photographer/studios/{studioId}/reviews
   /// Lấy danh sách đánh giá của một Studio (dành cho PHOTOGRAPHER)
@@ -62,8 +23,7 @@ class ReviewApiService {
       );
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final dto = SpaceReviewPageResponseDTO.fromJson(json);
-        return _mergeLocalReviews(dto, studioId);
+        return SpaceReviewPageResponseDTO.fromJson(json);
       }
       if (kDebugMode) {
         print(
@@ -90,8 +50,7 @@ class ReviewApiService {
       );
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final dto = SpaceReviewPageResponseDTO.fromJson(json);
-        return _mergeLocalReviews(dto, darkroomId);
+        return SpaceReviewPageResponseDTO.fromJson(json);
       }
       if (kDebugMode) {
         print(
@@ -127,11 +86,10 @@ class ReviewApiService {
   }
 
   /// POST /api/photographer/bookings/{bookingId}/review
-  /// Gửi đánh giá cho Studio/Darkroom khi khách hàng đã có đơn CONFIRMED hoặc COMPLETED.
+  /// Gửi đánh giá sau khi đơn đã thanh toán và kết thúc.
   Future<Map<String, dynamic>> createBookingReview({
     required String bookingId,
     required SpaceReviewWriteRequestDTO request,
-    bool allowConfirmedBookingFallback = true,
   }) async {
     try {
       final response = await _apiClient.post(
@@ -147,9 +105,13 @@ class ReviewApiService {
       }
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        final created = json.isNotEmpty
-            ? SpaceReviewResponseDTO.fromJson(json)
-            : null;
+        if (json['reviewId'] == null || json['reviewId'].toString().isEmpty) {
+          return {
+            'success': false,
+            'message': 'Máy chủ không trả về thông tin đánh giá hợp lệ.',
+          };
+        }
+        final created = SpaceReviewResponseDTO.fromJson(json);
         return {
           'success': true,
           'review': created,
@@ -158,35 +120,6 @@ class ReviewApiService {
 
       String message = json['message']?.toString() ??
           'Không thể gửi đánh giá (Mã lỗi: ${response.statusCode})';
-
-      // Nếu khách hàng đã có đơn CONFIRMED cho không gian này nhưng khung giờ đặt trên Backend
-      // chưa qua thời điểm EndAt (409 NotEligible) hoặc đơn đó đã đánh giá rồi, vẫn ghi nhận đánh giá cho không gian!
-      if (allowConfirmedBookingFallback &&
-          (response.statusCode == 409 || response.statusCode == 500)) {
-        final currentUser = AuthService().currentUser;
-        final customerName = (currentUser != null &&
-                currentUser.fullName.trim().isNotEmpty)
-            ? currentUser.fullName.trim()
-            : 'Nhiếp ảnh gia';
-        final localReview = SpaceReviewResponseDTO(
-          reviewId: 'rev-${DateTime.now().millisecondsSinceEpoch}',
-          bookingId: bookingId,
-          customerUserId: currentUser?.userId ?? '',
-          customerName: customerName,
-          spaceType: request.spaceType,
-          spaceId: request.spaceId,
-          rating: request.rating,
-          comment: request.comment,
-          createdAt: DateTime.now(),
-        );
-        final key = request.spaceId.trim().toLowerCase();
-        _localSpaceReviewsOverride.putIfAbsent(key, () => []);
-        _localSpaceReviewsOverride[key]!.insert(0, localReview);
-        return {
-          'success': true,
-          'review': localReview,
-        };
-      }
 
       if (response.statusCode == 409) {
         final rawMsg = message.toLowerCase();

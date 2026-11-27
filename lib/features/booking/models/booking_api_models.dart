@@ -100,6 +100,32 @@ class BookingEquipmentResponseDTO {
   }
 }
 
+class BookingCancellationResponseDTO {
+  final String bookingId;
+  final String status;
+  final double refundAmount;
+  final String refundStatus;
+  final bool packageUseRestored;
+
+  const BookingCancellationResponseDTO({
+    required this.bookingId,
+    required this.status,
+    required this.refundAmount,
+    required this.refundStatus,
+    required this.packageUseRestored,
+  });
+
+  factory BookingCancellationResponseDTO.fromJson(Map<String, dynamic> json) {
+    return BookingCancellationResponseDTO(
+      bookingId: json['bookingId']?.toString() ?? '',
+      status: json['status']?.toString() ?? '',
+      refundAmount: (json['refundAmount'] as num?)?.toDouble() ?? 0,
+      refundStatus: json['refundStatus']?.toString() ?? '',
+      packageUseRestored: json['packageUseRestored'] == true,
+    );
+  }
+}
+
 class PackageBookingSegmentRequestDTO {
   final int stepOrder;
   final String availabilityId;
@@ -436,7 +462,7 @@ class ProviderSpaceAvailabilityResponseDTO {
   final String date;
   final String startTime;
   final String endTime;
-  final double price;
+  final double? price;
 
   ProviderSpaceAvailabilityResponseDTO({
     required this.availabilityId,
@@ -457,7 +483,7 @@ class ProviderSpaceAvailabilityResponseDTO {
       date: resolvedDate.toString(),
       startTime: json['startTime']?.toString() ?? '',
       endTime: json['endTime']?.toString() ?? '',
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
+      price: (json['price'] as num?)?.toDouble(),
     );
   }
 }

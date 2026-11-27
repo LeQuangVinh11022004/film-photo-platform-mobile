@@ -13,9 +13,7 @@ import '../../booking/models/booking_schedule.dart';
 import '../../booking/models/review_api_models.dart';
 import '../../booking/services/booking_api_service.dart';
 import '../../booking/services/review_api_service.dart';
-import '../../community/models/article_api_models.dart';
 import '../../community/models/community_post_api_models.dart';
-import '../../community/services/article_api_service.dart';
 import '../../community/services/community_post_api_service.dart';
 import '../../../app/main.dart'; // Import themeNotifier
 
@@ -66,25 +64,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
     _loadProfileApiStats();
   }
 
-  List<ArticleResponseDTO> _loadedArticles = [];
   List<CommunityPostResponseDTO> _loadedMyCommunityPosts = [];
   List<SpaceReviewResponseDTO> _loadedSpaceReviews = [];
 
   Future<void> _loadProfileApiStats() async {
     try {
       if (_isExpertRole) {
-        final results = await Future.wait([
-          ArticleApiService().getExpertArticles(page: 1, pageSize: 50),
-          CommunityPostApiService().getMyPosts(page: 1, pageSize: 50),
-        ]);
-        if (!mounted) return;
-        final articlesPage = results[0] as PagedResponseDTO<ArticleResponseDTO>?;
         final myPostsPage =
-            results[1] as PagedResponseDTO<CommunityPostResponseDTO>?;
+            await CommunityPostApiService().getMyPosts(page: 1, pageSize: 50);
+        if (!mounted) return;
         setState(() {
-          if (articlesPage != null) {
-            _loadedArticles = articlesPage.items;
-          }
           if (myPostsPage != null) {
             _loadedMyCommunityPosts = myPostsPage.items;
           }
@@ -95,7 +84,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final results = await Future.wait([
         BookingApiService().getMyBookings(page: 1, pageSize: 50),
         BookingApiService().getPackageSubscriptions(),
-        ArticleApiService().getPublishedArticles(page: 1, pageSize: 50),
         CommunityPostApiService().getMyPosts(page: 1, pageSize: 50),
         BookingApiService().getStudios(),
         BookingApiService().getDarkrooms(),
@@ -104,11 +92,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final page = results[0] as PagedResponseDTO<BookingResponseDTO>?;
       final subs =
           results[1] as List<PhotographerPackageSubscriptionResponseDTO>;
-      final articlesPage = results[2] as PagedResponseDTO<ArticleResponseDTO>?;
       final myPostsPage =
-          results[3] as PagedResponseDTO<CommunityPostResponseDTO>?;
-      final studios = results[4] as List<ResourceItemResponseDTO>;
-      final darkrooms = results[5] as List<ResourceItemResponseDTO>;
+          results[2] as PagedResponseDTO<CommunityPostResponseDTO>?;
+      final studios = results[3] as List<ResourceItemResponseDTO>;
+      final darkrooms = results[4] as List<ResourceItemResponseDTO>;
 
       final List<SpaceReviewResponseDTO> collectedReviews = [];
       if (studios.isNotEmpty) {
@@ -141,9 +128,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
               : page.items.length;
         }
         _totalSubscriptionsCount = subs.length;
-        if (articlesPage != null) {
-          _loadedArticles = articlesPage.items;
-        }
         if (myPostsPage != null) {
           _loadedMyCommunityPosts = myPostsPage.items;
         }
@@ -548,26 +532,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   void _showMyPostsModal() async {
-    if (_loadedMyCommunityPosts.isEmpty) {
-      final myPostsPage =
-          await CommunityPostApiService().getMyPosts(page: 1, pageSize: 50);
-      if (myPostsPage != null && mounted) {
-        setState(() => _loadedMyCommunityPosts = myPostsPage.items);
-      }
-    }
-    if (_loadedArticles.isEmpty) {
-      final page = _isExpertRole
-          ? await ArticleApiService().getExpertArticles(page: 1, pageSize: 50)
-          : await ArticleApiService()
-              .getPublishedArticles(page: 1, pageSize: 50);
-      if (page != null && mounted) {
-        setState(() => _loadedArticles = page.items);
-      }
-    }
+    final myPostsPage =
+        await CommunityPostApiService().getMyPosts(page: 1, pageSize: 50);
     if (!mounted) return;
+    if (myPostsPage == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể tải bài đăng của bạn.')),
+      );
+      return;
+    }
+    setState(() => _loadedMyCommunityPosts = myPostsPage.items);
 
-    final int totalCount =
-        _loadedMyCommunityPosts.length + _loadedArticles.length;
+    final int totalCount = _loadedMyCommunityPosts.length;
 
     showModalBottomSheet(
       context: context,
@@ -593,9 +569,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SizedBox(height: 20),
             Text(
-              _isExpertRole
-                  ? 'Bài Đăng & Bài Viết Chuyên Môn ($totalCount)'
-                  : 'Bài Đăng Cộng Đồng & Diễn Đàn (${totalCount > 0 ? totalCount : 3})',
+              'Bài Đăng Cộng Đồng ($totalCount)',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -640,100 +614,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             ),
                           ),
                         ),
-                        ..._loadedArticles.map(
-                          (art) => Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: context.cardColor,
-                              border: Border.all(color: context.borderColor),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  art.title,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    color: context.textColor,
-                                  ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${art.category} • ${art.expertName} • ${art.status}',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: context.textSecColor,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
                       ],
                     )
-                  : ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                itemCount: 3,
-                itemBuilder: (context, index) {
-                  return Container(
-                    margin: EdgeInsets.only(bottom: 12),
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.cardColor,
-                      border: Border.all(color: context.borderColor),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Bài viết #${index + 1}: Kỹ thuật chụp film ngoài trời',
-                          style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 15,
-                            color: context.textColor,
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.favorite_rounded,
-                              size: 14,
-                              color: Colors.redAccent,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '128 lượt thích',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.textSecColor,
-                              ),
-                            ),
-                            SizedBox(width: 16),
-                            Icon(
-                              Icons.mode_comment_rounded,
-                              size: 14,
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(width: 4),
-                            Text(
-                              '24 bình luận',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: context.textSecColor,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                  : const Center(child: Text('Chưa có bài đăng cộng đồng.')),
             ),
           ],
         ),

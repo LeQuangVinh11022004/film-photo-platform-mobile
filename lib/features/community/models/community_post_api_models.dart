@@ -143,7 +143,6 @@ class CommunityPostResponseDTO {
       images: images.map((e) => e.imageUrl).toList(),
       category: cat,
       status: status,
-      isApiArticle: false,
       isCommunityPost: true,
       likes: likeCount,
       dislikes: 0,

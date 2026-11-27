@@ -516,16 +516,38 @@ class BookingApiService {
   }
 
   /// Hủy đơn đặt phòng (Photographer)
-  Future<bool> cancelBooking(String bookingId) async {
+  Future<Map<String, dynamic>> cancelBooking(String bookingId) async {
     try {
       final response = await _apiClient.patch(
         '/api/photographer/bookings/$bookingId/cancel',
       );
 
-      return response.statusCode == 204;
+      if (response.statusCode == 200) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
+        final cancellation = BookingCancellationResponseDTO.fromJson(json);
+        if (cancellation.bookingId.toLowerCase() != bookingId.toLowerCase() ||
+            cancellation.status.toUpperCase() != 'CANCELLED' ||
+            json['refundAmount'] is! num ||
+            json['refundStatus'] is! String ||
+            json['packageUseRestored'] is! bool) {
+          return {
+            'success': false,
+            'message': 'Máy chủ trả về thông tin hủy lịch không hợp lệ. Vui lòng kiểm tra lại lịch đặt.',
+          };
+        }
+        return {'success': true, 'cancellation': cancellation};
+      }
+      var message = 'Không thể hủy lịch đặt (Mã lỗi: ${response.statusCode}).';
+      if (response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
+          message = decoded['message'].toString();
+        }
+      }
+      return {'success': false, 'message': message};
     } catch (e) {
       if (kDebugMode) print('cancelBooking API Error: $e');
-      return false;
+      return {'success': false, 'message': 'Không thể kết nối để hủy lịch đặt.'};
     }
   }
 

@@ -16,7 +16,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _passwordController = TextEditingController();
   final _authService = AuthService();
 
@@ -57,7 +57,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _usernameController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -68,13 +68,12 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     final LoginResponse res = await _authService.login(
-      _emailController.text.trim(),
+      _usernameController.text.trim(),
       _passwordController.text,
     );
 
-    setState(() => _isLoading = false);
-
     if (!mounted) return;
+    setState(() => _isLoading = false);
 
     if (res.success) {
       toastification.show(
@@ -249,22 +248,12 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 36),
 
-                  // Email Input
+                  // Username Input
                   CustomTextField(
-                    controller: _emailController,
-                    hintText: 'Nhập địa chỉ Email',
-                    prefixIcon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                    validator: (value) {
-                      if (value == null || value.trim().isEmpty) {
-                        return 'Vui lòng nhập Email';
-                      }
-                      if (!RegExp(r'^[\w-.]+@([\w-]+\.)+[\w-]{2,10}$')
-                          .hasMatch(value.trim())) {
-                        return 'Email không hợp lệ';
-                      }
-                      return null;
-                    },
+                    controller: _usernameController,
+                    hintText: 'Nhập tên đăng nhập',
+                    prefixIcon: Icons.person_outline,
+                    validator: validateUsername,
                   ),
                   const SizedBox(height: 18),
 
@@ -278,8 +267,8 @@ class _LoginScreenState extends State<LoginScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Vui lòng nhập mật khẩu';
                       }
-                      if (value.length < 6) {
-                        return 'Mật khẩu phải từ 6 ký tự trở lên';
+                      if (value.length > 128) {
+                        return 'Mật khẩu không được quá 128 ký tự';
                       }
                       return null;
                     },

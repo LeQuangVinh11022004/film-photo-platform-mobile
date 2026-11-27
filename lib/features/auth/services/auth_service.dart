@@ -21,6 +21,11 @@ class AuthService {
       final token = prefs.getString('auth_token');
       final userJsonStr = prefs.getString('current_user');
 
+      if (token != null && token.startsWith('mock_jwt_token_')) {
+        await logout();
+        return false;
+      }
+
       if (token != null && token.isNotEmpty && userJsonStr != null && userJsonStr.isNotEmpty) {
         final Map<String, dynamic> userMap = jsonDecode(userJsonStr);
         currentUser = UserDTO.fromJson(userMap);
@@ -34,8 +39,8 @@ class AuthService {
   }
 
   /// Gọi API thực tế: POST /api/auth/login
-  Future<LoginResponse> login(String email, String password) async {
-    final requestDto = LoginRequest(email: email, password: password);
+  Future<LoginResponse> login(String username, String password) async {
+    final requestDto = LoginRequest(username: username, password: password);
 
     try {
       final response = await _apiClient.post(
@@ -48,6 +53,14 @@ class AuthService {
       if (response.statusCode == 200) {
         final loginResponse = LoginResponse.fromJson(json);
         if (loginResponse.success) {
+          if (loginResponse.user == null ||
+              loginResponse.token == null ||
+              loginResponse.token!.isEmpty) {
+            return LoginResponse(
+              success: false,
+              message: 'Máy chủ không trả về thông tin đăng nhập hợp lệ.',
+            );
+          }
           final role = (loginResponse.user?.role ?? '').trim().toUpperCase();
           if (role == 'PROVIDER') {
             await logout();
@@ -76,48 +89,11 @@ class AuthService {
       } else {
         return LoginResponse(
           success: false,
-          message: json['message'] ?? 'Email hoặc mật khẩu không chính xác.',
+          message: json['message'] ?? 'Tên đăng nhập hoặc mật khẩu không chính xác.',
         );
       }
     } catch (e) {
       if (kDebugMode) print('Login API Error: $e');
-
-      // Fallback thử nghiệm offline nếu chưa bật server API hoặc bị ngắt mạng
-      if (email.isNotEmpty && password.length >= 6) {
-        if (email.toLowerCase().contains('provider')) {
-          await logout();
-          return LoginResponse(
-            success: false,
-            message:
-                'Ứng dụng di động chỉ dành cho Nhiếp ảnh gia (Photographer) và Chuyên gia (Expert).',
-          );
-        }
-        final mockToken = 'mock_jwt_token_${DateTime.now().millisecondsSinceEpoch}';
-        _apiClient.setToken(mockToken);
-        
-        String mockRole = 'Photographer';
-        if (email.toLowerCase().contains('expert')) mockRole = 'Expert';
-
-        currentUser = UserDTO(
-          userId: 'mock-user-id',
-          fullName: mockRole == 'Expert' ? 'Chuyên gia Film' : 'Lê Hoàng Anh',
-          email: email,
-          role: mockRole,
-          status: 'Active',
-          createdAt: DateTime.now(),
-        );
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('auth_token', mockToken);
-        await prefs.setString('current_user', jsonEncode(currentUser!.toJson()));
-
-        return LoginResponse(
-          success: true,
-          message: 'Đăng nhập thành công (Thử nghiệm offline)',
-          token: _apiClient.authToken,
-          user: currentUser,
-        );
-      }
 
       return LoginResponse(
         success: false,
@@ -129,10 +105,11 @@ class AuthService {
   /// Gọi API thực tế: POST /api/auth/register/photographer
   Future<RegisterResponse> register({
     required String name,
+    required String username,
     required String email,
     required String password,
   }) async {
-    final requestDto = RegisterRequest(fullName: name, email: email, password: password);
+    final requestDto = RegisterRequest(fullName: name, username: username, email: email, password: password);
 
     try {
       final response = await _apiClient.post(
@@ -149,9 +126,10 @@ class AuthService {
           user: user,
         );
       } else if (response.statusCode == 409) {
+        final json = jsonDecode(response.body) as Map<String, dynamic>;
         return RegisterResponse(
           success: false,
-          message: 'Tài khoản với email này đã tồn tại trong hệ thống.',
+          message: json['message'] ?? 'Email hoặc tên đăng nhập đã tồn tại.',
         );
       } else {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
@@ -162,22 +140,6 @@ class AuthService {
       }
     } catch (e) {
       if (kDebugMode) print('Register API Error: $e');
-
-      // Fallback thử nghiệm offline nếu chưa bật server API
-      if (name.isNotEmpty && email.contains('@') && password.length >= 6) {
-        return RegisterResponse(
-          success: true,
-          message: 'Đăng ký thành công! Vui lòng đăng nhập.',
-          user: UserDTO(
-            userId: 'mock-new-id',
-            fullName: name,
-            email: email,
-            role: 'Photographer',
-            status: 'Active',
-            createdAt: DateTime.now(),
-          ),
-        );
-      }
 
       return RegisterResponse(
         success: false,

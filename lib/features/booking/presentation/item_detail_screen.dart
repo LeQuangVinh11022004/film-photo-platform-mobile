@@ -208,7 +208,8 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         style: ToastificationStyle.flatColored,
         title: const Text('Chưa đủ điều kiện đánh giá'),
         description: Text(
-          'Bạn cần có ít nhất 1 đơn đặt chỗ Đã xác nhận (CONFIRMED) tại "${_item.name}" để gửi đánh giá.',
+          'Bạn cần có đơn đặt chỗ hợp lệ tại "${_item.name}" để gửi đánh giá. '
+          'Đơn phải được thanh toán hoặc sử dụng lượt gói, lịch đã kết thúc và chưa được đánh giá.',
         ),
         alignment: Alignment.topCenter,
         autoCloseDuration: const Duration(seconds: 4),
@@ -271,7 +272,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Đã xác thực có đơn đặt chỗ CONFIRMED tại không gian này',
+                        'Đơn cần được thanh toán hoặc dùng lượt gói, lịch đã kết thúc và chưa được đánh giá.',
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.green.shade700,
