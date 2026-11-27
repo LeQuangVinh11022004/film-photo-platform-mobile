@@ -137,43 +137,10 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
-  Future<void> _handleGoogleSignIn() async {
-    setState(() => _isLoading = true);
-
-    final userData = await _authService.signInWithGoogle();
-
-    setState(() => _isLoading = false);
-
-    if (!mounted) return;
-
-    if (userData != null) {
-      toastification.show(
-        context: context,
-        type: ToastificationType.success,
-        style: ToastificationStyle.flatColored,
-        title: const Text('Đăng nhập Google thành công!'),
-        description: Text('Xin chào ${userData['name']}'),
-        alignment: Alignment.topCenter,
-        autoCloseDuration: const Duration(seconds: 3),
-        showProgressBar: false,
-      );
-      Navigator.pushNamedAndRemoveUntil(
-        context,
-        '/home',
-        (route) => false,
-      );
-    } else {
-      toastification.show(
-        context: context,
-        type: ToastificationType.error,
-        style: ToastificationStyle.flatColored,
-        title: const Text('Lỗi đăng nhập Google'),
-        description: const Text('Đăng nhập bằng Google thất bại.'),
-        alignment: Alignment.topCenter,
-        autoCloseDuration: const Duration(seconds: 4),
-        showProgressBar: false,
-      );
-    }
+  void _handleGoogleSignIn() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đăng nhập Google chưa được hỗ trợ.')),
+    );
   }
 
   @override

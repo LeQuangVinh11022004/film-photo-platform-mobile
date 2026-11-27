@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../ai_tools/presentation/ai_tools_hub_screen.dart';
@@ -16,7 +16,7 @@ class MainNavigationScreen extends StatefulWidget {
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
   int _currentIndex = 0;
-  int _scheduleReloadCount = 0;
+  final GlobalKey<ScheduleScreenState> _scheduleKey = GlobalKey<ScheduleScreenState>();
 
   @override
   void initState() {
@@ -44,10 +44,10 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
           index: _currentIndex,
           children: [
             const HomeScreen(),
-            ScheduleScreen(key: ValueKey('schedule_$_scheduleReloadCount')),
+            ScheduleScreen(key: _scheduleKey),
             const AIToolsHubScreen(),
             const CommunityScreen(),
-            ProfileScreen(),
+            const ProfileScreen(),
           ],
         ),
         // Cải tiến Navbar dạng Floating Floating Capsule (Viên nhộng nổi)
@@ -92,12 +92,14 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          if (index == 1) {
-            _scheduleReloadCount++;
-          }
-          _currentIndex = index;
-        });
+        if (index == 1 && _currentIndex != 1) {
+          _scheduleKey.currentState?.refreshBookings();
+        }
+        if (_currentIndex != index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        }
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(

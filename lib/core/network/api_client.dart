@@ -1,8 +1,6 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/io_client.dart';
 
 /// Lớp Generic API Client xử lý mọi request cho ứng dụng
 class ApiClient {
@@ -17,11 +15,7 @@ class ApiClient {
   }
 
   void _initClient() {
-    // Vượt qua lỗi SSL trên Android Emulator khi gọi localhost ASP.NET Core HTTPS
-    bool trustSelfSigned = true;
-    HttpClient httpClient = HttpClient()
-      ..badCertificateCallback = ((X509Certificate cert, String host, int port) => trustSelfSigned);
-    _client = IOClient(httpClient);
+    _client = http.Client();
   }
 
   /// Lấy instance http.Client (đảm bảo luôn được khởi tạo)

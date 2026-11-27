@@ -1,8 +1,7 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/device_image_picker.dart';
-import '../../../core/services/notification_service.dart';
 
 class AIRestorationScreen extends StatefulWidget {
   const AIRestorationScreen({super.key});
@@ -13,7 +12,6 @@ class AIRestorationScreen extends StatefulWidget {
 
 class _AIRestorationScreenState extends State<AIRestorationScreen> {
   double _sliderValue = 0.5; // Before/After split position
-  bool _isProcessing = false;
   bool _scratchRemoval = true;
   bool _colorEnhance = true;
   bool _superResolution = true;
@@ -70,7 +68,7 @@ class _AIRestorationScreenState extends State<AIRestorationScreen> {
             SizedBox(height: 28),
 
             // Interactive Before/After Split Viewer
-            Text('So Sánh Ảnh Gốc vs Ảnh AI Khôi Phục', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: context.textColor)),
+            Text('Minh họa so sánh ảnh (chưa xử lý bằng AI)', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: context.textColor)),
             SizedBox(height: 14),
 
             Container(
@@ -185,15 +183,14 @@ class _AIRestorationScreenState extends State<AIRestorationScreen> {
                 Expanded(
                   child: OutlinedButton.icon(
                     onPressed: () async {
+                      final messenger = ScaffoldMessenger.of(context);
                       final url = await DeviceImagePicker.pickImageFromDevice(context, title: 'Chọn Ảnh Film Từ Thiết Bị');
-                      if (url != null) {
+                      if (url != null && mounted) {
                         setState(() {
                           _beforeImage = url;
                           _afterImage = url;
                         });
-                        if (mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Đã nạp tệp ảnh film mới từ thiết bị!'), backgroundColor: Colors.green));
-                        }
+                        messenger.showSnackBar(const SnackBar(content: Text('Đã nạp tệp ảnh film mới từ thiết bị!'), backgroundColor: Colors.green));
                       }
                     },
                     icon: Icon(Icons.upload_file_rounded),
@@ -210,23 +207,13 @@ class _AIRestorationScreenState extends State<AIRestorationScreen> {
                 Expanded(
                   flex: 2,
                   child: ElevatedButton.icon(
-                    onPressed: _isProcessing
-                        ? null
-                        : () {
-                            setState(() => _isProcessing = true);
-                            Future.delayed(const Duration(seconds: 2), () {
-                              if (!mounted) return;
-                              setState(() => _isProcessing = false);
-                              NotificationService().triggerLocalNotification(
-                                context: context,
-                                title: 'Phục Chế Ảnh Film AI Hoàn Tất! 🤖',
-                                body: 'Ảnh film của bạn đã được AI xử lý làm nét 4K & khôi phục màu sắc thành công. Bấm để xem Bộ Sưu Tập.',
-                                route: '/digital-collections',
-                              );
-                            });
-                          },
-                    icon: _isProcessing ? SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2.5, color: context.cardColor)) : Icon(Icons.auto_fix_high_rounded, size: 22),
-                    label: Text(_isProcessing ? 'Đang Xử Lý AI...' : 'Phục Chế 4K', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Phục chế ảnh AI chưa được hỗ trợ.')),
+                      );
+                    },
+                    icon: const Icon(Icons.auto_fix_high_rounded, size: 22),
+                    label: const Text('Phục Chế 4K', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: context.cardColor,

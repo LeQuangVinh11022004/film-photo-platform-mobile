@@ -3,7 +3,6 @@ import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
-import '../models/review_api_models.dart';
 
 class BookingApiService {
   // Singleton pattern
@@ -227,15 +226,11 @@ class BookingApiService {
             .map((e) => PhotographerServicePackageResponseDTO.fromJson(
                 e as Map<String, dynamic>))
             .toList();
-      } else {
-        if (kDebugMode) {
-          print('Failed to get service packages (${response.statusCode}): ${response.body}');
-        }
-        return [];
       }
+      throw StateError('Không thể tải gói dịch vụ (HTTP ${response.statusCode}).');
     } catch (e) {
       if (kDebugMode) print('getServicePackages API Error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -313,15 +308,11 @@ class BookingApiService {
             .map((e) => PhotographerPackageSubscriptionResponseDTO.fromJson(
                 e as Map<String, dynamic>))
             .toList();
-      } else {
-        if (kDebugMode) {
-          print('Failed to get package subscriptions (${response.statusCode}): ${response.body}');
-        }
-        return [];
       }
+      throw StateError('Không thể tải gói đã đăng ký (HTTP ${response.statusCode}).');
     } catch (e) {
       if (kDebugMode) print('getPackageSubscriptions API Error: $e');
-      return [];
+      rethrow;
     }
   }
 
@@ -512,7 +503,7 @@ class BookingApiService {
         return candidate;
       }
     }
-    return [];
+    throw const FormatException('Máy chủ trả về danh sách không hợp lệ.');
   }
 
   /// Hủy đơn đặt phòng (Photographer)
@@ -548,127 +539,6 @@ class BookingApiService {
     } catch (e) {
       if (kDebugMode) print('cancelBooking API Error: $e');
       return {'success': false, 'message': 'Không thể kết nối để hủy lịch đặt.'};
-    }
-  }
-
-  /// GET /api/photographer/studios/{studioId}/reviews
-  /// Lấy danh sách đánh giá của Studio
-  Future<SpaceReviewPageResponseDTO?> getStudioReviews({
-    required String studioId,
-    int page = 1,
-    int pageSize = 20,
-  }) async {
-    try {
-      final response = await _apiClient.get(
-        '/api/photographer/studios/$studioId/reviews?page=$page&pageSize=$pageSize',
-      );
-      if (response.statusCode == 200 && response.body.isNotEmpty) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        return SpaceReviewPageResponseDTO.fromJson(json);
-      }
-      if (kDebugMode) {
-        print(
-            'getStudioReviews failed (${response.statusCode}): ${response.body}');
-      }
-      return null;
-    } catch (e) {
-      if (kDebugMode) print('getStudioReviews API Error: $e');
-      return null;
-    }
-  }
-
-  /// GET /api/photographer/darkrooms/{darkroomId}/reviews
-  /// Lấy danh sách đánh giá của Phòng tối (Darkroom)
-  Future<SpaceReviewPageResponseDTO?> getDarkroomReviews({
-    required String darkroomId,
-    int page = 1,
-    int pageSize = 20,
-  }) async {
-    try {
-      final response = await _apiClient.get(
-        '/api/photographer/darkrooms/$darkroomId/reviews?page=$page&pageSize=$pageSize',
-      );
-      if (response.statusCode == 200 && response.body.isNotEmpty) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        return SpaceReviewPageResponseDTO.fromJson(json);
-      }
-      if (kDebugMode) {
-        print(
-            'getDarkroomReviews failed (${response.statusCode}): ${response.body}');
-      }
-      return null;
-    } catch (e) {
-      if (kDebugMode) print('getDarkroomReviews API Error: $e');
-      return null;
-    }
-  }
-
-  /// POST /api/photographer/bookings/{bookingId}/review
-  /// Gửi đánh giá cho một đơn đặt chỗ đã thanh toán và hoàn thành
-  Future<Map<String, dynamic>> createBookingReview({
-    required String bookingId,
-    required SpaceReviewWriteRequestDTO request,
-  }) async {
-    try {
-      final response = await _apiClient.post(
-        '/api/photographer/bookings/$bookingId/review',
-        body: request.toJson(),
-      );
-
-      Map<String, dynamic> json = {};
-      if (response.body.isNotEmpty) {
-        try {
-          json = jsonDecode(response.body) as Map<String, dynamic>;
-        } catch (_) {}
-      }
-
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        return {
-          'success': true,
-          'review': json.isNotEmpty
-              ? SpaceReviewResponseDTO.fromJson(json)
-              : null,
-        };
-      } else if (response.statusCode == 400) {
-        return {
-          'success': false,
-          'message': json['message'] ??
-              'Thông tin đánh giá không hợp lệ (Rating từ 1 đến 5 sao, tối đa 2000 ký tự).',
-        };
-      } else if (response.statusCode == 404) {
-        return {
-          'success': false,
-          'message': json['message'] ??
-              'Không tìm thấy đơn đặt chỗ hoặc không gian cần đánh giá.',
-        };
-      } else if (response.statusCode == 409) {
-        final rawMsg = json['message']?.toString() ?? '';
-        String viMsg =
-            'Chỉ có thể đánh giá sau khi đơn đặt chỗ đã thanh toán và kết thúc.';
-        if (rawMsg.toLowerCase().contains('already has a review')) {
-          viMsg = 'Đơn đặt chỗ này đã được đánh giá trước đó.';
-        } else if (rawMsg.toLowerCase().contains('not part of this booking')) {
-          viMsg = 'Không gian đã chọn không thuộc đơn đặt chỗ này.';
-        } else if (rawMsg.isNotEmpty) {
-          viMsg = '$viMsg ($rawMsg)';
-        }
-        return {
-          'success': false,
-          'message': viMsg,
-        };
-      } else {
-        return {
-          'success': false,
-          'message': json['message'] ??
-              'Không thể gửi đánh giá (Mã lỗi: ${response.statusCode})',
-        };
-      }
-    } catch (e) {
-      if (kDebugMode) print('createBookingReview API Error: $e');
-      return {
-        'success': false,
-        'message': 'Đã xảy ra lỗi khi gửi đánh giá: $e',
-      };
     }
   }
 }

@@ -104,14 +104,6 @@ class SafeNetworkImage extends StatelessWidget {
       return trimmed;
     }
 
-    // 5. Kiểm tra trực tiếp file tồn tại trên thiết bị
-    try {
-      final f = File(trimmed);
-      if (f.existsSync()) {
-        return f.path;
-      }
-    } catch (_) {}
-
     return null;
   }
 
@@ -180,6 +172,12 @@ class SafeNetworkImage extends StatelessWidget {
       } else {
         final resolved = _resolveNetworkUrl(trimmed);
         if (resolved.startsWith('http://') || resolved.startsWith('https://')) {
+          final int? cacheWidth = (width != null && width!.isFinite && width! > 0)
+              ? (width! * 2).round()
+              : null;
+          final int? cacheHeight = (height != null && height!.isFinite && height! > 0)
+              ? (height! * 2).round()
+              : null;
           imageWidget = CachedNetworkImage(
             imageUrl: resolved,
             cacheManager: kDebugMode
@@ -187,6 +185,9 @@ class SafeNetworkImage extends StatelessWidget {
                 : DefaultCacheManager(),
             width: width,
             height: height,
+            memCacheWidth: cacheWidth,
+            memCacheHeight: cacheHeight,
+            fadeInDuration: const Duration(milliseconds: 180),
             fit: fit,
             placeholder: (context, _) => Container(
               width: width,

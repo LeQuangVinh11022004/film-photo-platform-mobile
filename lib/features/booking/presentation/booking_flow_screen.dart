@@ -6,7 +6,6 @@ import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/primary_button.dart';
 import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
-import '../models/booking_schedule.dart';
 import '../services/booking_api_service.dart';
 import 'payment_screen.dart';
 
@@ -40,9 +39,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   PhotographerPackageSubscriptionResponseDTO? _selectedSubscription;
 
   List<Map<String, dynamic>> get _timeSlots {
-    final sourceSlots = _liveAvailableSlots.isNotEmpty
-        ? _liveAvailableSlots
-        : widget.item.availableSlots;
+    final sourceSlots = _liveAvailableSlots;
     if (sourceSlots.isEmpty) {
       return [];
     }
@@ -178,16 +175,30 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     _syncLiveSlotsSubscriptionsAndEquipment();
   }
 
+  String get _resolvedSpaceId {
+    if (widget.item.category == BookingCategory.equipment &&
+        widget.item.parentSpaceId != null &&
+        widget.item.parentSpaceId!.trim().isNotEmpty) {
+      return widget.item.parentSpaceId!.trim();
+    }
+    return widget.item.id.trim();
+  }
+
   Future<void> _syncLiveSlotsSubscriptionsAndEquipment() async {
-    final spaceId = widget.item.id.trim();
+    final spaceId = _resolvedSpaceId;
     if (spaceId.length < 32) return; // Skip mock non-UUID items
 
     setState(() => _isLoadingEquipment = true);
 
     try {
+      var subscriptionsFailed = false;
       final results = await Future.wait([
         BookingApiService().getAvailableSlots(spaceId: spaceId),
-        BookingApiService().getPackageSubscriptions(),
+        BookingApiService().getPackageSubscriptions().catchError((Object e) {
+          debugPrint('Không thể tải gói đã đăng ký: $e');
+          subscriptionsFailed = true;
+          return <PhotographerPackageSubscriptionResponseDTO>[];
+        }),
         BookingApiService().getEquipmentForSpace(
           spaceId: spaceId,
           page: 1,
@@ -196,30 +207,33 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       ]);
 
       if (!mounted) return;
+      if (subscriptionsFailed) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể tải gói đã đăng ký. Bạn vẫn có thể đặt lịch thông thường.')),
+        );
+      }
 
       final apiSlots = results[0] as List<ProviderSpaceAvailabilityResponseDTO>;
       final apiSubs = results[1] as List<PhotographerPackageSubscriptionResponseDTO>;
       final equipPage =
           results[2] as PagedResponseDTO<PhotographerEquipmentResponseDTO>?;
 
-      if (apiSlots.isNotEmpty) {
-        final converted = <Map<String, dynamic>>[];
-        for (final s in apiSlots) {
-          final startIso = '${s.date}T${s.startTime}Z';
-          final endIso = '${s.date}T${s.endTime}Z';
-          converted.add({
-            'availabilityId': s.availabilityId,
-            'startAt': startIso,
-            'endAt': endIso,
-            'price': s.price,
-          });
-        }
-        setState(() {
-          _liveAvailableSlots = converted;
+      final converted = <Map<String, dynamic>>[];
+      for (final s in apiSlots) {
+        final startIso = '${s.date}T${s.startTime}Z';
+        final endIso = '${s.date}T${s.endTime}Z';
+        converted.add({
+          'availabilityId': s.availabilityId,
+          'startAt': startIso,
+          'endAt': endIso,
+          'price': s.price,
         });
-        if (widget.item.availableSlots.isEmpty) {
-          _initSelectedDateFromSource(_liveAvailableSlots);
-        }
+      }
+      setState(() {
+        _liveAvailableSlots = converted;
+      });
+      if (widget.item.availableSlots.isEmpty && converted.isNotEmpty) {
+        _initSelectedDateFromSource(converted);
       }
 
       if (equipPage != null) {
@@ -254,7 +268,14 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           _matchingSubscriptions = activeMatching;
         });
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Không thể đồng bộ dữ liệu đặt lịch: $e');
+      if (mounted) {
+        setState(() => _liveAvailableSlots = []);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể tải dữ liệu đặt lịch. Vui lòng thử lại.')),
+        );
+      }
     } finally {
       if (mounted) {
         setState(() => _isLoadingEquipment = false);
@@ -298,6 +319,16 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       // Keep only selections that still exist in available equipment
       final validNames = mapped.map((m) => m['name'] as String).toSet();
       _selectedAddons.removeWhere((name) => !validNames.contains(name));
+      // Nếu mở luồng đặt chỗ từ một Thiết bị (BookingCategory.equipment), tự động tích chọn thiết bị đó
+      if (widget.item.category == BookingCategory.equipment) {
+        for (final m in mapped) {
+          if (m['equipmentId']?.toString().toLowerCase() ==
+                  widget.item.id.trim().toLowerCase() &&
+              !_selectedAddons.contains(m['name'])) {
+            _selectedAddons.add(m['name'] as String);
+          }
+        }
+      }
     });
   }
 
@@ -305,7 +336,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   /// và GET /api/photographer/equipment/{equipmentId}/availability để đồng bộ thiết bị trống theo khung giờ
   Future<void> _refreshEquipmentForAvailabilitySlot(
       String availabilityId) async {
-    final spaceId = widget.item.id.trim();
+    final spaceId = _resolvedSpaceId;
     if (spaceId.length < 32 || availabilityId.length < 32) return;
     final generation = ++_equipmentRequestGeneration;
     final fromDate = DateFormat('yyyy-MM-dd').format(_selectedDate);
@@ -435,6 +466,12 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   }
 
   void _nextStep() {
+    if (_isLoadingEquipment) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Đang tải dữ liệu đặt lịch, vui lòng chờ.')),
+      );
+      return;
+    }
     if (_currentStep == 0 && _timeSlots.isEmpty) {
       toastification.show(
         context: context,
@@ -503,7 +540,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final BookingCreateRequestDTO request;
     if (_selectedSubscription != null) {
       final stepItem = _selectedSubscription!.items.firstWhere(
-        (i) => i.resourceId.toLowerCase() == widget.item.id.toLowerCase(),
+        (i) => i.resourceId.toLowerCase() == _resolvedSpaceId.toLowerCase(),
         orElse: () => _selectedSubscription!.items.first,
       );
       final equipIds = _selectedSubscription!.items
@@ -551,18 +588,6 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         );
         return;
       }
-
-      final newSchedule = BookingSchedule(
-        id: bookingId,
-        item: widget.item,
-        bookingDate: _selectedDate,
-        timeSlot: '${slot['slot']} ($hours giờ)',
-        totalPrice: createdBooking != null && createdBooking.totalAmount > 0
-            ? createdBooking.totalAmount
-            : totalPrice,
-        status: BookingStatus.confirmed,
-      );
-      BookingSchedule.sampleSchedules.insert(0, newSchedule);
 
       if (_selectedSubscription != null ||
           createdBooking?.depositStatus.toUpperCase() == 'NOT_REQUIRED') {

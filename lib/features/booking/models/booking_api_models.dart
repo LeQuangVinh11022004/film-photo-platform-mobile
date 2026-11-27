@@ -720,7 +720,7 @@ class ResourceItemResponseDTO {
       category: isDarkroom ? BookingCategory.darkroom : BookingCategory.studio,
       location: address.isNotEmpty ? address : 'Hồ Chí Minh, Việt Nam',
       pricePerHour: resolvedPrice,
-      rating: 4.9,
+      rating: 0,
       imageUrl: mainImage,
       description: description.isNotEmpty
           ? description

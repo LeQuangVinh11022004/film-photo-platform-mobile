@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../models/expert_application_state.dart';
 
 class ExpertApplicationScreen extends StatefulWidget {
   const ExpertApplicationScreen({super.key});
@@ -50,12 +49,6 @@ class _ExpertApplicationScreenState extends State<ExpertApplicationScreen> {
 
     final portfolio = _portfolioController.text.trim();
 
-    // Portfolio là tùy chọn, nhưng nếu có thì phải là URL hợp lệ.
-    if (portfolio.isNotEmpty && !Uri.tryParse(portfolio)!.hasScheme) {
-      // Không sử dụng đoạn này để xác thực URL:
-      // hasScheme chỉ kiểm tra sơ bộ, chưa đảm bảo URL hợp lệ.
-    }
-
     if (portfolio.isNotEmpty) {
       final uri = Uri.tryParse(portfolio);
       if (uri == null ||
@@ -71,46 +64,11 @@ class _ExpertApplicationScreenState extends State<ExpertApplicationScreen> {
       }
     }
 
-    // DEMO ONLY: Tự động approved vì hiện tại chưa có backend.
-    // TODO(BACKEND): Khi tích hợp API, gửi đơn và chuyển sang pending.
-    // Chỉ backend/Admin mới có quyền xác nhận approved thực sự.
-    // Lưu trạng thái đăng ký và bắt đầu giả lập duyệt.
-    // Lưu trạng thái đăng ký và bắt đầu giả lập duyệt.
-    ExpertApplicationState.instance.submitDemoApplication(
-      fullName: _nameController.text.trim(),
-      specialty: _selectedSpecialty!,
-      experience: _experienceController.text.trim(),
-      introduction: _introductionController.text.trim(),
-      portfolioUrl: _portfolioController.text.trim(),
-    );
-
-    // Lấy các đối tượng trước khi đóng màn hình form.
-    final messenger = ScaffoldMessenger.of(context);
-    final navigator = Navigator.of(context);
-
-    // Quay về Profile thay vì mở Expert Workspace.
-    navigator.pop();
-
-    // Thông báo đầu tiên: đang chờ duyệt.
-    messenger.showSnackBar(
+    ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Đã gửi đăng ký thành công. Vui lòng chờ duyệt!'),
-        duration: Duration(seconds: 3),
+        content: Text('Đăng ký chuyên gia chưa được hỗ trợ. Vui lòng liên hệ quản trị viên.'),
       ),
     );
-
-    // Sau 5 giây, thông báo khi demo tự duyệt thành công.
-    Future.delayed(const Duration(seconds: 5), () {
-      if (!messenger.mounted) return;
-
-      messenger.showSnackBar(
-        const SnackBar(
-          content: Text('Đã được duyệt! Chúc mừng bạn đã trở thành Expert.'),
-          duration: Duration(seconds: 4),
-          backgroundColor: Colors.green,
-        ),
-      );
-    });
   }
 
   @override
@@ -180,7 +138,7 @@ class _ExpertApplicationScreenState extends State<ExpertApplicationScreen> {
 
               _buildLabel('Lĩnh vực chuyên môn'),
               DropdownButtonFormField<String>(
-                value: _selectedSpecialty,
+                initialValue: _selectedSpecialty,
                 isExpanded: true,
                 decoration: _inputDecoration(
                   hint: 'Chọn lĩnh vực của bạn',

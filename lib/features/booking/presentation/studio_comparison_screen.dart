@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
+import '../services/booking_api_service.dart';
 
 class StudioComparisonScreen extends StatefulWidget {
   const StudioComparisonScreen({super.key});
@@ -11,15 +13,45 @@ class StudioComparisonScreen extends StatefulWidget {
 }
 
 class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
-  final List<BookingItem> _all = BookingItem.sampleItems;
+  final BookingApiService _bookingApiService = BookingApiService();
+  List<BookingItem> _all = List<BookingItem>.from(BookingItem.sampleItems);
   late BookingItem _item1;
   late BookingItem _item2;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _item1 = _all[0]; // Vintage Film Studio Saigon
-    _item2 = _all[1]; // Silver Halide Darkroom Studio
+    _item1 = _all[0];
+    _item2 = _all.length > 1 ? _all[1] : _all[0];
+    _loadLiveSpaces();
+  }
+
+  Future<void> _loadLiveSpaces() async {
+    try {
+      final results = await Future.wait<List<ResourceItemResponseDTO>>([
+        _bookingApiService.getStudios(),
+        _bookingApiService.getDarkrooms(),
+      ]);
+      if (!mounted) return;
+      final studios = results[0].map((e) => e.toBookingItem()).toList();
+      final darkrooms = results[1].map((e) => e.toBookingItem()).toList();
+      final combined = [...studios, ...darkrooms];
+      if (combined.length >= 2) {
+        setState(() {
+          _all = combined;
+          _item1 = combined[0];
+          _item2 = combined[1];
+          _isLoading = false;
+        });
+      } else {
+        setState(() => _isLoading = false);
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
@@ -28,6 +60,22 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('So Sánh Không Gian & Thiết Bị'),
+        actions: [
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.only(right: 16),
+              child: Center(
+                child: SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -82,11 +130,27 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                     _buildCompHeader(),
                     _buildCompRow('Loại hình', _item1.categoryName, _item2.categoryName),
                     _buildCompRow('Đơn giá thuê', '${_item1.pricePerHour.toInt()}đ / giờ', '${_item2.pricePerHour.toInt()}đ / giờ'),
-                    _buildCompRow('Đánh giá ⭐', '${_item1.rating} ⭐', '${_item2.rating} ⭐'),
+                    _buildCompRow('Đánh giá ⭐', _item1.ratingLabel, _item2.ratingLabel),
                     _buildCompRow('Vị trí', _item1.location, _item2.location),
-                    _buildCompRow('Sức chứa chuẩn', '5 - 10 người', '1 - 4 người'),
-                    _buildCompRow('Phong cách', 'Retro / Vintage', 'B&W Film Lab'),
-                    _buildCompRow('Số thiết bị', '${_item1.amenities.length} trang bị', '${_item2.amenities.length} trang bị'),
+                    _buildCompRow(
+                      'Sức chứa chuẩn',
+                      'Tối đa ${_item1.capacity} người',
+                      'Tối đa ${_item2.capacity} người',
+                    ),
+                    _buildCompRow(
+                      'Phong cách / Quy trình',
+                      _item1.artisticStyle.isNotEmpty
+                          ? _item1.artisticStyle
+                          : (_item1.supportedProcesses.isNotEmpty
+                              ? _item1.supportedProcesses
+                              : 'Tiêu chuẩn Film'),
+                      _item2.artisticStyle.isNotEmpty
+                          ? _item2.artisticStyle
+                          : (_item2.supportedProcesses.isNotEmpty
+                              ? _item2.supportedProcesses
+                              : 'Tiêu chuẩn Film'),
+                    ),
+                    _buildCompRow('Số tiện ích', '${_item1.amenities.length} trang bị', '${_item2.amenities.length} trang bị'),
                   ],
                 ),
               ),

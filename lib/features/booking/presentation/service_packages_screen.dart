@@ -24,7 +24,8 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
 
   bool _isLoadingPackages = true;
   bool _isLoadingSubscriptions = true;
-  bool _usingFallbackPackages = false;
+  bool _packagesError = false;
+  bool _subscriptionsError = false;
 
   List<ServicePackage> _packages = [];
   List<PhotographerPackageSubscriptionResponseDTO> _subscriptions = [];
@@ -51,30 +52,25 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
 
   Future<void> _fetchPackages() async {
     if (!mounted) return;
-    setState(() => _isLoadingPackages = true);
+    setState(() {
+      _isLoadingPackages = true;
+      _packagesError = false;
+    });
 
     try {
       final apiDtos = await _apiService.getServicePackages();
       if (!mounted) return;
 
-      if (apiDtos.isNotEmpty) {
-        setState(() {
-          _packages = apiDtos.map(ServicePackage.fromDto).toList();
-          _usingFallbackPackages = false;
-          _isLoadingPackages = false;
-        });
-      } else {
-        setState(() {
-          _packages = ServicePackage.samplePackages;
-          _usingFallbackPackages = true;
-          _isLoadingPackages = false;
-        });
-      }
-    } catch (_) {
+      setState(() {
+        _packages = apiDtos.map(ServicePackage.fromDto).toList();
+        _isLoadingPackages = false;
+      });
+    } catch (e) {
+      debugPrint('Không thể tải gói dịch vụ: $e');
       if (!mounted) return;
       setState(() {
-        _packages = ServicePackage.samplePackages;
-        _usingFallbackPackages = true;
+        _packages = [];
+        _packagesError = true;
         _isLoadingPackages = false;
       });
     }
@@ -82,7 +78,10 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
 
   Future<void> _fetchSubscriptions() async {
     if (!mounted) return;
-    setState(() => _isLoadingSubscriptions = true);
+    setState(() {
+      _isLoadingSubscriptions = true;
+      _subscriptionsError = false;
+    });
 
     try {
       final subs = await _apiService.getPackageSubscriptions();
@@ -91,10 +90,12 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
         _subscriptions = subs;
         _isLoadingSubscriptions = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Không thể tải gói đã đăng ký: $e');
       if (!mounted) return;
       setState(() {
         _subscriptions = [];
+        _subscriptionsError = true;
         _isLoadingSubscriptions = false;
       });
     }
@@ -730,6 +731,20 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
       );
     }
 
+    if (_packagesError || _packages.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(_packagesError
+                ? 'Không thể tải gói dịch vụ.'
+                : 'Hiện chưa có gói dịch vụ khả dụng.'),
+            TextButton(onPressed: _fetchPackages, child: const Text('Thử lại')),
+          ],
+        ),
+      );
+    }
+
     return RefreshIndicator(
       color: AppColors.primary,
       onRefresh: _fetchPackages,
@@ -738,40 +753,9 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
-        itemCount: _packages.length + (_usingFallbackPackages ? 1 : 0),
+        itemCount: _packages.length,
         itemBuilder: (context, index) {
-          if (_usingFallbackPackages && index == 0) {
-            return Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.08),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: AppColors.primary.withValues(alpha: 0.2),
-                ),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded,
-                      color: AppColors.primary, size: 20),
-                  SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      'Đang hiển thị các gói Combo tiêu chuẩn. Kéo xuống để đồng bộ gói dịch vụ mới nhất từ máy chủ.',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textPrimary,
-                        height: 1.35,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            );
-          }
-
-          final pkg = _packages[_usingFallbackPackages ? index - 1 : index];
+          final pkg = _packages[index];
           return Container(
             margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
@@ -933,6 +917,21 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
     if (_isLoadingSubscriptions) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+
+    if (_subscriptionsError) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('Không thể tải gói đã đăng ký.'),
+            TextButton(
+              onPressed: _fetchSubscriptions,
+              child: const Text('Thử lại'),
+            ),
+          ],
+        ),
       );
     }
 

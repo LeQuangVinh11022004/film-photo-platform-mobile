@@ -15,12 +15,15 @@ class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
 
   @override
-  State<ScheduleScreen> createState() => _ScheduleScreenState();
+  State<ScheduleScreen> createState() => ScheduleScreenState();
 }
 
-class _ScheduleScreenState extends State<ScheduleScreen> {
+class ScheduleScreenState extends State<ScheduleScreen> {
   final BookingApiService _bookingApiService = BookingApiService();
   final ReviewApiService _reviewApiService = ReviewApiService();
+
+  /// Cho phép làm mới lịch đặt mà không cần hủy/tạo lại toàn bộ State của tab.
+  Future<void> refreshBookings() => _fetchBookings();
 
   DateTime _currentMonth = DateTime(2026, 11, 1);
   DateTime _selectedDate = DateTime(2026, 11, 20);

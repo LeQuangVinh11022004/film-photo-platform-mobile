@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../services/ai_api_service.dart';
 
@@ -30,6 +30,13 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     'Chụp phố đêm với Kodak Portra',
     'Quy tắc Sunny 16?',
   ];
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    _scrollController.dispose();
+    super.dispose();
+  }
 
   Future<void> _sendMessage(String text) async {
     if (text.trim().isEmpty) return;

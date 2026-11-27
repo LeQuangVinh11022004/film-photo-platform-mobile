@@ -116,8 +116,9 @@ class _ExpertScheduleScreenState extends State<ExpertScheduleScreen> {
     );
     if (!mounted) return;
     if (action == 'edit') _edit(item: item);
-    if (action == 'delete')
+    if (action == 'delete') {
       setState(() => _items.removeWhere((e) => e.id == item.id));
+    }
   }
 
   @override

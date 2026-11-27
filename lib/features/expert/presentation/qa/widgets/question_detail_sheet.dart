@@ -182,7 +182,7 @@ class _QuestionDetailSheetState
                 : ListView.separated(
                     padding: const EdgeInsets.fromLTRB(20, 4, 20, 16),
                     itemCount: _comments.length,
-                    separatorBuilder: (_, __) =>
+                    separatorBuilder: (_, _) =>
                         const SizedBox(height: 12),
                     itemBuilder: (context, index) {
                       return Row(

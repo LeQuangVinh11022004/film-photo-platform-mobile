@@ -33,39 +33,23 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   List<BookingResponseDTO> _mySpaceBookings = [];
   List<PhotographerEquipmentResponseDTO> _spaceEquipment = [];
   bool _isLoadingReviews = false;
+  bool _reviewsError = false;
 
-  final List<Map<String, dynamic>> _sampleReviews = [
-    {
-      'name': 'Nguyễn Văn Minh',
-      'avatar':
-          'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&auto=format&fit=crop&q=80',
-      'rating': 5.0,
-      'date': '2 ngày trước',
-      'comment':
-          'Studio trang bị ánh sáng cực đỉnh! Đèn Profoto hoạt động rất ổn định, phông nền film vintage chụp portrait lên màu rất mịn. Rất đáng tiền!',
-    },
-    {
-      'name': 'Trần Thị Thu Hà',
-      'avatar':
-          'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&auto=format&fit=crop&q=80',
-      'rating': 5.0,
-      'date': '1 tuần trước',
-      'comment':
-          'Không gian sạch sẽ, yên tĩnh, chủ studio thân thiện và nhiệt tình hỗ trợ kê đặt thiết bị. Chắc chắn sẽ quay lại đặt thường xuyên!',
-    },
-    {
-      'name': 'Lê Quốc Bảo',
-      'avatar':
-          'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=100&auto=format&fit=crop&q=80',
-      'rating': 4.8,
-      'date': '2 tuần trước',
-      'comment':
-          'Thiết bị rất mới, có sẵn nước uống và wifi nhanh. Trải nghiệm tuyệt vời cho nhiếp ảnh gia tự do.',
-    },
-  ];
+  String get _resolvedSpaceType {
+    if (_item.category == BookingCategory.equipment) {
+      return (_item.parentSpaceType?.toUpperCase() == 'DARKROOM')
+          ? 'DARKROOM'
+          : 'STUDIO';
+    }
+    return _item.category == BookingCategory.darkroom ? 'DARKROOM' : 'STUDIO';
+  }
 
-  String get _resolvedSpaceType =>
-      _item.category == BookingCategory.darkroom ? 'DARKROOM' : 'STUDIO';
+  String get _resolvedSpaceId {
+    if (_item.category == BookingCategory.equipment) {
+      return (_item.parentSpaceId ?? '').trim();
+    }
+    return _item.id.trim();
+  }
 
   List<Map<String, dynamic>> get _reviews {
     final apiMapped = _apiReviews
@@ -79,11 +63,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
               'date': SpaceReviewResponseDTO.formatTimeAgo(r.createdAt),
               'comment': (r.comment != null && r.comment!.trim().isNotEmpty)
                   ? r.comment!.trim()
-                  : 'Không gian tuyệt vời, trải nghiệm rất hài lòng!',
+                  : '',
               'isApi': true,
             })
         .toList();
-    return [...apiMapped, ..._sampleReviews];
+    return apiMapped;
   }
 
   @override
@@ -104,13 +88,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   /// Gọi GET /api/photographer/studios/{studioId}/reviews
   /// hoặc GET /api/photographer/darkrooms/{darkroomId}/reviews
   Future<void> _loadSpaceReviewsAndBookings() async {
-    final spaceId = _item.id.trim();
+    final spaceId = _resolvedSpaceId;
     if (spaceId.length < 32) return;
 
     setState(() => _isLoadingReviews = true);
     try {
       final Future<SpaceReviewPageResponseDTO?> reviewFuture =
-          _item.category == BookingCategory.darkroom
+          _resolvedSpaceType == 'DARKROOM'
               ? _reviewApiService.getDarkroomReviews(
                   darkroomId: spaceId,
                   page: 1,
@@ -148,6 +132,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
       setState(() {
         _reviewPage = page;
+        _reviewsError = page == null;
         _apiReviews = page?.items ?? [];
         _mySpaceBookings = matchingBookings;
         _spaceEquipment = equipPage?.items ?? [];
@@ -177,13 +162,20 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
             operatingHours: _item.operatingHours,
             usagePolicies: _item.usagePolicies,
             availableSlots: _item.availableSlots,
+            parentSpaceId: _item.parentSpaceId,
+            parentSpaceType: _item.parentSpaceType,
+            parentSpaceName: _item.parentSpaceName,
           );
         }
         _isLoadingReviews = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Không thể tải đánh giá: $e');
       if (!mounted) return;
-      setState(() => _isLoadingReviews = false);
+      setState(() {
+        _isLoadingReviews = false;
+        _reviewsError = true;
+      });
     }
   }
 
@@ -201,7 +193,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
     final BookingResponseDTO? confirmedBooking =
         _mySpaceBookings.isNotEmpty ? _mySpaceBookings.first : null;
 
-    if (confirmedBooking == null && _item.id.trim().length >= 32) {
+    if (confirmedBooking == null && _resolvedSpaceId.length >= 32) {
       toastification.show(
         context: context,
         type: ToastificationType.warning,
@@ -329,14 +321,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                         : () async {
                             final comment = commentController.text.trim();
                             if (confirmedBooking != null &&
-                                _item.id.trim().length >= 32) {
+                                _resolvedSpaceId.length >= 32) {
                               setModalState(() => isSubmitting = true);
                               final res = await _reviewApiService
                                   .createBookingReview(
                                 bookingId: confirmedBooking.bookingId,
                                 request: SpaceReviewWriteRequestDTO(
                                   spaceType: _resolvedSpaceType,
-                                  spaceId: _item.id.trim(),
+                                  spaceId: _resolvedSpaceId,
                                   rating: selectedRating,
                                   comment: comment,
                                 ),
@@ -453,7 +445,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   child: IconButton(
                     icon: ValueListenableBuilder<List<BookingItem>>(
                       valueListenable: FavoriteService().favorites,
-                      builder: (context, _, __) {
+                      builder: (context, _, _) {
                         final isFav = FavoriteService().isFavorite(_item.id);
                         return Icon(
                           isFav ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -682,7 +674,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                               const Icon(Icons.star_rounded, color: Colors.amber, size: 18),
                               const SizedBox(width: 4),
                               Text(
-                                '${_item.rating}',
+                                _item.ratingLabel,
                                 style: TextStyle(fontWeight: FontWeight.bold, color: context.textColor),
                               ),
                             ],
@@ -1013,6 +1005,13 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                     const SizedBox(height: 14),
 
                     // Review List Cards
+                    if (!_isLoadingReviews && _reviews.isEmpty)
+                      Text(
+                        _reviewsError
+                            ? 'Không thể tải đánh giá.'
+                            : 'Chưa có đánh giá.',
+                        style: TextStyle(color: context.textSecColor),
+                      ),
                     ..._reviews.map((rev) => Container(
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(20),
