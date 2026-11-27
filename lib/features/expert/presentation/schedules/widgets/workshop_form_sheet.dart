@@ -151,7 +151,7 @@ class _WorkshopFormSheetState extends State<WorkshopFormSheet> {
             ),
             const SizedBox(height: 10),
             DropdownButtonFormField<String>(
-              value: _category,
+              initialValue: _category,
               decoration: _dec('Loại lịch'),
               items: const [
                 DropdownMenuItem(value: 'Workshop', child: Text('Workshop')),

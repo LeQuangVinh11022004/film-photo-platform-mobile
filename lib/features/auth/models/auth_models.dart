@@ -83,7 +83,7 @@ class LoginResponse {
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     return LoginResponse(
-      success: json['success'] ?? true,
+      success: json['success'] == true,
       message: json['message'] ?? 'Đăng nhập thành công',
       token: json['token'],
       expiresAtUtc: json['expiresAtUtc'] != null

@@ -142,4 +142,25 @@ void main() {
         .refreshPackageSubscriptionStatus('new-order');
     expect(match?.subscriptionId, 'new');
   });
+
+  test('package and subscription failures are not empty successful lists',
+      () async {
+    statusCode = 500;
+    await expectLater(
+      BookingApiService().getServicePackages(),
+      throwsStateError,
+    );
+    await expectLater(
+      BookingApiService().getPackageSubscriptions(),
+      throwsStateError,
+    );
+    statusCode = 200;
+    responseBody = {'unexpected': 'shape'};
+    await expectLater(
+      BookingApiService().getServicePackages(),
+      throwsFormatException,
+    );
+    responseBody = [];
+    expect(await BookingApiService().getServicePackages(), isEmpty);
+  });
 }

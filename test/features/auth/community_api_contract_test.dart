@@ -25,6 +25,7 @@ void main() {
   var failUpdates = false;
   var failLogin = false;
   var emptyPostResponse = false;
+  var loginRole = 'EXPERT';
   const postId = '12345678-1234-1234-1234-123456789abc';
 
   setUpAll(() async {
@@ -68,7 +69,7 @@ void main() {
             'fullName': 'User',
             'username': 'film_user',
             'email': 'film@example.test',
-            'role': 'EXPERT',
+            'role': loginRole,
             'status': 'Active',
           },
         }));
@@ -121,6 +122,7 @@ void main() {
     failUpdates = false;
     failLogin = false;
     emptyPostResponse = false;
+    loginRole = 'EXPERT';
   });
 
   test('login failure does not create an offline session', () async {
@@ -137,8 +139,23 @@ void main() {
       'auth_token': 'mock_jwt_token_123',
       'current_user': '{}',
     });
+
     expect(await AuthService().tryAutoLogin(), isFalse);
     expect(ApiClient().authToken, isNull);
+    expect(AuthService().currentUser, isNull);
+  });
+
+  test('unsupported roles cannot start or restore a mobile session', () async {
+    await AuthService().logout();
+    loginRole = 'ADMIN';
+    final response = await AuthService().login('film_user', 'password');
+    expect(response.success, isFalse);
+    expect(ApiClient().authToken, isNull);
+    SharedPreferences.setMockInitialValues({
+      'auth_token': 'token',
+      'current_user': jsonEncode({'role': 'PROVIDER'}),
+    });
+    expect(await AuthService().tryAutoLogin(), isFalse);
     expect(AuthService().currentUser, isNull);
   });
 

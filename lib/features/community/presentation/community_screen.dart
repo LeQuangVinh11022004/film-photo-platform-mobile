@@ -688,7 +688,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 size: 16,
                                 color: Colors.white,
                               ),
-                              onPressed: () {
+                              onPressed: isSubmitting ? null : () {
                                 setModalState(() {
                                   selectedImageFile = null;
                                   selectedImageUrl = null;
@@ -756,8 +756,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                     await _communityPostApiService.uploadPostImage(
                                   selectedImageFile!,
                                 );
+                                if (!modalCtx.mounted) return;
                                 if (uploadResult['success'] != true) {
-                                  if (!modalCtx.mounted) return;
                                   setModalState(() => isSubmitting = false);
                                   ScaffoldMessenger.of(modalCtx).showSnackBar(
                                     SnackBar(

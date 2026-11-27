@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
-import '../services/auth_service.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -14,9 +13,6 @@ class ForgotPasswordScreen extends StatefulWidget {
 class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
-  final _authService = AuthService();
-
-  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -24,38 +20,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     super.dispose();
   }
 
-  Future<void> _handleSendResetLink() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    final email = _emailController.text.trim();
-    final success = await _authService.sendForgotPasswordEmail(email);
-
-    setState(() => _isLoading = false);
-
-    if (!mounted) return;
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Mã xác minh đã được gửi đến $email!'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pushNamed(
-        context,
-        '/reset-password',
-        arguments: email,
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Gửi mã thất bại. Vui lòng kiểm tra lại Email.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+  void _handleSendResetLink() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Khôi phục mật khẩu chưa được hỗ trợ. Vui lòng liên hệ quản trị viên.'),
+      ),
+    );
   }
 
   void _navigateBack() {
@@ -132,7 +102,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   ),
                   const SizedBox(height: 12),
                   const Text(
-                    'Nhập địa chỉ Email tài khoản của bạn để nhận mã xác minh khôi phục mật khẩu.',
+                    'Khôi phục mật khẩu hiện chưa được hỗ trợ. Vui lòng liên hệ quản trị viên.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
@@ -165,7 +135,6 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   // Primary Send Code Button
                   PrimaryButton(
                     text: 'Gửi mã xác minh',
-                    isLoading: _isLoading,
                     onPressed: _handleSendResetLink,
                   ),
                   const SizedBox(height: 24),

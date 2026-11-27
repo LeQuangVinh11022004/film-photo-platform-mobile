@@ -716,15 +716,28 @@ class _PaymentScreenState extends State<PaymentScreen>
                 ],
               ),
             ),
-            Radio<int>(
-              value: index,
-              groupValue: _selectedPaymentMethod,
-              activeColor: AppColors.primary,
-              onChanged: (val) {
-                if (val != null) {
-                  setState(() => _selectedPaymentMethod = val);
-                }
-              },
+            Container(
+              width: 22,
+              height: 22,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: isSelected ? AppColors.primary : AppColors.border,
+                  width: 2,
+                ),
+              ),
+              child: isSelected
+                  ? Center(
+                      child: Container(
+                        width: 11,
+                        height: 11,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    )
+                  : null,
             ),
           ],
         ),

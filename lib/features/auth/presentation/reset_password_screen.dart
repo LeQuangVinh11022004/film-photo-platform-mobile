@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/custom_text_field.dart';
 import '../../../core/widgets/primary_button.dart';
-import '../services/auth_service.dart';
 
 class ResetPasswordScreen extends StatefulWidget {
   const ResetPasswordScreen({super.key});
@@ -17,9 +16,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   final _codeController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _authService = AuthService();
-
-  bool _isLoading = false;
   bool _isEmailInitialized = false;
 
   @override
@@ -43,37 +39,12 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
     super.dispose();
   }
 
-  Future<void> _handleResetPassword() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    setState(() => _isLoading = true);
-
-    final success = await _authService.resetPassword(
-      email: _emailController.text.trim(),
-      code: _codeController.text.trim(),
-      newPassword: _newPasswordController.text,
+  void _handleResetPassword() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Đặt lại mật khẩu chưa được hỗ trợ. Vui lòng liên hệ quản trị viên.'),
+      ),
     );
-
-    setState(() => _isLoading = false);
-
-    if (!mounted) return;
-
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đặt lại mật khẩu thành công! Vui lòng đăng nhập lại.'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pushNamedAndRemoveUntil(context, '/login', (route) => false);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đặt lại mật khẩu thất bại. Vui lòng kiểm tra lại thông tin.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
   }
 
   void _navigateToLogin() {
@@ -146,7 +117,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    'Nhập mã xác minh đã được gửi đến email và thiết lập mật khẩu mới của bạn.',
+                    'Đặt lại mật khẩu hiện chưa được hỗ trợ. Vui lòng liên hệ quản trị viên.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
@@ -226,7 +197,6 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   // Reset Password Button
                   PrimaryButton(
                     text: 'Cập nhật mật khẩu',
-                    isLoading: _isLoading,
                     onPressed: _handleResetPassword,
                   ),
                   const SizedBox(height: 32),

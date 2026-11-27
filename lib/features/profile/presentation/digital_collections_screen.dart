@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/device_image_picker.dart';
@@ -25,11 +25,12 @@ class _DigitalCollectionsScreenState extends State<DigitalCollectionsScreen> {
             icon: Icon(Icons.add_photo_alternate_rounded, color: AppColors.primary, size: 28),
             tooltip: 'Tải ảnh mới',
             onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
               final url = await DeviceImagePicker.pickImageFromDevice(
                 context,
                 title: 'Tải Ảnh Số Hóa Lên Album',
               );
-              
+
               if (url != null && mounted) {
                 setState(() {
                   _collections[0].photos.insert(
@@ -45,7 +46,7 @@ class _DigitalCollectionsScreenState extends State<DigitalCollectionsScreen> {
                     ),
                   );
                 });
-                ScaffoldMessenger.of(context).showSnackBar(
+                messenger.showSnackBar(
                   const SnackBar(content: Text('Đã thêm 1 ảnh mới vào Album đầu tiên!'), backgroundColor: Colors.green),
                 );
               }

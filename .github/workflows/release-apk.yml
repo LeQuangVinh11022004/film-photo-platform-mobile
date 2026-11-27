@@ -30,13 +30,30 @@ jobs:
         with:
           distribution: 'temurin'
           java-version: '17' # Tương thích tốt nhất với Gradle mới
+          cache: 'gradle'
 
       # 3. Cài đặt môi trường Flutter
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          cache: true # Bật cache để build nhanh hơn ở các lần sau
+          cache: true # Bật cache SDK Flutter để build nhanh hơn ở các lần sau
+
+      # 3b. Cache Pub packages & Gradle build cache để tăng tốc độ release
+      - name: Cache Pub Dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.pub-cache
+            .dart_tool
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
 
       # 4. Tải các gói phụ thuộc
       - name: Install Dependencies
@@ -54,9 +71,9 @@ jobs:
             echo "KEYSTORE_BASE64 is empty! Build will fall back to debug key."
           fi
 
-      # 5. Build file APK với Release Keystore (Nếu có)
+      # 5. Build file APK với Release Keystore (chỉ build arm64-v8a phổ biến giúp giảm ~50% thời gian biên dịch AOT)
       - name: Build APK
-        run: flutter build apk --release -t lib/app/main.dart
+        run: flutter build apk --release --target-platform android-arm64 -t lib/app/main.dart
         env:
           KEYSTORE_PATH: ${{ secrets.KEYSTORE_BASE64 != '' && 'upload-keystore.jks' || '' }}
           KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}

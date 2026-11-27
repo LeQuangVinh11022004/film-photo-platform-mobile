@@ -119,7 +119,7 @@ class _CreateQuestionSheetState
               ),
               const SizedBox(height: 10),
               DropdownButtonFormField<String>(
-                value: _category,
+                initialValue: _category,
                 decoration: _decoration('Chủ đề'),
                 items: const [
                   DropdownMenuItem(

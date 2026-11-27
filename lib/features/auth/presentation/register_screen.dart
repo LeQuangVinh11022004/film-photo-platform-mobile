@@ -75,31 +75,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  Future<void> _handleGoogleSignIn() async {
-    setState(() => _isLoading = true);
-
-    final userData = await _authService.signInWithGoogle();
-
-    setState(() => _isLoading = false);
-
-    if (!mounted) return;
-
-    if (userData != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đăng ký Google thành công! Xin chào ${userData['name']}'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      Navigator.pushReplacementNamed(context, '/home');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đăng ký bằng Google thất bại.'),
-          backgroundColor: Colors.red,
-        ),
-      );
-    }
+  void _handleGoogleSignIn() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Đăng ký bằng Google chưa được hỗ trợ.')),
+    );
   }
 
   void _navigateBack() {

@@ -16,7 +16,6 @@ class ExpertNavigationScreen extends StatefulWidget {
 
 class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
   int _currentIndex = 0;
-  int _scheduleReloadCount = 0;
 
   // Màu nhận diện riêng của Expert.
   static const Color _expertAccent = Color(0xFF7C5CFC);
@@ -39,13 +38,11 @@ class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
 
         body: IndexedStack(
           index: _currentIndex,
-          children: [
-            const ExpertHomeScreen(),
-            ExpertScheduleScreen(
-              key: ValueKey('expert_schedule_$_scheduleReloadCount'),
-            ),
-            const CommunityScreen(),
-            const ExpertQaScreen(),
+          children: const [
+            ExpertHomeScreen(),
+            ExpertScheduleScreen(),
+            CommunityScreen(),
+            ExpertQaScreen(),
             ProfileScreen(),
           ],
         ),
@@ -116,12 +113,11 @@ class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
 
     return GestureDetector(
       onTap: () {
-        setState(() {
-          if (index == 1) {
-            _scheduleReloadCount++;
-          }
-          _currentIndex = index;
-        });
+        if (_currentIndex != index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        }
       },
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(

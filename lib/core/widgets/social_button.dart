@@ -88,7 +88,11 @@ class SocialLoginRow extends StatelessWidget {
         // Facebook Button
         SocialButton(
           tooltip: 'Facebook',
-          onTap: onFacebookTap ?? onGoogleTap,
+          onTap: onFacebookTap ?? () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Đăng nhập Facebook chưa được hỗ trợ.')),
+            );
+          },
           icon: const Icon(
             Icons.facebook,
             color: Color(0xFF1877F2),
@@ -100,7 +104,11 @@ class SocialLoginRow extends StatelessWidget {
         // Apple Button
         SocialButton(
           tooltip: 'Apple',
-          onTap: onAppleTap ?? onGoogleTap,
+          onTap: onAppleTap ?? () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Đăng nhập Apple chưa được hỗ trợ.')),
+            );
+          },
           icon: const Icon(
             Icons.apple,
             color: Colors.black,

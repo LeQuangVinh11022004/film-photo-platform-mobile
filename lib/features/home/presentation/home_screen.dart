@@ -26,6 +26,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // API Data state
   final BookingApiService _bookingApiService = BookingApiService();
   List<BookingItem> _apiItems = [];
+  bool _isLoadingItems = true;
+  bool _hasLoadError = false;
 
   @override
   void initState() {
@@ -33,7 +35,19 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchApiResources();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _fetchApiResources() async {
+    if (mounted) {
+      setState(() {
+        _isLoadingItems = true;
+        _hasLoadError = false;
+      });
+    }
     try {
       final results = await Future.wait<List<ResourceItemResponseDTO>>([
         _bookingApiService.getStudios(),
@@ -48,9 +62,17 @@ class _HomeScreenState extends State<HomeScreen> {
       if (mounted) {
         setState(() {
           _apiItems = combined;
+          _isLoadingItems = false;
         });
       }
-    } catch (_) {}
+    } catch (_) {
+      if (mounted) {
+        setState(() {
+          _isLoadingItems = false;
+          _hasLoadError = true;
+        });
+      }
+    }
   }
 
   // Quick Banners Slider Data
@@ -663,7 +685,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           _selectedCategoryIndex = 0;
                           _searchController.clear();
                           _searchQuery = '';
-                          _maxPriceFilter = 2500000;
+                          _maxPriceFilter = _maxPriceLimit;
                           _minRatingFilter = 0.0;
                           _sortBy = 'default';
                         });
@@ -677,21 +699,38 @@ class _HomeScreenState extends State<HomeScreen> {
 
             // Section 1 Horizontal Cards List
             SliverToBoxAdapter(
-              child: _filteredItems.isEmpty
-                  ? Container(height: 100, alignment: Alignment.center, child: Text('Không tìm thấy kết quả phù hợp'))
-                  : SizedBox(
-                      height: 260,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                        itemCount: _filteredItems.length,
-                        itemBuilder: (context, index) {
-                          final item = _filteredItems[index];
-                          return _buildNearCard(context, item);
-                        },
+              child: _isLoadingItems
+                  ? const SizedBox(
+                      height: 180,
+                      child: Center(
+                        child: CircularProgressIndicator(color: AppColors.primary),
                       ),
-                    ),
+                    )
+                  : _hasLoadError
+                      ? Container(
+                          height: 120,
+                          alignment: Alignment.center,
+                          child: TextButton.icon(
+                            onPressed: _fetchApiResources,
+                            icon: const Icon(Icons.refresh_rounded),
+                            label: const Text('Không thể tải dữ liệu. Nhấn để thử lại'),
+                          ),
+                        )
+                      : _filteredItems.isEmpty
+                          ? Container(height: 100, alignment: Alignment.center, child: Text('Không tìm thấy kết quả phù hợp'))
+                          : SizedBox(
+                              height: 260,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                padding: EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                                itemCount: _filteredItems.length,
+                                itemBuilder: (context, index) {
+                                  final item = _filteredItems[index];
+                                  return _buildNearCard(context, item);
+                                },
+                              ),
+                            ),
             ),
 
             // Section 2: Popular Header
@@ -768,7 +807,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   right: 10,
                   child: ValueListenableBuilder<List<BookingItem>>(
                     valueListenable: FavoriteService().favorites,
-                    builder: (context, _, __) {
+                    builder: (context, _, _) {
                       final isFav = FavoriteService().isFavorite(item.id);
                       return GestureDetector(
                         onTap: () {
@@ -822,7 +861,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Icon(Icons.star_rounded, color: Colors.amber, size: 16),
                           SizedBox(width: 2),
-                          Text(item.rating.toString(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textColor)),
+                          Text(item.ratingLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textColor)),
                         ],
                       ),
                     ],
@@ -875,7 +914,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         children: [
                           Icon(Icons.star_rounded, color: Colors.amber, size: 16),
                           SizedBox(width: 2),
-                          Text(item.rating.toString(), style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textColor)),
+                          Text(item.ratingLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textColor)),
                         ],
                       ),
                     ],

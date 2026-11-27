@@ -29,6 +29,11 @@ class AuthService {
       if (token != null && token.isNotEmpty && userJsonStr != null && userJsonStr.isNotEmpty) {
         final Map<String, dynamic> userMap = jsonDecode(userJsonStr);
         currentUser = UserDTO.fromJson(userMap);
+        final role = currentUser!.role.trim().toUpperCase();
+        if (role != 'PHOTOGRAPHER' && role != 'EXPERT') {
+          await logout();
+          return false;
+        }
         _apiClient.setToken(token);
         return true;
       }
@@ -62,12 +67,12 @@ class AuthService {
             );
           }
           final role = (loginResponse.user?.role ?? '').trim().toUpperCase();
-          if (role == 'PROVIDER') {
+          if (role != 'PHOTOGRAPHER' && role != 'EXPERT') {
             await logout();
             return LoginResponse(
               success: false,
               message:
-                  'Ứng dụng di động chỉ dành cho Nhiếp ảnh gia (Photographer) và Chuyên gia (Expert). Tài khoản Provider không được hỗ trợ đăng nhập.',
+                  'Ứng dụng di động chỉ hỗ trợ tài khoản Photographer và Expert.',
             );
           }
           // Lưu token vào ApiClient & SharedPreferences
@@ -159,30 +164,5 @@ class AuthService {
     } catch (_) {}
   }
 
-  /// Giả lập gửi yêu cầu quên mật khẩu
-  Future<bool> sendForgotPasswordEmail(String email) async {
-    await Future.delayed(const Duration(seconds: 1));
-    return email.contains('@');
-  }
-
-  /// Giả lập đặt lại mật khẩu
-  Future<bool> resetPassword({
-    required String email,
-    required String code,
-    required String newPassword,
-  }) async {
-    await Future.delayed(const Duration(seconds: 1));
-    return code.isNotEmpty && newPassword.length >= 6;
-  }
-
-  /// Giả lập Đăng nhập bằng Google
-  Future<Map<String, String>?> signInWithGoogle() async {
-    await Future.delayed(const Duration(seconds: 1));
-    return {
-      'name': 'Google User',
-      'email': 'user.google@gmail.com',
-      'photoUrl': 'https://via.placeholder.com/150',
-    };
-  }
 }
 

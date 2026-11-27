@@ -38,10 +38,6 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
       initialIndex = 1;
     }
     _tabController = TabController(length: 2, vsync: this, initialIndex: initialIndex);
-    _tabController.addListener(() {
-      setState(() {});
-    });
-
     _loadData();
   }
 
@@ -518,7 +514,7 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
                         const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
                         const SizedBox(width: 3),
                         Text(
-                          item.rating.toString(),
+                          item.ratingLabel,
                           style: GoogleFonts.inter(
                             fontWeight: FontWeight.bold,
                             fontSize: 12,

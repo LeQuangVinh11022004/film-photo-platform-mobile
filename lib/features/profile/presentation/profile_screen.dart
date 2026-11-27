@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 
 import 'dart:io';
 
@@ -9,7 +9,6 @@ import '../../../core/widgets/device_image_picker.dart';
 import '../../auth/services/auth_service.dart';
 import '../../booking/models/booking_api_models.dart';
 import '../../booking/models/booking_item.dart';
-import '../../booking/models/booking_schedule.dart';
 import '../../booking/models/review_api_models.dart';
 import '../../booking/services/booking_api_service.dart';
 import '../../booking/services/review_api_service.dart';
@@ -32,7 +31,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   String _email = 'hoanganh.film@gmail.com';
   String _roleLabel = 'Nhiếp ảnh gia (Photographer)';
   bool _isExpertRole = false;
-  int _totalBookingsCount = BookingSchedule.sampleSchedules.length;
+  int _totalBookingsCount = 0;
   int _totalSubscriptionsCount = 0;
   List<BookingResponseDTO> _loadedBookings = [];
   String _bio =
@@ -98,24 +97,22 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final darkrooms = results[4] as List<ResourceItemResponseDTO>;
 
       final List<SpaceReviewResponseDTO> collectedReviews = [];
-      if (studios.isNotEmpty) {
-        final studioRev = await ReviewApiService().getStudioReviews(
-          studioId: studios.first.resourceId,
-          page: 1,
-          pageSize: 10,
-        );
-        if (studioRev != null) {
-          collectedReviews.addAll(studioRev.items);
-        }
-      }
-      if (darkrooms.isNotEmpty) {
-        final darkroomRev = await ReviewApiService().getDarkroomReviews(
-          darkroomId: darkrooms.first.resourceId,
-          page: 1,
-          pageSize: 10,
-        );
-        if (darkroomRev != null) {
-          collectedReviews.addAll(darkroomRev.items);
+      final reviewFutures = <Future<SpaceReviewPageResponseDTO?>>[
+        ...studios.take(5).map((s) => ReviewApiService().getStudioReviews(
+              studioId: s.resourceId,
+              page: 1,
+              pageSize: 20,
+            )),
+        ...darkrooms.take(5).map((d) => ReviewApiService().getDarkroomReviews(
+              darkroomId: d.resourceId,
+              page: 1,
+              pageSize: 20,
+            )),
+      ];
+      final reviewPages = await Future.wait(reviewFutures);
+      for (final revPage in reviewPages) {
+        if (revPage != null) {
+          collectedReviews.addAll(revPage.items);
         }
       }
 
@@ -131,9 +128,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
         if (myPostsPage != null) {
           _loadedMyCommunityPosts = myPostsPage.items;
         }
-        _loadedSpaceReviews = collectedReviews;
+        final userId = AuthService().currentUser?.userId.toLowerCase();
+        _loadedSpaceReviews = userId == null || userId.isEmpty
+            ? []
+            : collectedReviews
+                .where((review) => review.customerUserId.toLowerCase() == userId)
+                .toList();
       });
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('Không thể tải thông tin hồ sơ: $e');
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Không thể tải đầy đủ thông tin hồ sơ.')),
+      );
+    }
   }
 
   void _showChangeAvatarModal() async {
@@ -318,7 +326,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
     final role = (AuthService().currentUser?.role ?? '').toUpperCase();
     if (!role.contains('EXPERT') && !role.contains('PROVIDER')) {
       final page = await BookingApiService().getMyBookings(page: 1, pageSize: 50);
-      if (page != null && page.items.isNotEmpty) {
+      if (!mounted) return;
+      if (page == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể tải lịch sử đặt chỗ.')),
+        );
+        return;
+      }
+      if (page.items.isNotEmpty || apiBookings.isNotEmpty) {
         apiBookings = page.items;
         if (mounted) {
           setState(() {
@@ -439,91 +454,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         );
                       },
                     )
-                  : ListView.builder(
-                physics: const BouncingScrollPhysics(),
-                itemCount: BookingSchedule.sampleSchedules.length,
-                itemBuilder: (context, index) {
-                  final s = BookingSchedule.sampleSchedules[index];
-                  return Container(
-                    margin: EdgeInsets.only(bottom: 12),
-                    padding: EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.cardColor,
-                      border: Border.all(color: context.borderColor),
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withValues(alpha: 0.02),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                s.item.name,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                  color: context.textColor,
-                                ),
-                              ),
-                              SizedBox(height: 6),
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.calendar_month_rounded,
-                                    size: 14,
-                                    color: context.textSecColor,
-                                  ),
-                                  SizedBox(width: 4),
-                                  Text(
-                                    '${s.bookingDate.day}/${s.bookingDate.month}/${s.bookingDate.year} • ${s.timeSlot}',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: context.textSecColor,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '${s.totalPrice.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                            SizedBox(height: 4),
-                            Text(
-                              s.statusText,
-                              style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.bold,
-                                color: s.status == BookingStatus.confirmed
-                                    ? Colors.green
-                                    : AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                  : const Center(child: Text('Chưa có lịch sử đặt chỗ.')),
             ),
           ],
         ),
@@ -649,7 +580,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ),
             SizedBox(height: 20),
             Text(
-              'Đánh Giá Không Gian (${_loadedSpaceReviews.isNotEmpty ? _loadedSpaceReviews.length : 15})',
+              'Đánh Giá Không Gian (${_loadedSpaceReviews.length})',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
@@ -672,7 +603,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       shape: BoxShape.circle,
                     ),
                     child: Text(
-                      '4.9',
+                      _loadedSpaceReviews.isEmpty
+                          ? '—'
+                          : (_loadedSpaceReviews
+                                      .map((review) => review.rating)
+                                      .reduce((a, b) => a + b) /
+                                  _loadedSpaceReviews.length)
+                              .toStringAsFixed(1),
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
@@ -697,9 +634,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                         SizedBox(height: 6),
                         Text(
-                          _loadedSpaceReviews.isNotEmpty
-                              ? 'Đã đồng bộ ${_loadedSpaceReviews.length} đánh giá trực tiếp từ hệ thống Studio & Phòng tối.'
-                              : 'Dựa trên 15 lượt đánh giá từ khách hàng & đối tác.',
+                          'Chỉ hiển thị đánh giá của bạn trong các không gian đã tải, không phải toàn bộ lịch sử.',
                           style: TextStyle(
                             fontSize: 13,
                             color: context.textSecColor,
@@ -995,7 +930,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                       color: Colors.amber, size: 13),
                                                   const SizedBox(width: 3),
                                                   Text(
-                                                    item.rating.toString(),
+                                                    item.ratingLabel,
                                                     style: TextStyle(
                                                       fontSize: 12,
                                                       fontWeight: FontWeight.w600,
@@ -1329,41 +1264,55 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
+                          if (!_isExpertRole) ...[
+                            _StatItem(
+                              value: '$_totalBookingsCount',
+                              label: 'Lịch đặt',
+                              onTap: _showBookingHistoryModal,
+                            ),
+                            Container(
+                              width: 1,
+                              height: 32,
+                              color: context.borderColor,
+                            ),
+                            _StatItem(
+                              value: '$_totalSubscriptionsCount',
+                              label: 'Gói đã mua',
+                              onTap: () => Navigator.pushNamed(
+                                context,
+                                '/service-packages',
+                              ).then((_) => _loadProfileApiStats()),
+                            ),
+                            Container(
+                              width: 1,
+                              height: 32,
+                              color: context.borderColor,
+                            ),
+                          ],
                           _StatItem(
-                            value: '$_totalBookingsCount',
-                            label: 'Lịch đặt',
-                            onTap: _showBookingHistoryModal,
+                            value: '${_loadedMyCommunityPosts.length}',
+                            label: 'Bài đăng',
+                            onTap: _showMyPostsModal,
                           ),
-                          Container(
-                            width: 1,
-                            height: 32,
-                            color: context.borderColor,
-                          ),
-                          _StatItem(
-                            value: _totalSubscriptionsCount > 0
-                                ? '$_totalSubscriptionsCount'
-                                : '12',
-                            label: _totalSubscriptionsCount > 0
-                                ? 'Gói đã mua'
-                                : 'Bài viết',
-                            onTap: _totalSubscriptionsCount > 0
-                                ? () => Navigator.pushNamed(
-                                      context,
-                                      '/service-packages',
-                                    )
-                                : _showMyPostsModal,
-                          ),
-                          Container(
-                            width: 1,
-                            height: 32,
-                            color: context.borderColor,
-                          ),
-                          _StatItem(
-                            value: '4.9',
-                            label: 'Đánh giá',
-                            isStar: true,
-                            onTap: _showMyReviewsModal,
-                          ),
+                          if (!_isExpertRole) ...[
+                            Container(
+                              width: 1,
+                              height: 32,
+                              color: context.borderColor,
+                            ),
+                            _StatItem(
+                              value: _loadedSpaceReviews.isEmpty
+                                  ? '0'
+                                  : (_loadedSpaceReviews
+                                              .map((r) => r.rating)
+                                              .reduce((a, b) => a + b) /
+                                          _loadedSpaceReviews.length)
+                                      .toStringAsFixed(1),
+                              label: 'Đánh giá',
+                              isStar: true,
+                              onTap: _showMyReviewsModal,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -1513,42 +1462,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       title: 'Thông tin cá nhân',
                       onTap: _showEditProfileModal,
                     ),
-                    Divider(
-                      height: 1,
-                      indent: 60,
-                      endIndent: 20,
-                      color: context.inputColor,
-                    ),
-                    _ProfileTile(
-                      icon: Icons.history_rounded,
-                      title: 'Lịch sử đặt phòng & thiết bị',
-                      onTap: _showBookingHistoryModal,
-                    ),
-                    Divider(
-                      height: 1,
-                      indent: 60,
-                      endIndent: 20,
-                      color: context.inputColor,
-                    ),
-                    _ProfileTile(
-                      icon: Icons.card_membership_rounded,
-                      title: 'Gói dịch vụ & Subscription của tôi',
-                      onTap: () => Navigator.pushNamed(
-                        context,
-                        '/service-packages',
-                      ).then((_) => _loadProfileApiStats()),
-                    ),
-                    Divider(
-                      height: 1,
-                      indent: 60,
-                      endIndent: 20,
-                      color: context.inputColor,
-                    ),
-                    _ProfileTile(
-                      icon: Icons.favorite_border_rounded,
-                      title: 'Danh sách Studio đã lưu',
-                      onTap: _showSavedListModal,
-                    ),
+                    if (!_isExpertRole) ...[
+                      Divider(
+                        height: 1,
+                        indent: 60,
+                        endIndent: 20,
+                        color: context.inputColor,
+                      ),
+                      _ProfileTile(
+                        icon: Icons.history_rounded,
+                        title: 'Lịch sử đặt phòng & thiết bị',
+                        onTap: _showBookingHistoryModal,
+                      ),
+                      Divider(
+                        height: 1,
+                        indent: 60,
+                        endIndent: 20,
+                        color: context.inputColor,
+                      ),
+                      _ProfileTile(
+                        icon: Icons.card_membership_rounded,
+                        title: 'Gói dịch vụ & Subscription của tôi',
+                        onTap: () => Navigator.pushNamed(
+                          context,
+                          '/service-packages',
+                        ).then((_) => _loadProfileApiStats()),
+                      ),
+                      Divider(
+                        height: 1,
+                        indent: 60,
+                        endIndent: 20,
+                        color: context.inputColor,
+                      ),
+                      _ProfileTile(
+                        icon: Icons.favorite_border_rounded,
+                        title: 'Danh sách Studio đã lưu',
+                        onTap: _showSavedListModal,
+                      ),
+                    ],
                     Divider(
                       height: 1,
                       indent: 60,

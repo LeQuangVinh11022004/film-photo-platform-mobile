@@ -30,6 +30,11 @@ class BookingItem {
   final String usagePolicies;
   final List<Map<String, dynamic>> availableSlots;
 
+  // Khi item là Thiết bị (BookingCategory.equipment), lưu thông tin Space cha để đặt lịch cùng Space
+  final String? parentSpaceId;
+  final String? parentSpaceType;
+  final String? parentSpaceName;
+
   BookingItem({
     required this.id,
     required this.name,
@@ -55,7 +60,12 @@ class BookingItem {
     this.operatingHours = '',
     this.usagePolicies = '',
     this.availableSlots = const [],
+    this.parentSpaceId,
+    this.parentSpaceType,
+    this.parentSpaceName,
   });
+
+  String get ratingLabel => rating > 0 ? rating.toStringAsFixed(1) : 'Chưa rõ';
 
   String get categoryName {
     switch (category) {
@@ -137,7 +147,7 @@ class BookingItem {
       category: isDarkroom ? BookingCategory.darkroom : BookingCategory.studio,
       location: address.isNotEmpty ? address : 'Hồ Chí Minh, Việt Nam',
       pricePerHour: calculatedHourlyRate > 0 ? calculatedHourlyRate : (isDarkroom ? 180000 : 250000),
-      rating: 4.9,
+      rating: 0,
       imageUrl: mainImage,
       description: description.isNotEmpty
           ? description
@@ -180,7 +190,7 @@ class BookingItem {
       category: BookingCategory.equipment,
       location: spaceName.isNotEmpty ? 'Thuộc: $spaceName' : 'Thiết bị cho thuê',
       pricePerHour: price,
-      rating: 4.9,
+      rating: 0,
       imageUrl:
           'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=800&auto=format&fit=crop&q=80',
       description: description.isNotEmpty
@@ -194,6 +204,9 @@ class BookingItem {
       previewImages: const [
         'https://images.unsplash.com/photo-1526170375885-4d8ecf77b99f?w=400&auto=format&fit=crop&q=80',
       ],
+      parentSpaceId: dto.spaceId.isNotEmpty ? dto.spaceId : null,
+      parentSpaceType: dto.spaceType.isNotEmpty ? dto.spaceType : null,
+      parentSpaceName: spaceName.isNotEmpty ? spaceName : null,
     );
   }
 
