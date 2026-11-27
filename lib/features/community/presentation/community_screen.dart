@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
@@ -506,12 +509,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ? (existing.images.first.caption ?? '')
           : '',
     );
-    final imageUrlController = TextEditingController(
-      text: existing != null && existing.images.isNotEmpty
-          ? existing.images.first.imageUrl
-          : '',
-    );
-
     final categories = [
       'Kỹ thuật chụp Film',
       'Tráng rọi Phòng tối',
@@ -529,6 +526,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         (existing != null && existing.images.isNotEmpty)
             ? existing.images.first.imageUrl
             : null;
+    XFile? selectedImageFile;
     bool isSubmitting = false;
 
     showModalBottomSheet(
@@ -623,34 +621,59 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  TextField(
-                    controller: imageUrlController,
-                    keyboardType: TextInputType.url,
-                    onChanged: (value) => setModalState(
-                      () => selectedImageUrl = value.trim().isEmpty
-                          ? null
-                          : value.trim(),
-                    ),
-                    decoration: InputDecoration(
-                      labelText: 'Liên kết ảnh (tùy chọn)',
-                      helperText: 'Nhập URL ảnh http hoặc https.',
-                      filled: true,
-                      fillColor: context.inputColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
+                  OutlinedButton.icon(
+                    onPressed: isSubmitting
+                        ? null
+                        : () async {
+                            try {
+                              final image = await ImagePicker().pickImage(
+                                source: ImageSource.gallery,
+                                imageQuality: 85,
+                                maxWidth: 2000,
+                                maxHeight: 2000,
+                              );
+                              if (image != null && modalCtx.mounted) {
+                                setModalState(() {
+                                  selectedImageFile = image;
+                                  selectedImageUrl = null;
+                                });
+                              }
+                            } catch (e) {
+                              if (!modalCtx.mounted) return;
+                              ScaffoldMessenger.of(modalCtx).showSnackBar(
+                                SnackBar(
+                                  content: Text('Không thể mở thư viện ảnh: $e'),
+                                  backgroundColor: Colors.redAccent,
+                                ),
+                              );
+                            }
+                          },
+                    icon: const Icon(Icons.photo_library_outlined),
+                    label: Text(
+                      selectedImageFile == null
+                          ? 'Chọn ảnh từ thư viện'
+                          : 'Chọn ảnh khác',
                     ),
                   ),
-                  if (selectedImageUrl != null) ...[
+                  if (selectedImageFile != null || selectedImageUrl != null) ...[
                     const SizedBox(height: 12),
                     Stack(
                       children: [
-                        SafeNetworkImage(
-                          url: selectedImageUrl!,
-                          width: double.infinity,
-                          height: 160,
+                        ClipRRect(
                           borderRadius: BorderRadius.circular(16),
+                          child: selectedImageFile != null
+                              ? Image.file(
+                                  File(selectedImageFile!.path),
+                                  width: double.infinity,
+                                  height: 160,
+                                  fit: BoxFit.cover,
+                                )
+                              : SafeNetworkImage(
+                                  url: selectedImageUrl!,
+                                  width: double.infinity,
+                                  height: 160,
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
                         ),
                         Positioned(
                           top: 8,
@@ -666,8 +689,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 color: Colors.white,
                               ),
                               onPressed: () {
-                                imageUrlController.clear();
-                                setModalState(() => selectedImageUrl = null);
+                                setModalState(() {
+                                  selectedImageFile = null;
+                                  selectedImageUrl = null;
+                                });
                               },
                             ),
                           ),
@@ -712,34 +737,49 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
                               final List<CommunityPostImageWriteRequestDTO>
                                   imageDtos = [];
+                              if ((selectedImageFile != null ||
+                                      selectedImageUrl != null) &&
+                                  imageCaptionController.text.trim().length >
+                                      500) {
+                                ScaffoldMessenger.of(modalCtx).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('Chú thích ảnh tối đa 500 ký tự.'),
+                                    backgroundColor: Colors.redAccent,
+                                  ),
+                                );
+                                return;
+                              }
+                              setModalState(() => isSubmitting = true);
+
+                              if (selectedImageFile != null) {
+                                final uploadResult =
+                                    await _communityPostApiService.uploadPostImage(
+                                  selectedImageFile!,
+                                );
+                                if (uploadResult['success'] != true) {
+                                  if (!modalCtx.mounted) return;
+                                  setModalState(() => isSubmitting = false);
+                                  ScaffoldMessenger.of(modalCtx).showSnackBar(
+                                    SnackBar(
+                                      content: Text(
+                                        uploadResult['message']?.toString() ??
+                                            'Không thể tải ảnh lên.',
+                                      ),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                selectedImageUrl =
+                                    uploadResult['imageUrl'] as String;
+                                selectedImageFile = null;
+                              }
+
                               if (selectedImageUrl != null &&
                                   selectedImageUrl!.trim().isNotEmpty) {
-                                final rawUrl = selectedImageUrl!.trim();
-                                final uri = Uri.tryParse(rawUrl);
-                                if (rawUrl.length > 1000 ||
-                                    uri == null ||
-                                    !uri.hasAuthority ||
-                                    (uri.scheme != 'http' && uri.scheme != 'https')) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Liên kết ảnh phải là URL http hoặc https hợp lệ, tối đa 1000 ký tự.'),
-                                      backgroundColor: Colors.redAccent,
-                                    ),
-                                  );
-                                  return;
-                                }
-                                if (imageCaptionController.text.trim().length > 500) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('Chú thích ảnh tối đa 500 ký tự.'),
-                                      backgroundColor: Colors.redAccent,
-                                    ),
-                                  );
-                                  return;
-                                }
                                 imageDtos.add(
                                   CommunityPostImageWriteRequestDTO(
-                                    imageUrl: rawUrl,
+                                    imageUrl: selectedImageUrl!.trim(),
                                     caption: imageCaptionController.text
                                             .trim()
                                             .isNotEmpty
@@ -758,8 +798,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                       ),
                                     ));
                               }
-
-                              setModalState(() => isSubmitting = true);
 
                               final requestDto = CommunityPostWriteRequestDTO(
                                 title: title,

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:film_photography_platform/core/network/api_client.dart';
 import 'package:film_photography_platform/features/auth/models/auth_models.dart';
@@ -7,12 +8,20 @@ import 'package:film_photography_platform/features/auth/services/auth_service.da
 import 'package:film_photography_platform/features/community/models/community_post_api_models.dart';
 import 'package:film_photography_platform/features/community/services/community_post_api_service.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   late HttpServer server;
   late String originalBaseUrl;
-  final requests = <({String method, String path, Map<String, dynamic> body})>[];
+  final requests = <({
+    String method,
+    String path,
+    Map<String, dynamic> body,
+    String? contentType,
+    String? authorization,
+    String rawBody,
+  })>[];
   var failUpdates = false;
   var failLogin = false;
   var emptyPostResponse = false;
@@ -24,14 +33,29 @@ void main() {
     originalBaseUrl = ApiClient().baseUrl;
     ApiClient().baseUrl = 'http://127.0.0.1:${server.port}';
     server.listen((request) async {
-      final raw = await utf8.decoder.bind(request).join();
+      final rawBytes = await request.fold<List<int>>(
+        <int>[],
+        (bytes, chunk) => bytes..addAll(chunk),
+      );
+      final raw = utf8.decode(rawBytes, allowMalformed: true);
       requests.add((
         method: request.method,
         path: request.uri.path,
-        body: raw.isEmpty ? <String, dynamic>{} : jsonDecode(raw),
+        body: request.uri.path == '/api/community/posts/images/upload' ||
+                raw.isEmpty
+            ? <String, dynamic>{}
+            : jsonDecode(raw),
+        contentType: request.headers.contentType?.toString(),
+        authorization: request.headers.value('authorization'),
+        rawBody: raw,
       ));
       request.response.headers.contentType = ContentType.json;
-      if (request.uri.path == '/api/auth/login' && failLogin) {
+      if (request.uri.path == '/api/community/posts/images/upload') {
+        request.response.statusCode = 201;
+        request.response.write(jsonEncode({
+          'imageUrl': 'https://cdn.example.test/uploaded.jpg',
+        }));
+      } else if (request.uri.path == '/api/auth/login' && failLogin) {
         request.response.statusCode = 401;
         request.response.write(jsonEncode({'message': 'Invalid credentials'}));
       } else if (request.uri.path == '/api/auth/login') {
@@ -192,4 +216,27 @@ void main() {
     expect(result['success'], isFalse);
   });
 
+  test('post image uploads as authenticated multipart file', () async {
+    ApiClient().setToken('upload-test-token');
+    final result = await CommunityPostApiService().uploadPostImage(
+      XFile.fromData(
+        Uint8List.fromList([0xFF, 0xD8, 0xFF]),
+        name: 'film-photo.jpg',
+        mimeType: 'image/jpeg',
+      ),
+    );
+
+    expect(result, {
+      'success': true,
+      'imageUrl': 'https://cdn.example.test/uploaded.jpg',
+    });
+    final request = requests.single;
+    expect(request.method, 'POST');
+    expect(request.path, '/api/community/posts/images/upload');
+    expect(request.authorization, 'Bearer upload-test-token');
+    expect(request.contentType, startsWith('multipart/form-data; boundary='));
+    expect(request.rawBody, contains('name="file"'));
+    expect(request.rawBody, contains('filename="community-image.jpg"'));
+    ApiClient().clearToken();
+  });
 }
