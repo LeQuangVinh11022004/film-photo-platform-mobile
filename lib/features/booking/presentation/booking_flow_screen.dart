@@ -373,6 +373,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   }
 
   void _initAddons() {
+    if (widget.item.id.trim().length >= 32) {
+      _availableAddons = [];
+      return;
+    }
     if (widget.item.category == BookingCategory.studio) {
       _availableAddons = [
         {
@@ -774,7 +778,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                 SizedBox(width: 10),
                 Expanded(
                   child: Text(
-                    'Không gian này hiện chưa cấu hình thiết bị riêng trên máy chủ. Đang hiển thị phụ kiện tiêu chuẩn.',
+                    'Không có thiết bị khả dụng cho không gian hoặc khung giờ này.',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,

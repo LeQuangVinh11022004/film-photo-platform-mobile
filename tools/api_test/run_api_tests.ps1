@@ -17,10 +17,14 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $script:results = @()
 $script:index = 0
 $script:token = $null
+$script:p2Token = $null
+$script:p3Token = $null
 $script:expertToken = $null
 
 function Mask([string]$s) {
-  if ($script:token) { $s = $s.Replace($script:token, "<PHOTOGRAPHER_JWT>") }
+  if ($script:token) { $s = $s.Replace($script:token, "<PHOTOGRAPHER1_JWT>") }
+  if ($script:p2Token) { $s = $s.Replace($script:p2Token, "<PHOTOGRAPHER2_JWT>") }
+  if ($script:p3Token) { $s = $s.Replace($script:p3Token, "<PHOTOGRAPHER3_JWT>") }
   if ($script:expertToken) { $s = $s.Replace($script:expertToken, "<EXPERT_JWT>") }
   return $s
 }
@@ -112,31 +116,42 @@ $(Mask $pretty)
 Write-Host "Base URL: $BaseUrl"
 Write-Host "Log dir : $OutDir`n"
 
-# ---------- 1. AUTH (PHOTOGRAPHER & EXPERT) ----------
+# ---------- 1. AUTH (PHOTOGRAPHER1, PHOTOGRAPHER2, PHOTOGRAPHER3 & EXPERT) ----------
 $email = "apitest_$stamp@example.com"
+$username = "apitest_$stamp"
 $pass = "Test@123456"
 $guid = [guid]::NewGuid().ToString()
 
 Invoke-ApiTest "Auth_Register_Photographer" POST "/api/auth/register/photographer" `
-  @{ fullName = "API Tester"; email = $email; password = $pass } -Expect 201 `
+  @{ fullName = "API Tester"; username = $username; email = $email; password = $pass } -Expect 201 `
   -UsedBy "auth_service.dart register()" | Out-Null
 
-Invoke-ApiTest "Auth_Register_Duplicate_Email" POST "/api/auth/register/photographer" `
-  @{ fullName = "API Tester"; email = "photographer.demo@filmbooking.local"; password = $pass } -Expect 409 `
-  -Note "App xu ly 409 = email da ton tai" -UsedBy "auth_service.dart register()" | Out-Null
+Invoke-ApiTest "Auth_Register_Duplicate_Username" POST "/api/auth/register/photographer" `
+  @{ fullName = "API Tester"; username = "photographer1"; email = "photographer.demo@filmbooking.local"; password = $pass } -Expect 409 `
+  -Note "App xu ly 409 = username hoac email da ton tai" -UsedBy "auth_service.dart register()" | Out-Null
 
-$login = Invoke-ApiTest "Auth_Login_Photographer_OK" POST "/api/auth/login" `
-  @{ email = "photographer.demo@filmbooking.local"; password = "FilmDemo2026!" } -Expect 200 `
-  -Note "Dang nhap PHOTOGRAPHER (photographer.demo@filmbooking.local) -> dieu huong /home" -UsedBy "auth_service.dart login()"
-if ($login -and $login.token) { $script:token = $login.token }
+$login1 = Invoke-ApiTest "Auth_Login_Photographer1_OK" POST "/api/auth/login" `
+  @{ username = "photographer1"; password = "FilmDemo2026!" } -Expect 200 `
+  -Note "Dang nhap PHOTOGRAPHER 1 (photographer1 / Nguyen Minh Anh) -> dieu huong /home" -UsedBy "auth_service.dart login()"
+if ($login1 -and $login1.token) { $script:token = $login1.token }
+
+$login2 = Invoke-ApiTest "Auth_Login_Photographer2_OK" POST "/api/auth/login" `
+  @{ username = "photographer2"; password = "FilmDemo2026!" } -Expect 200 `
+  -Note "Dang nhap PHOTOGRAPHER 2 (photographer2 / Tran Bao Chau) -> dieu huong /home" -UsedBy "auth_service.dart login()"
+if ($login2 -and $login2.token) { $script:p2Token = $login2.token }
+
+$login3 = Invoke-ApiTest "Auth_Login_Photographer3_OK" POST "/api/auth/login" `
+  @{ username = "photographer3"; password = "FilmDemo2026!" } -Expect 200 `
+  -Note "Dang nhap PHOTOGRAPHER 3 (photographer3 / Le Hoang Nam) -> dieu huong /home" -UsedBy "auth_service.dart login()"
+if ($login3 -and $login3.token) { $script:p3Token = $login3.token }
 
 Invoke-ApiTest "Auth_Login_WrongPassword" POST "/api/auth/login" `
-  @{ email = "photographer.demo@filmbooking.local"; password = "wrong_pass" } -Expect 401 `
+  @{ username = "photographer1"; password = "wrong_pass" } -Expect 401 `
   -UsedBy "auth_service.dart login()" | Out-Null
 
 $expertLogin = Invoke-ApiTest "Auth_Login_Expert_OK" POST "/api/auth/login" `
-  @{ email = "expert.demo@filmbooking.local"; password = "FilmDemo2026!" } -Expect 200 `
-  -Note "Dang nhap EXPERT -> dieu huong /expert-workspace" -UsedBy "auth_service.dart login()"
+  @{ username = "expert"; password = "FilmDemo2026!" } -Expect 200 `
+  -Note "Dang nhap EXPERT (expert / Expert Demo) -> dieu huong /expert-workspace" -UsedBy "auth_service.dart login()"
 if ($expertLogin -and $expertLogin.token) { $script:expertToken = $expertLogin.token }
 
 # ---------- 2. BROWSE SPACES & EQUIPMENT (PHOTOGRAPHER vs EXPERT) ----------
@@ -209,7 +224,15 @@ Invoke-ApiTest "Photographer_PackageSubscription_Detail_NotFound" GET "/api/phot
   -UsedBy "service_packages_screen.dart -> getPackageSubscriptionDetail()" | Out-Null
 
 # ---------- 4. BOOKINGS (STANDARD & PACKAGE SUBSCRIPTION) ----------
-Invoke-ApiTest "Photographer_Bookings_List" GET "/api/photographer/bookings?page=1&pageSize=20" -Auth $true `
+Invoke-ApiTest "Photographer1_Bookings_List" GET "/api/photographer/bookings?page=1&pageSize=20" -Auth $true `
+  -UsedBy "schedule_screen.dart, profile_screen.dart -> getMyBookings()" | Out-Null
+
+Invoke-ApiTest "Photographer2_Bookings_List" GET "/api/photographer/bookings?page=1&pageSize=20" -CustomToken $script:p2Token -Expect 200 `
+  -Note "Kiem tra danh sach lich dat cua photographer2 (Tran Bao Chau)" `
+  -UsedBy "schedule_screen.dart, profile_screen.dart -> getMyBookings()" | Out-Null
+
+Invoke-ApiTest "Photographer3_Bookings_List" GET "/api/photographer/bookings?page=1&pageSize=20" -CustomToken $script:p3Token -Expect 200 `
+  -Note "Kiem tra danh sach lich dat cua photographer3 (Le Hoang Nam)" `
   -UsedBy "schedule_screen.dart, profile_screen.dart -> getMyBookings()" | Out-Null
 
 $bk = Invoke-ApiTest "Photographer_Booking_Create_Standard" POST "/api/photographer/bookings" `
@@ -254,8 +277,8 @@ Invoke-ApiTest "Payment_VNPay_IPN" GET "/api/payments/vnpay/ipn?vnp_TxnRef=abc&v
   -Note "Server-to-server webhook cua VNPay (RspCode 97/99)" | Out-Null
 
 # ---------- 6. CANCEL BOOKING ----------
-Invoke-ApiTest "Photographer_Booking_Cancel" PATCH "/api/photographer/bookings/$bookingId/cancel" -Auth $true -Expect 204 `
-  -Note "Huy don dang o trang thai AWAITING_DEPOSIT -> 204 NoContent, nha slot" `
+Invoke-ApiTest "Photographer_Booking_Cancel" PATCH "/api/photographer/bookings/$bookingId/cancel" -Auth $true -Expect 200, 204 `
+  -Note "Huy don dang o trang thai AWAITING_DEPOSIT -> 200 OK (kem thong tin refundAmount/refundStatus) va nha slot" `
   -UsedBy "schedule_screen.dart -> cancelBooking()" | Out-Null
 
 Invoke-ApiTest "Photographer_Booking_Cancel_NotFound" PATCH "/api/photographer/bookings/$guid/cancel" -Auth $true -Expect 404 `
@@ -353,15 +376,27 @@ Invoke-ApiTest "Community_Post_Update" PUT "/api/community/posts/$postId" `
   -Note "API MOI (CommunityPostsController): Cap nhat bai dang cong dong -> 200 OK" `
   -UsedBy "community_post_api_service.dart -> updatePost() -> community_screen.dart" | Out-Null
 
-Invoke-ApiTest "Community_Post_Like" PUT "/api/community/posts/$postId/like" `
-  -Auth $true -Expect 204 `
-  -Note "API MOI (CommunityPostsController): Thich bai dang cong dong -> 204 NoContent" `
+Invoke-ApiTest "Community_Post_Like_Photographer2" PUT "/api/community/posts/$postId/like" `
+  -CustomToken $script:p2Token -Expect 204 `
+  -Note "API MOI (CommunityPostsController): photographer2 thich bai dang cong dong cua photographer1 -> 204 NoContent" `
   -UsedBy "community_post_api_service.dart -> likePost() -> community_screen.dart" | Out-Null
 
-Invoke-ApiTest "Community_Post_Unlike" DELETE "/api/community/posts/$postId/like" `
-  -Auth $true -Expect 204 `
-  -Note "API MOI (CommunityPostsController): Bo thich bai dang cong dong -> 204 NoContent" `
+Invoke-ApiTest "Community_Post_Unlike_Photographer2" DELETE "/api/community/posts/$postId/like" `
+  -CustomToken $script:p2Token -Expect 204 `
+  -Note "API MOI (CommunityPostsController): photographer2 bo thich bai dang cong dong -> 204 NoContent" `
   -UsedBy "community_post_api_service.dart -> unlikePost() -> community_screen.dart" | Out-Null
+
+$p3Comment = Invoke-ApiTest "Community_Comment_Create_Photographer3" POST "/api/community/posts/$postId/comments" `
+  @{ content = "Goc chup dep qua! Minh dung photographer3 binh luan thu."; parentCommentId = $null } `
+  -CustomToken $script:p3Token -Expect 201 `
+  -Note "API MOI (CommunityPostsController): photographer3 binh luan vao bai dang cua photographer1 -> 201 Created" `
+  -UsedBy "community_post_api_service.dart -> createComment() -> community_screen.dart"
+if ($p3Comment -and $p3Comment.commentId) {
+  Invoke-ApiTest "Community_Comment_Delete_Photographer3" DELETE "/api/community/posts/$postId/comments/$($p3Comment.commentId)" `
+    -CustomToken $script:p3Token -Expect 204 `
+    -Note "photographer3 xoa binh luan cua chinh minh -> 204 NoContent" `
+    -UsedBy "community_post_api_service.dart -> deleteComment() -> community_screen.dart" | Out-Null
+}
 
 $createdComment = Invoke-ApiTest "Community_Comment_Create" POST "/api/community/posts/$postId/comments" `
   @{ content = "Tone mau Portra 400 len rat am va chi tiet!"; parentCommentId = $null } `
@@ -468,8 +503,10 @@ $logLines.Add("                  CONSOLIDATED API TEST REPORT (PHOTOGRAPHER & EX
 $logLines.Add($sepDouble)
 $logLines.Add(" Thoi gian thuc thi : $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')")
 $logLines.Add(" Base URL Backend   : $BaseUrl")
-$logLines.Add(" Tai khoan test 1   : $email (Role: PHOTOGRAPHER)")
-$logLines.Add(" Tai khoan test 2   : expert.demo@filmbooking.local (Role: EXPERT)")
+$logLines.Add(" Tai khoan test 1   : photographer1 / FilmDemo2026! (Role: PHOTOGRAPHER - Nguyen Minh Anh)")
+$logLines.Add(" Tai khoan test 2   : photographer2 / FilmDemo2026! (Role: PHOTOGRAPHER - Tran Bao Chau)")
+$logLines.Add(" Tai khoan test 3   : photographer3 / FilmDemo2026! (Role: PHOTOGRAPHER - Le Hoang Nam)")
+$logLines.Add(" Tai khoan test 4   : expert / FilmDemo2026!        (Role: EXPERT - Expert Demo)")
 $logLines.Add(" Tong so kiem thu   : $($results.Count) kịch bản API")
 $logLines.Add(" Ket qua tong quan  : [PASS]: $pass/$($results.Count) ($pctPass%)   |   [FAIL/ERROR]: $fail/$($results.Count) ($pctFail%)")
 $logLines.Add($sepDouble)

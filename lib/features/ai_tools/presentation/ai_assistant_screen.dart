@@ -1,5 +1,4 @@
 ﻿import 'package:flutter/material.dart';
-import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../services/ai_api_service.dart';
 
@@ -61,10 +60,9 @@ class _AIAssistantScreenState extends State<AIAssistantScreen> {
     setState(() {
       _isLoading = false;
       if (result['success']) {
-        final aiReply = result['data']['guide'] ?? result['data']['message'] ?? result['data'].toString();
         _messages.add({
           'isUser': false,
-          'text': aiReply,
+          'text': result['guide'],
           'time': 'Vừa xong',
         });
       } else {

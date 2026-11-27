@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -8,6 +7,8 @@ import 'package:webview_flutter/webview_flutter.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../../core/network/api_client.dart';
+import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
 import '../services/payment_api_service.dart';
 
@@ -53,9 +54,8 @@ class _PaymentScreenState extends State<PaymentScreen>
   bool _awaitingExternalReturn = false;
   bool _hasHandledConfirmation = false;
 
-  Uri? pendingReturnUri;
-
   String? _transactionId;
+  String? _purchaseOrderId;
   String? _confirmationMessage;
 
   late final double _amount;
@@ -167,6 +167,16 @@ class _PaymentScreenState extends State<PaymentScreen>
         return;
       }
 
+      if (_isPackagePurchase) {
+        final data = initResult['data'] as PackagePurchasePaymentResponseDTO?;
+        if (data == null || data.orderId.isEmpty) {
+          setState(() => _isProcessing = false);
+          _showErrorToast('Backend không trả về mã đơn mua gói hợp lệ.');
+          return;
+        }
+        _purchaseOrderId = data.orderId;
+      }
+
       final String paymentUrl = initResult['paymentUrl'] as String;
       final uri = Uri.tryParse(paymentUrl);
 
@@ -204,11 +214,8 @@ class _PaymentScreenState extends State<PaymentScreen>
     if (!mounted) return;
     setState(() => _isProcessing = false);
 
-    if (result != null && result.isConfirmed) {
-      _onPaymentConfirmed(result);
-    } else {
-      await _checkBookingFallback(showPendingToastIfNotPaid: true);
-    }
+    _paymentLog('VNPay return status: ${result?.status ?? "unknown"}');
+    await _checkBookingFallback(showPendingToastIfNotPaid: true);
   }
 
   Future<void> _openWithExternalLauncher(Uri paymentUri) async {
@@ -249,9 +256,9 @@ class _PaymentScreenState extends State<PaymentScreen>
     if (_hasHandledConfirmation) return;
 
     if (_isPackagePurchase) {
-      if (_packageId.isEmpty) return;
+      if (_purchaseOrderId == null || _purchaseOrderId!.isEmpty) return;
       final activeSub =
-          await _paymentService.refreshPackageSubscriptionStatus(_packageId);
+          await _paymentService.refreshPackageSubscriptionStatus(_purchaseOrderId!);
       if (!mounted || _hasHandledConfirmation) return;
       if (activeSub != null) {
         _onPaymentConfirmed(
@@ -287,13 +294,8 @@ class _PaymentScreenState extends State<PaymentScreen>
 
     final depositStatus = updatedBooking?.depositStatus.toUpperCase() ?? '';
     final bookingStatus = updatedBooking?.status.toUpperCase() ?? '';
-    final isPaid = depositStatus == 'PAID' ||
-        depositStatus == 'DEPOSITED' ||
-        depositStatus == 'COMPLETED' ||
-        depositStatus == 'CONFIRMED' ||
-        depositStatus == 'SUCCESS' ||
-        bookingStatus == 'CONFIRMED' ||
-        bookingStatus == 'PAID';
+    final isPaid = depositStatus == 'SUCCESS' &&
+        (bookingStatus == 'CONFIRMED' || bookingStatus == 'COMPLETED');
 
     if (isPaid) {
       _onPaymentConfirmed(
@@ -811,9 +813,13 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
   }
 
   bool _isReturnUrl(String url) {
-    final lower = url.toLowerCase();
-    return lower.contains('/api/payments/vnpay/return') ||
-        lower.contains('payment/return');
+    final uri = Uri.tryParse(url);
+    final backend = Uri.tryParse(ApiClient().baseUrl);
+    return uri != null &&
+        backend != null &&
+        (uri.isScheme('http') || uri.isScheme('https')) &&
+        uri.origin == backend.origin &&
+        uri.path == '/api/payments/vnpay/return';
   }
 
   void _scheduleReturnCheck(String url) {
@@ -829,14 +835,12 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
     _isResolvingReturn = true;
 
     try {
-      // Nếu là URL callback từ VNPay (/api/payments/vnpay/return), gọi verifyReturnEndpoint
-      // để tự động kích hoạt IPN cập nhật DB sang ACTIVE/CONFIRMED rồi đóng WebView ngay
       if (_isReturnUrl(url)) {
         final uri = Uri.tryParse(url);
         if (uri != null) {
           final verified =
               await widget.paymentService.verifyReturnEndpoint(uri);
-          if (verified != null && verified.isConfirmed) {
+          if (verified != null) {
             _popWithResult(verified);
             return;
           }
@@ -856,14 +860,6 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
         }
       }
 
-      final rawBody = await _controller.runJavaScriptReturningResult(
-        '(document.querySelector("pre") ? document.querySelector("pre").innerText : (document.body ? document.body.innerText : ""))',
-      );
-      final parsedFromDom = _parseDomJson(rawBody);
-      if (parsedFromDom != null && parsedFromDom.isConfirmed) {
-        _popWithResult(parsedFromDom);
-        return;
-      }
     } catch (e, stackTrace) {
       _paymentLog('_tryResolveFromCurrentPage error: $e\n$stackTrace');
     } finally {
@@ -875,34 +871,6 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
     if (_hasPopped || !mounted) return;
     _hasPopped = true;
     Navigator.pop(context, result);
-  }
-
-  PaymentConfirmationResult? _parseDomJson(Object? rawResult) {
-    if (rawResult == null) return null;
-    String text = rawResult.toString().trim();
-
-    if (text.startsWith('"') && text.endsWith('"') && text.length > 1) {
-      try {
-        final unwrapped = jsonDecode(text);
-        if (unwrapped is String) text = unwrapped.trim();
-      } catch (_) {}
-    }
-
-    final startIdx = text.indexOf('{');
-    final endIdx = text.lastIndexOf('}');
-    if (startIdx == -1 || endIdx == -1 || endIdx <= startIdx) {
-      return null;
-    }
-
-    final jsonCandidate = text.substring(startIdx, endIdx + 1);
-    try {
-      final decoded = jsonDecode(jsonCandidate);
-      if (decoded is Map<String, dynamic> && decoded.containsKey('status')) {
-        return PaymentConfirmationResult.fromJson(decoded);
-      }
-    } catch (_) {}
-
-    return null;
   }
 
   Future<void> _openInExternalBrowser(Uri uri) async {

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import '../../../core/network/api_client.dart';
 import '../models/booking_api_models.dart';
 import 'booking_api_service.dart';
@@ -25,36 +24,25 @@ class PaymentConfirmationResult {
     this.transactionId,
   });
 
-  factory PaymentConfirmationResult.fromJson(
-    Map<String, dynamic> json, {
-    bool vnpaySuccessParams = false,
-  }) {
+  factory PaymentConfirmationResult.fromJson(Map<String, dynamic> json) {
     _paymentApiLog('PaymentConfirmationResult.fromJson raw: $json');
     final rawStatus = (json['status'] ?? '').toString().trim();
     final rawMessage = (json['message'] ?? '').toString().trim();
     final rawTxId = json['transactionId']?.toString().trim();
 
     final normalizedStatus = rawStatus.toLowerCase();
-    final isBrowserReturnValid =
-        rawMessage.toLowerCase().contains('browser return is valid');
-    final confirmed = normalizedStatus == 'confirmed' ||
-        normalizedStatus == 'paid' ||
-        normalizedStatus == 'success' ||
-        normalizedStatus == 'completed' ||
-        (vnpaySuccessParams &&
-            normalizedStatus == 'pending' &&
-            isBrowserReturnValid);
+    final confirmed = normalizedStatus == 'confirmed';
 
     final res = PaymentConfirmationResult(
       isConfirmed: confirmed,
       status: confirmed
           ? 'Confirmed'
           : (rawStatus.isEmpty ? 'Pending' : rawStatus),
-      message: confirmed
-          ? 'Thanh toán qua VNPay đã được xác nhận thành công!'
-          : (rawMessage.isEmpty
-              ? 'Giao dịch chưa được xác nhận.'
-              : rawMessage),
+      message: rawMessage.isNotEmpty
+          ? rawMessage
+          : (confirmed
+              ? 'Thanh toán qua VNPay đã được xác nhận thành công!'
+              : 'Giao dịch chưa được xác nhận.'),
       transactionId: (rawTxId != null && rawTxId.isNotEmpty) ? rawTxId : null,
     );
     _paymentApiLog(
@@ -135,45 +123,22 @@ class PaymentApiService {
     }
   }
 
-  /// Xác thực kết quả redirect từ VNPay:
-  /// 1. Tự động gọi GET /api/payments/vnpay/ipn kèm chữ ký thật từ VNPay để Backend cập nhật DB
-  ///    (transaction = SUCCESS, order = COMPLETED/CONFIRMED, subscription = ACTIVE).
-  /// 2. Gọi GET /api/payments/vnpay/return để lấy kết quả Confirmed và tự đóng WebView.
+  /// Kiểm tra trạng thái giao dịch do backend xác thực; VNPay gửi IPN riêng.
   Future<PaymentConfirmationResult?> verifyReturnEndpoint(Uri returnUri) async {
     _paymentApiLog('verifyReturnEndpoint start: $returnUri');
     try {
-      final base = ApiClient().baseUrl.endsWith('/')
-          ? ApiClient().baseUrl.substring(0, ApiClient().baseUrl.length - 1)
-          : ApiClient().baseUrl;
-      final query = returnUri.query;
-      final qp = returnUri.queryParameters;
-      final bool isVnPaySuccess = qp['vnp_ResponseCode'] == '00' &&
-          (qp['vnp_TransactionStatus'] == null ||
-              qp['vnp_TransactionStatus'] == '00');
-
-      // Bước 1: Đồng bộ IPN lên Backend Azure với đúng bộ query & vnp_SecureHash thật từ VNPay
-      if (query.isNotEmpty && qp.containsKey('vnp_SecureHash')) {
-        final ipnUri = Uri.parse('$base/api/payments/vnpay/ipn?$query');
-        _paymentApiLog('Triggering VNPay IPN reconciliation: $ipnUri');
-        try {
-          final ipnRes = await http
-              .get(ipnUri)
-              .timeout(const Duration(seconds: 12));
-          _paymentApiLog(
-            'VNPay IPN response | statusCode=${ipnRes.statusCode} | body=${ipnRes.body}',
-          );
-        } catch (e) {
-          _paymentApiLog('VNPay IPN call error: $e');
-        }
+      final backend = Uri.parse(ApiClient().baseUrl);
+      if ((!returnUri.isScheme('https') && !returnUri.isScheme('http')) ||
+          returnUri.origin != backend.origin ||
+          returnUri.path != '/api/payments/vnpay/return' ||
+          returnUri.query.isEmpty) {
+        _paymentApiLog('Invalid VNPay return URI.');
+        return null;
       }
 
-      // Bước 2: Gọi /api/payments/vnpay/return trên Backend Azure
-      final targetReturnUri = query.isNotEmpty
-          ? Uri.parse('$base/api/payments/vnpay/return?$query')
-          : returnUri;
-      final response = await http
-          .get(targetReturnUri)
-          .timeout(const Duration(seconds: 12));
+      final response = await ApiClient().get(
+        '/api/payments/vnpay/return?${returnUri.query}',
+      );
       _paymentApiLog(
         'verifyReturnEndpoint response | statusCode=${response.statusCode} | '
         'body=${response.body}',
@@ -181,22 +146,13 @@ class PaymentApiService {
       if (response.statusCode == 200 && response.body.trim().isNotEmpty) {
         final decoded = jsonDecode(response.body);
         if (decoded is Map<String, dynamic>) {
-          return PaymentConfirmationResult.fromJson(
-            decoded,
-            vnpaySuccessParams: isVnPaySuccess,
-          );
+          return PaymentConfirmationResult.fromJson(decoded);
         }
       }
     } catch (e, stackTrace) {
       _paymentApiLog('verifyReturnEndpoint error: $e\n$stackTrace');
     }
     return null;
-  }
-
-  PaymentConfirmationResult parsePaymentJson(String rawJson) {
-    _paymentApiLog('parsePaymentJson input: $rawJson');
-    final decoded = jsonDecode(rawJson) as Map<String, dynamic>;
-    return PaymentConfirmationResult.fromJson(decoded);
   }
 
   /// Kiểm tra lại trạng thái booking từ GET /api/photographer/bookings/{bookingId}
@@ -263,13 +219,14 @@ class PaymentApiService {
 
   /// Kiểm tra lại trạng thái gói đăng ký sau khi thanh toán VNPay
   Future<PhotographerPackageSubscriptionResponseDTO?>
-      refreshPackageSubscriptionStatus(String packageId) async {
+      refreshPackageSubscriptionStatus(String purchaseOrderId) async {
     _paymentApiLog(
-        'refreshPackageSubscriptionStatus start | packageId=$packageId');
+        'refreshPackageSubscriptionStatus start | purchaseOrderId=$purchaseOrderId');
+    if (purchaseOrderId.trim().isEmpty) return null;
     try {
       final subs = await _bookingApiService.getPackageSubscriptions();
       for (final sub in subs) {
-        if (sub.packageId.toLowerCase() == packageId.toLowerCase() &&
+        if (sub.purchaseOrderId.toLowerCase() == purchaseOrderId.toLowerCase() &&
             sub.status.toUpperCase() == 'ACTIVE') {
           return sub;
         }

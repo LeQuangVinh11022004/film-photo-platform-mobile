@@ -235,7 +235,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
           (Match m) => '${m[1]}.',
     );
-    return '${formatted}đ';
+    return '$formattedđ';
   }
 
   String _statusLabel(String status) {
@@ -285,20 +285,31 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   bool _canCancelBooking(BookingResponseDTO booking) {
     final s = booking.status.toUpperCase();
-    final isPackageBooking =
-        (booking.packageId != null && booking.packageId!.isNotEmpty) ||
-            booking.depositStatus.toUpperCase() == 'NOT_REQUIRED';
-    if (isPackageBooking) {
-      return s == 'CONFIRMED' || s == 'AWAITING_DEPOSIT' || s == 'PENDING';
-    }
-    return s == 'AWAITING_DEPOSIT' || s == 'PENDING';
+    return s == 'AWAITING_DEPOSIT' || s == 'CONFIRMED';
   }
 
   Future<void> _handleCancelBooking(BuildContext sheetContext, BookingResponseDTO booking) async {
     if (_isCancelling) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Hủy lịch đặt?'),
+        content: const Text(
+          'Bạn chỉ có thể hủy trước khi bắt đầu và check-in. '
+          'Tiền cọc đã thanh toán được hoàn 100% trước ít nhất 48 giờ, '
+          '50% từ 24 đến dưới 48 giờ, và không hoàn dưới 24 giờ. '
+          'Với đơn dùng gói, lượt sử dụng có thể được hoàn lại.',
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Quay lại')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Xác nhận hủy')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
     setState(() => _isCancelling = true);
 
-    final ok = await _bookingApiService.cancelBooking(booking.bookingId);
+    final result = await _bookingApiService.cancelBooking(booking.bookingId);
 
     if (!mounted) return;
     setState(() => _isCancelling = false);
@@ -307,19 +318,26 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       Navigator.pop(sheetContext);
     }
 
-    if (ok) {
+    if (result['success'] == true) {
+      final cancellation = result['cancellation'] as BookingCancellationResponseDTO;
       await _fetchBookings();
       if (!mounted) return;
+      final refundMessage = cancellation.packageUseRestored
+          ? ' Lượt sử dụng gói đã được hoàn lại.'
+          : cancellation.refundAmount > 0
+              ? ' Tiền hoàn: ${_formatCurrency(cancellation.refundAmount)} '
+                  '(${cancellation.refundStatus == 'PENDING_MANUAL' ? 'chờ xử lý thủ công' : cancellation.refundStatus}).'
+              : '';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Đã hủy lịch đặt thành công!'),
+        SnackBar(
+          content: Text('Đã hủy lịch đặt thành công!$refundMessage'),
           backgroundColor: Colors.redAccent,
         ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Chỉ các đơn đang chờ đặt cọc (hoặc đơn gói chưa diễn ra) mới có thể hủy trực tiếp.'),
+        SnackBar(
+          content: Text(result['message']?.toString() ?? 'Không thể hủy lịch đặt.'),
         ),
       );
     }
@@ -794,7 +812,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               );
                             } else {
                               toastification.show(
-                                context: context,
+                                context: modalCtx,
                                 type: ToastificationType.warning,
                                 style: ToastificationStyle.flatColored,
                                 title: const Text('Chưa thể gửi đánh giá'),
