@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/services/auth_service.dart';
 import '../../community/presentation/community_screen.dart';
-import '../../community/services/article_api_service.dart';
+import '../../community/services/community_post_api_service.dart';
 
 class ExpertHomeScreen extends StatefulWidget {
   const ExpertHomeScreen({super.key});
@@ -13,7 +13,7 @@ class ExpertHomeScreen extends StatefulWidget {
 }
 
 class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
-  int _articleCount = 12;
+  int? _articleCount;
 
   @override
   void initState() {
@@ -24,7 +24,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
   Future<void> _fetchExpertArticleCount() async {
     try {
       final page =
-          await ArticleApiService().getExpertArticles(page: 1, pageSize: 50);
+          await CommunityPostApiService().getMyPosts(page: 1, pageSize: 50);
       if (!mounted) return;
       if (page != null) {
         setState(() {
@@ -81,7 +81,7 @@ class _ExpertHomeScreenState extends State<ExpertHomeScreen> {
                 children: [
                   _MetricCard(
                     title: 'Bài viết',
-                    value: '$_articleCount',
+                    value: _articleCount?.toString() ?? '—',
                     subtitle: 'Đã tạo (API)',
                     icon: Icons.article_outlined,
                   ),

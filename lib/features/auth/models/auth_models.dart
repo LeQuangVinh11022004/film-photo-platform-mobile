@@ -1,11 +1,19 @@
+String? validateUsername(String? value) {
+  final username = value?.trim() ?? '';
+  if (!RegExp(r'^[A-Za-z0-9._-]{3,50}$').hasMatch(username)) {
+    return 'Tên đăng nhập phải có 3-50 ký tự: chữ, số, dấu chấm, gạch dưới hoặc gạch ngang';
+  }
+  return null;
+}
+
 class LoginRequest {
-  final String email;
+  final String username;
   final String password;
 
-  LoginRequest({required this.email, required this.password});
+  LoginRequest({required this.username, required this.password});
 
   Map<String, dynamic> toJson() => {
-        'email': email,
+        'username': username,
         'password': password,
       };
 }
@@ -13,6 +21,7 @@ class LoginRequest {
 class UserDTO {
   final String userId;
   final String fullName;
+  final String username;
   final String email;
   final String role;
   final String status;
@@ -22,6 +31,7 @@ class UserDTO {
   UserDTO({
     required this.userId,
     required this.fullName,
+    this.username = '',
     required this.email,
     required this.role,
     required this.status,
@@ -33,6 +43,7 @@ class UserDTO {
     return UserDTO(
       userId: json['userId']?.toString() ?? '',
       fullName: json['fullName'] ?? json['name'] ?? '',
+      username: json['username'] ?? '',
       email: json['email'] ?? '',
       role: json['role'] ?? '',
       status: json['status'] ?? '',
@@ -46,6 +57,7 @@ class UserDTO {
   Map<String, dynamic> toJson() => {
         'userId': userId,
         'fullName': fullName,
+        'username': username,
         'email': email,
         'role': role,
         'status': status,
@@ -84,17 +96,20 @@ class LoginResponse {
 
 class RegisterRequest {
   final String fullName;
+  final String username;
   final String email;
   final String password;
 
   RegisterRequest({
     required this.fullName,
+    required this.username,
     required this.email,
     required this.password,
   });
 
   Map<String, dynamic> toJson() => {
         'fullName': fullName,
+        'username': username,
         'email': email,
         'password': password,
       };

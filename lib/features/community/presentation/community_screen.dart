@@ -2,12 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
-import '../../../core/widgets/device_image_picker.dart';
 import '../../auth/services/auth_service.dart';
-import '../models/article_api_models.dart';
 import '../models/blog_post.dart';
 import '../models/community_post_api_models.dart';
-import '../services/article_api_service.dart';
 import '../services/community_post_api_service.dart';
 
 class CommunityScreen extends StatefulWidget {
@@ -18,22 +15,20 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen> {
-  final ArticleApiService _articleApiService = ArticleApiService();
   final CommunityPostApiService _communityPostApiService =
       CommunityPostApiService();
 
   List<BlogPost> _posts = [];
   List<CommunityPostResponseDTO> _myCommunityPosts = [];
-  List<ArticleResponseDTO> _expertMyArticles = [];
 
   bool _isLoadingFeed = true;
   bool _isLoadingMyPosts = false;
-  bool _isLoadingExpertArticles = false;
+  bool _myPostsError = false;
+  bool _feedError = false;
 
   /// Chế độ hiển thị:
-  /// 0 = Diễn đàn Chung (GET /api/community/posts + GET /api/articles)
+  /// 0 = Diễn đàn Chung (GET /api/community/posts)
   /// 1 = Bài đăng Cộng đồng của tôi (GET/POST/PUT/DELETE /api/community/posts/mine)
-  /// 2 = Quản lý Bài viết Chuyên gia (GET/POST/PUT/PATCH/DELETE /api/expert/articles - chỉ cho EXPERT)
   int _viewMode = 0;
 
   int _selectedFilterIndex = 0;
@@ -45,18 +40,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
     'Thiết bị',
   ];
 
-  /// Bộ lọc trạng thái cho tab Bài viết Chuyên gia: '', 'PUBLISHED', 'DRAFT'
-  String _expertStatusFilter = '';
-
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   bool _showFab = false;
   String _searchQuery = '';
-
-  bool get _isExpertRole {
-    final role = (AuthService().currentUser?.role ?? '').trim().toUpperCase();
-    return role == 'EXPERT' || role.contains('EXPERT');
-  }
 
   @override
   void initState() {
@@ -70,9 +57,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     });
     _loadCommunityFeed();
     _loadMyCommunityPosts();
-    if (_isExpertRole) {
-      _loadExpertMyArticles();
-    }
   }
 
   @override
@@ -82,54 +66,30 @@ class _CommunityScreenState extends State<CommunityScreen> {
     super.dispose();
   }
 
-  /// Gọi song song GET /api/community/posts và GET /api/articles cho Diễn đàn chung
+  /// Gọi GET /api/community/posts cho Diễn đàn chung.
   Future<void> _loadCommunityFeed({String? category}) async {
     if (!mounted) return;
     setState(() => _isLoadingFeed = true);
 
     try {
-      final results = await Future.wait([
-        _communityPostApiService.getFeed(
+      final page = await _communityPostApiService.getFeed(
           category: category,
           page: 1,
           pageSize: 50,
-        ),
-        _articleApiService.getPublishedArticles(
-          category: category,
-          page: 1,
-          pageSize: 50,
-        ),
-      ]);
+        );
       if (!mounted) return;
-
-      final communityPage = results[0] as dynamic;
-      final articlesPage = results[1] as dynamic;
-
-      final List<BlogPost> communityPosts = (communityPage?.items
-                  as List<CommunityPostResponseDTO>?)
-              ?.map((dto) => dto.toBlogPost())
-              .toList() ??
-          [];
-      final List<BlogPost> articlePosts =
-          (articlesPage?.items as List<ArticleResponseDTO>?)
-                  ?.map((dto) => dto.toBlogPost())
-                  .toList() ??
-              [];
-
-      final combinedApi = <BlogPost>[...communityPosts, ...articlePosts];
-
       setState(() {
-        if (combinedApi.isNotEmpty) {
-          _posts = [...combinedApi, ...BlogPost.samplePosts];
-        } else {
-          _posts = List<BlogPost>.from(BlogPost.samplePosts);
+        _feedError = page == null;
+        if (page != null) {
+          _posts = page.items.map((dto) => dto.toBlogPost()).toList();
         }
         _isLoadingFeed = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Không thể tải bài đăng cộng đồng: $e');
       if (!mounted) return;
       setState(() {
-        _posts = List<BlogPost>.from(BlogPost.samplePosts);
+        _feedError = true;
         _isLoadingFeed = false;
       });
     }
@@ -147,39 +107,16 @@ class _CommunityScreenState extends State<CommunityScreen> {
       );
       if (!mounted) return;
       setState(() {
-        _myCommunityPosts = page?.items ?? [];
+        _myPostsError = page == null;
+        if (page != null) _myCommunityPosts = page.items;
         _isLoadingMyPosts = false;
       });
-    } catch (_) {
+    } catch (e) {
+      debugPrint('Không thể tải bài đăng của bạn: $e');
       if (!mounted) return;
       setState(() {
-        _myCommunityPosts = [];
+        _myPostsError = true;
         _isLoadingMyPosts = false;
-      });
-    }
-  }
-
-  /// Gọi GET /api/expert/articles dành riêng cho Role EXPERT
-  Future<void> _loadExpertMyArticles() async {
-    if (!_isExpertRole || !mounted) return;
-    setState(() => _isLoadingExpertArticles = true);
-
-    try {
-      final page = await _articleApiService.getExpertArticles(
-        status: _expertStatusFilter.isEmpty ? null : _expertStatusFilter,
-        page: 1,
-        pageSize: 50,
-      );
-      if (!mounted) return;
-      setState(() {
-        _expertMyArticles = page?.items ?? [];
-        _isLoadingExpertArticles = false;
-      });
-    } catch (_) {
-      if (!mounted) return;
-      setState(() {
-        _expertMyArticles = [];
-        _isLoadingExpertArticles = false;
       });
     }
   }
@@ -190,8 +127,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
     if (_selectedFilterIndex == 1) {
       list = list
           .where((p) =>
-              p.authorRole.toLowerCase().contains('chuyên gia') ||
-              p.isApiArticle)
+              p.authorRole.toLowerCase().contains('chuyên gia'))
           .toList();
     } else if (_selectedFilterIndex == 2) {
       list = list
@@ -244,17 +180,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
         .toList();
   }
 
-  List<ArticleResponseDTO> get _filteredExpertArticles {
-    if (_searchQuery.isEmpty) return _expertMyArticles;
-    final q = _searchQuery.toLowerCase();
-    return _expertMyArticles
-        .where((a) =>
-            a.title.toLowerCase().contains(q) ||
-            a.content.toLowerCase().contains(q) ||
-            a.category.toLowerCase().contains(q))
-        .toList();
-  }
-
   /// PUT /api/community/posts/{postId}/like & DELETE /api/community/posts/{postId}/like
   Future<void> _handleLike(BlogPost post) async {
     final bool wasLiked = post.userReaction == 'like';
@@ -287,54 +212,28 @@ class _CommunityScreenState extends State<CommunityScreen> {
             if (post.likes > 0) post.likes--;
           }
         });
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể cập nhật lượt thích.')),
+        );
       } else {
         _loadMyCommunityPosts();
       }
     }
   }
 
-  void _handleDislike(BlogPost post) {
-    setState(() {
-      if (post.userReaction == 'dislike') {
-        post.userReaction = null;
-        if (post.dislikes > 0) post.dislikes--;
-      } else {
-        if (post.userReaction == 'like') {
-          if (post.likes > 0) post.likes--;
-          if (post.isCommunityPost && post.id.length >= 32) {
-            _communityPostApiService.unlikePost(post.id);
-          }
-        }
-        post.userReaction = 'dislike';
-        post.dislikes++;
-      }
-    });
-  }
-
   bool _isMyCommunityPost(String postId, String? authorUserId) {
     if (_myCommunityPosts.any((p) => p.postId == postId)) return true;
-    final currentName = (AuthService().currentUser?.fullName ?? '').trim();
-    return false ||
-        (authorUserId != null &&
-            authorUserId.isNotEmpty &&
-            currentName.isNotEmpty &&
-            _myCommunityPosts.any((p) => p.userId == authorUserId));
+    final userId = AuthService().currentUser?.userId;
+    return userId != null && userId.isNotEmpty && userId == authorUserId;
   }
 
-  /// Xem chi tiết bài đăng Cộng đồng (GET /api/community/posts/{postId})
-  /// hoặc bài viết Chuyên gia (GET /api/articles/{articleId} / GET /api/expert/articles/{articleId})
-  Future<void> _showPostOrArticleDetailModal({
+  /// Xem chi tiết bài đăng cộng đồng.
+  Future<void> _showPostDetailModal({
     BlogPost? post,
     CommunityPostResponseDTO? communityPost,
-    ArticleResponseDTO? expertArticle,
   }) async {
     CommunityPostResponseDTO? loadedCommunityPost = communityPost;
-    ArticleResponseDTO? loadedArticleDto = expertArticle;
-
-    final bool isCommPost =
-        communityPost != null || (post?.isCommunityPost ?? false);
-    final String targetId =
-        communityPost?.postId ?? expertArticle?.articleId ?? post?.id ?? '';
+    final String targetId = communityPost?.postId ?? post?.id ?? '';
 
     if (targetId.length >= 32) {
       showDialog(
@@ -345,53 +244,39 @@ class _CommunityScreenState extends State<CommunityScreen> {
         ),
       );
 
-      if (isCommPost) {
-        loadedCommunityPost =
-            await _communityPostApiService.getPostDetail(targetId) ??
-                communityPost;
-      } else if (expertArticle != null && _isExpertRole) {
-        loadedArticleDto =
-            await _articleApiService.getExpertArticleDetail(targetId) ??
-                expertArticle;
-      } else {
-        loadedArticleDto =
-            await _articleApiService.getPublishedArticleDetail(targetId) ??
-                expertArticle;
-      }
+      loadedCommunityPost = await _communityPostApiService.getPostDetail(targetId);
 
       if (!mounted) return;
       Navigator.pop(context);
+      if (loadedCommunityPost == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Không thể tải chi tiết bài đăng.')),
+        );
+        return;
+      }
     }
 
     if (!mounted) return;
 
     final displayTitle = loadedCommunityPost?.title ??
-        loadedArticleDto?.title ??
         post?.title ??
         '';
     final displayContent = loadedCommunityPost?.content ??
-        loadedArticleDto?.content ??
         post?.content ??
         '';
     final displayAuthor = loadedCommunityPost?.authorName ??
-        loadedArticleDto?.expertName ??
         post?.authorName ??
         'Thành viên Film';
     final displayCategory = loadedCommunityPost?.category ??
-        loadedArticleDto?.category ??
         post?.category ??
         'Kỹ thuật Film';
     final displayStatus = loadedCommunityPost?.status ??
-        loadedArticleDto?.status ??
         post?.status ??
         'PUBLISHED';
     final displayTime = loadedCommunityPost != null
         ? CommunityPostResponseDTO.formatTimeAgo(
             loadedCommunityPost.updatedAt ?? loadedCommunityPost.createdAt)
-        : (loadedArticleDto != null
-            ? ArticleResponseDTO.formatTimeAgo(
-                loadedArticleDto.updatedAt ?? loadedArticleDto.createdAt)
-            : (post?.timeAgo ?? 'Vừa xong'));
+        : (post?.timeAgo ?? 'Vừa xong');
 
     final List<String> displayImages = loadedCommunityPost != null &&
             loadedCommunityPost.images.isNotEmpty
@@ -602,59 +487,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   ],
                 ),
               ],
-              if (_isExpertRole && loadedArticleDto != null) ...[
-                const SizedBox(height: 28),
-                const Divider(),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          _showExpertArticleFormModal(
-                            existing: loadedArticleDto,
-                          );
-                        },
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: const Text('Sửa bài'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: () {
-                          Navigator.pop(ctx);
-                          final nextStatus =
-                              loadedArticleDto!.status.toUpperCase() ==
-                                      'PUBLISHED'
-                                  ? 'DRAFT'
-                                  : 'PUBLISHED';
-                          _handleToggleExpertArticleStatus(
-                            loadedArticleDto,
-                            nextStatus,
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                        ),
-                        icon: Icon(
-                          loadedArticleDto.status.toUpperCase() == 'PUBLISHED'
-                              ? Icons.unpublished_outlined
-                              : Icons.publish_rounded,
-                          size: 18,
-                        ),
-                        label: Text(
-                          loadedArticleDto.status.toUpperCase() == 'PUBLISHED'
-                              ? 'Chuyển về Nháp'
-                              : 'Xuất bản ngay',
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
             ],
           ),
         ),
@@ -674,8 +506,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
           ? (existing.images.first.caption ?? '')
           : '',
     );
+    final imageUrlController = TextEditingController(
+      text: existing != null && existing.images.isNotEmpty
+          ? existing.images.first.imageUrl
+          : '',
+    );
 
-    final categories = const [
+    final categories = [
       'Kỹ thuật chụp Film',
       'Tráng rọi Phòng tối',
       'Đánh giá Thiết bị & Film',
@@ -686,9 +523,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
         (existing?.category != null && existing!.category!.trim().isNotEmpty)
             ? existing.category!.trim()
             : categories.first;
-    if (!categories.contains(selectedCategory)) {
-      selectedCategory = categories.first;
-    }
+    if (!categories.contains(selectedCategory)) categories.add(selectedCategory);
 
     String? selectedImageUrl =
         (existing != null && existing.images.isNotEmpty)
@@ -788,30 +623,22 @@ class _CommunityScreenState extends State<CommunityScreen> {
                     ),
                   ),
                   const SizedBox(height: 14),
-                  OutlinedButton.icon(
-                    onPressed: () async {
-                      final url = await DeviceImagePicker.pickImageFromDevice(
-                        context,
-                        title: 'Chọn Ảnh Đính Kèm Bài Đăng',
-                      );
-                      if (url != null) {
-                        setModalState(() => selectedImageUrl = url);
-                      }
-                    },
-                    icon: const Icon(Icons.photo_library_outlined, size: 20),
-                    label: Text(
-                      selectedImageUrl == null
-                          ? 'Đính Kèm Ảnh Bài Đăng'
-                          : 'Đổi Ảnh Đính Kèm',
-                      style: const TextStyle(fontWeight: FontWeight.bold),
+                  TextField(
+                    controller: imageUrlController,
+                    keyboardType: TextInputType.url,
+                    onChanged: (value) => setModalState(
+                      () => selectedImageUrl = value.trim().isEmpty
+                          ? null
+                          : value.trim(),
                     ),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.primary,
-                      minimumSize: const Size(double.infinity, 48),
-                      side: const BorderSide(
-                          color: AppColors.primary, width: 1.5),
-                      shape: RoundedRectangleBorder(
+                    decoration: InputDecoration(
+                      labelText: 'Liên kết ảnh (tùy chọn)',
+                      helperText: 'Nhập URL ảnh http hoặc https.',
+                      filled: true,
+                      fillColor: context.inputColor,
+                      border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide.none,
                       ),
                     ),
                   ),
@@ -838,8 +665,10 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 size: 16,
                                 color: Colors.white,
                               ),
-                              onPressed: () =>
-                                  setModalState(() => selectedImageUrl = null),
+                              onPressed: () {
+                                imageUrlController.clear();
+                                setModalState(() => selectedImageUrl = null);
+                              },
                             ),
                           ),
                         ),
@@ -869,11 +698,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           : () async {
                               final title = titleController.text.trim();
                               final content = contentController.text.trim();
-                              if (title.isEmpty || content.isEmpty) {
+                              if (title.isEmpty || title.length > 255 || content.isEmpty) {
                                 ScaffoldMessenger.of(context).showSnackBar(
                                   const SnackBar(
                                     content: Text(
-                                      'Vui lòng nhập đầy đủ tiêu đề và nội dung bài đăng',
+                                      'Nhập nội dung và tiêu đề tối đa 255 ký tự.',
                                     ),
                                     backgroundColor: Colors.redAccent,
                                   ),
@@ -881,19 +710,36 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                 return;
                               }
 
-                              setModalState(() => isSubmitting = true);
-
                               final List<CommunityPostImageWriteRequestDTO>
                                   imageDtos = [];
                               if (selectedImageUrl != null &&
                                   selectedImageUrl!.trim().isNotEmpty) {
                                 final rawUrl = selectedImageUrl!.trim();
-                                final normalizedUrl = rawUrl.length <= 1000
-                                    ? rawUrl
-                                    : 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=800&auto=format&fit=crop&q=80';
+                                final uri = Uri.tryParse(rawUrl);
+                                if (rawUrl.length > 1000 ||
+                                    uri == null ||
+                                    !uri.hasAuthority ||
+                                    (uri.scheme != 'http' && uri.scheme != 'https')) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Liên kết ảnh phải là URL http hoặc https hợp lệ, tối đa 1000 ký tự.'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                  return;
+                                }
+                                if (imageCaptionController.text.trim().length > 500) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Chú thích ảnh tối đa 500 ký tự.'),
+                                      backgroundColor: Colors.redAccent,
+                                    ),
+                                  );
+                                  return;
+                                }
                                 imageDtos.add(
                                   CommunityPostImageWriteRequestDTO(
-                                    imageUrl: normalizedUrl,
+                                    imageUrl: rawUrl,
                                     caption: imageCaptionController.text
                                             .trim()
                                             .isNotEmpty
@@ -903,6 +749,17 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   ),
                                 );
                               }
+                              if (existing != null) {
+                                imageDtos.addAll(existing.images.skip(1).map(
+                                      (image) => CommunityPostImageWriteRequestDTO(
+                                        imageUrl: image.imageUrl,
+                                        caption: image.caption,
+                                        displayOrder: image.displayOrder,
+                                      ),
+                                    ));
+                              }
+
+                              setModalState(() => isSubmitting = true);
 
                               final requestDto = CommunityPostWriteRequestDTO(
                                 title: title,
@@ -948,7 +805,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   showProgressBar: false,
                                 );
                               } else {
-                                if (!modalCtx.mounted) return;
+                                if (!modalCtx.mounted || !mounted) return;
                                 setModalState(() => isSubmitting = false);
                                 toastification.show(
                                   context: context,
@@ -1058,384 +915,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  /// Modal Tạo mới (POST /api/expert/articles) hoặc Cập nhật (PUT /api/expert/articles/{articleId})
-  /// dành riêng cho Role EXPERT
-  void _showExpertArticleFormModal({ArticleResponseDTO? existing}) {
-    final isEditing = existing != null;
-    final titleController = TextEditingController(text: existing?.title ?? '');
-    final contentController =
-        TextEditingController(text: existing?.content ?? '');
-    final categories = const [
-      'Kỹ thuật chụp Film',
-      'Tráng rọi Phòng tối',
-      'Đánh giá Thiết bị & Film',
-      'Kinh nghiệm Ánh sáng Studio',
-      'Phục chế & Lưu trữ',
-    ];
-    String selectedCategory = existing?.category.isNotEmpty == true
-        ? existing!.category
-        : categories.first;
-    if (!categories.contains(selectedCategory)) {
-      selectedCategory = categories.first;
-    }
-
-    bool publishImmediately =
-        existing == null ? true : existing.status.toUpperCase() == 'PUBLISHED';
-    bool isSubmitting = false;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: context.cardColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (modalCtx) => StatefulBuilder(
-        builder: (modalCtx, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: MediaQuery.of(modalCtx).viewInsets.bottom,
-              left: 24,
-              right: 24,
-              top: 24,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: context.borderColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    isEditing
-                        ? 'Chỉnh Sửa Bài Viết Chuyên Môn'
-                        : 'Tạo Bài Viết Chuyên Gia (API)',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: context.textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  DropdownButtonFormField<String>(
-                    initialValue: selectedCategory,
-                    isExpanded: true,
-                    decoration: InputDecoration(
-                      labelText: 'Danh mục bài viết',
-                      filled: true,
-                      fillColor: context.inputColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                    items: categories
-                        .map((c) => DropdownMenuItem(value: c, child: Text(c)))
-                        .toList(),
-                    onChanged: (val) {
-                      if (val != null) {
-                        setModalState(() => selectedCategory = val);
-                      }
-                    },
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: titleController,
-                    decoration: InputDecoration(
-                      labelText: 'Tiêu đề bài viết',
-                      filled: true,
-                      fillColor: context.inputColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  TextField(
-                    controller: contentController,
-                    maxLines: 5,
-                    decoration: InputDecoration(
-                      labelText: 'Nội dung bài viết chuyên sâu...',
-                      filled: true,
-                      fillColor: context.inputColor,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide.none,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(
-                      'Xuất bản công khai lên Diễn đàn (PUBLISHED)',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: context.textColor,
-                      ),
-                    ),
-                    subtitle: Text(
-                      publishImmediately
-                          ? 'Mọi Photographer đều xem được trên GET /api/articles'
-                          : 'Lưu dưới dạng Bản nháp (DRAFT)',
-                      style:
-                          TextStyle(fontSize: 12, color: context.textSecColor),
-                    ),
-                    value: publishImmediately,
-                    activeThumbColor: AppColors.primary,
-                    onChanged: (val) {
-                      setModalState(() => publishImmediately = val);
-                    },
-                  ),
-                  const SizedBox(height: 20),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 54,
-                    child: ElevatedButton(
-                      onPressed: isSubmitting
-                          ? null
-                          : () async {
-                              final title = titleController.text.trim();
-                              final content = contentController.text.trim();
-                              if (title.isEmpty || content.isEmpty) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                    content: Text(
-                                      'Vui lòng nhập đầy đủ tiêu đề và nội dung bài viết',
-                                    ),
-                                    backgroundColor: Colors.redAccent,
-                                  ),
-                                );
-                                return;
-                              }
-
-                              setModalState(() => isSubmitting = true);
-                              final writeDto = ArticleWriteRequestDTO(
-                                title: title,
-                                content: content,
-                                category: selectedCategory,
-                              );
-
-                              Map<String, dynamic> res;
-                              if (isEditing) {
-                                res = await _articleApiService
-                                    .updateExpertArticle(
-                                  articleId: existing.articleId,
-                                  request: writeDto,
-                                );
-                              } else {
-                                res = await _articleApiService
-                                    .createExpertArticle(writeDto);
-                              }
-
-                              if (res['success'] == true) {
-                                final createdOrUpdated =
-                                    res['article'] as ArticleResponseDTO?;
-                                final targetStatus = publishImmediately
-                                    ? 'PUBLISHED'
-                                    : 'DRAFT';
-                                if (createdOrUpdated != null &&
-                                    createdOrUpdated.status.toUpperCase() !=
-                                        targetStatus) {
-                                  await _articleApiService
-                                      .updateExpertArticleStatus(
-                                    articleId: createdOrUpdated.articleId,
-                                    status: targetStatus,
-                                  );
-                                }
-
-                                if (!modalCtx.mounted) return;
-                                Navigator.pop(modalCtx);
-                                await Future.wait([
-                                  _loadExpertMyArticles(),
-                                  _loadCommunityFeed(),
-                                ]);
-                                if (!mounted) return;
-                                toastification.show(
-                                  context: context,
-                                  type: ToastificationType.success,
-                                  style: ToastificationStyle.flatColored,
-                                  title: Text(
-                                    isEditing
-                                        ? 'Đã cập nhật bài viết!'
-                                        : 'Đã tạo bài viết mới!',
-                                  ),
-                                  description: Text(
-                                    publishImmediately
-                                        ? 'Bài viết "$title" đã được xuất bản lên Diễn đàn.'
-                                        : 'Bài viết "$title" đã được lưu ở trạng thái Bản nháp.',
-                                  ),
-                                  alignment: Alignment.topCenter,
-                                  autoCloseDuration:
-                                      const Duration(seconds: 4),
-                                  showProgressBar: false,
-                                );
-                              } else {
-                                if (!modalCtx.mounted) return;
-                                setModalState(() => isSubmitting = false);
-                                toastification.show(
-                                  context: context,
-                                  type: ToastificationType.error,
-                                  style: ToastificationStyle.flatColored,
-                                  title: const Text('Thao tác thất bại'),
-                                  description: Text(
-                                    res['message']?.toString() ??
-                                        'Không thể lưu bài viết.',
-                                  ),
-                                  alignment: Alignment.topCenter,
-                                  autoCloseDuration:
-                                      const Duration(seconds: 4),
-                                  showProgressBar: false,
-                                );
-                              }
-                            },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: isSubmitting
-                          ? const SizedBox(
-                              width: 22,
-                              height: 22,
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : Text(
-                              isEditing ? 'Lưu Thay Đổi' : 'Đăng Bài Ngay',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 16,
-                              ),
-                            ),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  /// PATCH /api/expert/articles/{articleId}/status
-  Future<void> _handleToggleExpertArticleStatus(
-    ArticleResponseDTO article,
-    String newStatus,
-  ) async {
-    final res = await _articleApiService.updateExpertArticleStatus(
-      articleId: article.articleId,
-      status: newStatus,
-    );
-    if (!mounted) return;
-
-    if (res['success'] == true) {
-      await Future.wait([
-        _loadExpertMyArticles(),
-        _loadCommunityFeed(),
-      ]);
-      if (!mounted) return;
-      toastification.show(
-        context: context,
-        type: ToastificationType.success,
-        style: ToastificationStyle.flatColored,
-        title: Text(
-          newStatus == 'PUBLISHED'
-              ? 'Đã xuất bản bài viết!'
-              : 'Đã chuyển về Bản nháp!',
-        ),
-        description: Text('Bài viết "${article.title}" -> $newStatus'),
-        alignment: Alignment.topCenter,
-        autoCloseDuration: const Duration(seconds: 3),
-        showProgressBar: false,
-      );
-    } else {
-      toastification.show(
-        context: context,
-        type: ToastificationType.error,
-        style: ToastificationStyle.flatColored,
-        title: const Text('Cập nhật trạng thái thất bại'),
-        description: Text(res['message']?.toString() ?? 'Vui lòng thử lại.'),
-        alignment: Alignment.topCenter,
-        autoCloseDuration: const Duration(seconds: 3),
-        showProgressBar: false,
-      );
-    }
-  }
-
-  /// DELETE /api/expert/articles/{articleId}
-  Future<void> _handleDeleteExpertArticle(ArticleResponseDTO article) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Xóa bài viết?'),
-        content: Text(
-          'Bạn có chắc chắn muốn xóa bài viết "${article.title}" không?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('Hủy'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.redAccent),
-            child: const Text('Xóa'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed != true || !mounted) return;
-
-    final ok = await _articleApiService.deleteExpertArticle(article.articleId);
-    if (!mounted) return;
-
-    if (ok) {
-      await Future.wait([
-        _loadExpertMyArticles(),
-        _loadCommunityFeed(),
-      ]);
-      if (!mounted) return;
-      toastification.show(
-        context: context,
-        type: ToastificationType.success,
-        style: ToastificationStyle.flatColored,
-        title: const Text('Đã xóa bài viết thành công'),
-        alignment: Alignment.topCenter,
-        autoCloseDuration: const Duration(seconds: 3),
-        showProgressBar: false,
-      );
-    } else {
-      toastification.show(
-        context: context,
-        type: ToastificationType.error,
-        style: ToastificationStyle.flatColored,
-        title: const Text('Xóa bài viết thất bại'),
-        alignment: Alignment.topCenter,
-        autoCloseDuration: const Duration(seconds: 3),
-        showProgressBar: false,
-      );
-    }
-  }
-
   Widget _buildArticleStatusBadge(String status) {
     final isPub = status.toUpperCase() == 'PUBLISHED';
     return Container(
@@ -1467,6 +946,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
     List<CommunityCommentResponseDTO> apiComments = [];
     bool isLoadingComments = isLiveCommunityPost;
+    bool hasRequestedComments = false;
+    bool commentsError = false;
     bool isSending = false;
     CommunityCommentResponseDTO? replyingTo;
     CommunityCommentResponseDTO? editingComment;
@@ -1494,7 +975,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
       builder: (modalCtx) => StatefulBuilder(
         builder: (modalCtx, setModalState) {
           Future<void> fetchLiveComments() async {
-            if (!isLiveCommunityPost) return;
+            if (!isLiveCommunityPost || !modalCtx.mounted) return;
             setModalState(() => isLoadingComments = true);
             final page = await _communityPostApiService.getComments(
               postId: post.id,
@@ -1503,7 +984,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
             );
             if (!modalCtx.mounted) return;
             setModalState(() {
-              apiComments = page?.items ?? [];
+              commentsError = page == null;
+              if (page != null) apiComments = page.items;
               isLoadingComments = false;
             });
             if (mounted && page != null) {
@@ -1515,8 +997,8 @@ class _CommunityScreenState extends State<CommunityScreen> {
             }
           }
 
-          if (isLoadingComments && apiComments.isEmpty) {
-            isLoadingComments = false;
+          if (!hasRequestedComments && isLiveCommunityPost) {
+            hasRequestedComments = true;
             Future.microtask(fetchLiveComments);
           }
 
@@ -1572,7 +1054,16 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   const SizedBox(height: 12),
                   Expanded(
                     child: isLiveCommunityPost
-                        ? (apiComments.isEmpty
+                        ? (isLoadingComments
+                            ? const Center(child: CircularProgressIndicator())
+                            : commentsError
+                            ? Center(
+                                child: TextButton(
+                                  onPressed: fetchLiveComments,
+                                  child: const Text('Không thể tải bình luận. Nhấn để thử lại.'),
+                                ),
+                              )
+                            : apiComments.isEmpty
                             ? Center(
                                 child: Text(
                                   'Chưa có bình luận nào. Hãy là người đầu tiên chia sẻ ý kiến!',
@@ -1586,7 +1077,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                             : ListView.separated(
                                 physics: const BouncingScrollPhysics(),
                                 itemCount: apiComments.length,
-                                separatorBuilder: (_, __) =>
+                                separatorBuilder: (_, _) =>
                                     Divider(color: context.inputColor),
                                 itemBuilder: (_, index) {
                                   final c = apiComments[index];
@@ -1773,7 +1264,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         : ListView.separated(
                             physics: const BouncingScrollPhysics(),
                             itemCount: fallbackComments.length,
-                            separatorBuilder: (_, __) =>
+                            separatorBuilder: (_, _) =>
                                 Divider(color: context.inputColor),
                             itemBuilder: (_, index) {
                               final c = fallbackComments[index];
@@ -1953,11 +1444,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                       );
                                     }
 
-                                    if (!modalCtx.mounted) return;
+                                    if (!modalCtx.mounted || !mounted) return;
                                     setModalState(() {
                                       isSending = false;
-                                      replyingTo = null;
-                                      editingComment = null;
+                                      if (res['success'] == true) {
+                                        replyingTo = null;
+                                        editingComment = null;
+                                      }
                                     });
                                     if (res['success'] == true) {
                                       commentController.clear();
@@ -2096,17 +1589,13 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isExpert = _isExpertRole;
-
     return Scaffold(
       backgroundColor: context.bgColor,
       appBar: AppBar(
         title: Text(
-          _viewMode == 2
-              ? 'Quản Lý Bài Viết Chuyên Gia'
-              : (_viewMode == 1
+          _viewMode == 1
                   ? 'Bài Đăng Cộng Đồng Của Tôi'
-                  : 'Diễn Đàn Cộng Đồng Film'),
+                  : 'Diễn Đàn Cộng Đồng Film',
         ),
         actions: [
           IconButton(
@@ -2118,16 +1607,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
             tooltip: 'Đăng bài chia sẻ cộng đồng',
             onPressed: () => _showCommunityPostFormModal(),
           ),
-          if (isExpert)
-            IconButton(
-              icon: const Icon(
-                Icons.edit_note_rounded,
-                color: AppColors.primary,
-                size: 28,
-              ),
-              tooltip: 'Tạo bài viết chuyên gia (Article)',
-              onPressed: () => _showExpertArticleFormModal(),
-            ),
         ],
       ),
       body: SafeArea(
@@ -2197,35 +1676,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         ),
                       ),
                     ),
-                    if (isExpert)
-                      Expanded(
-                        child: GestureDetector(
-                          onTap: () {
-                            setState(() => _viewMode = 2);
-                            _loadExpertMyArticles();
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            decoration: BoxDecoration(
-                              color: _viewMode == 2
-                                  ? AppColors.primary
-                                  : Colors.transparent,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              'Chuyên Gia (${_expertMyArticles.length})',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                                color: _viewMode == 2
-                                    ? Colors.white
-                                    : context.textColor,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
@@ -2271,22 +1721,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             ),
 
             // Filter Row
-            if (isExpert && _viewMode == 2)
-              SizedBox(
-                height: 44,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  children: [
-                    _buildExpertStatusChip('Tất cả', ''),
-                    const SizedBox(width: 8),
-                    _buildExpertStatusChip('Đã xuất bản', 'PUBLISHED'),
-                    const SizedBox(width: 8),
-                    _buildExpertStatusChip('Bản nháp', 'DRAFT'),
-                  ],
-                ),
-              )
-            else if (_viewMode == 0)
+            if (_viewMode == 0)
               SizedBox(
                 height: 46,
                 child: ListView.builder(
@@ -2329,11 +1764,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
             // Content Area
             Expanded(
-              child: _viewMode == 2 && isExpert
-                  ? _buildExpertArticlesView()
-                  : (_viewMode == 1
+              child: _viewMode == 1
                       ? _buildMyCommunityPostsView()
-                      : _buildCommunityFeedView()),
+                      : _buildCommunityFeedView(),
             ),
           ],
         ),
@@ -2359,33 +1792,19 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  Widget _buildExpertStatusChip(String label, String statusValue) {
-    final isSelected = _expertStatusFilter == statusValue;
-    return ActionChip(
-      label: Text(label),
-      backgroundColor: isSelected ? AppColors.primary : context.cardColor,
-      labelStyle: TextStyle(
-        color: isSelected ? Colors.white : context.textColor,
-        fontWeight: FontWeight.bold,
-        fontSize: 12,
-      ),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-          color: isSelected ? AppColors.primary : context.borderColor,
-        ),
-      ),
-      onPressed: () {
-        setState(() => _expertStatusFilter = statusValue);
-        _loadExpertMyArticles();
-      },
-    );
-  }
-
   Widget _buildCommunityFeedView() {
     if (_isLoadingFeed) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+
+    if (_feedError) {
+      return Center(
+        child: TextButton(
+          onPressed: _loadCommunityFeed,
+          child: const Text('Không thể tải bài đăng. Nhấn để thử lại.'),
+        ),
       );
     }
 
@@ -2438,6 +1857,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
     if (_isLoadingMyPosts) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+    if (_myPostsError) {
+      return Center(
+        child: TextButton(
+          onPressed: _loadMyCommunityPosts,
+          child: const Text('Không thể tải bài đăng của bạn. Nhấn để thử lại.'),
+        ),
       );
     }
 
@@ -2510,7 +1937,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
 
           return GestureDetector(
             onTap: () =>
-                _showPostOrArticleDetailModal(communityPost: postDto),
+                _showPostDetailModal(communityPost: postDto),
             child: Container(
               margin: const EdgeInsets.only(bottom: 16),
               padding: const EdgeInsets.all(18),
@@ -2650,189 +2077,9 @@ class _CommunityScreenState extends State<CommunityScreen> {
     );
   }
 
-  Widget _buildExpertArticlesView() {
-    if (_isLoadingExpertArticles) {
-      return const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
-      );
-    }
-
-    final items = _filteredExpertArticles;
-    if (items.isEmpty) {
-      return RefreshIndicator(
-        color: AppColors.primary,
-        onRefresh: _loadExpertMyArticles,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(32),
-          children: [
-            const SizedBox(height: 60),
-            const Icon(Icons.article_outlined,
-                size: 64, color: AppColors.textHint),
-            const SizedBox(height: 16),
-            Text(
-              'Chưa có bài viết chuyên môn nào',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: context.textColor,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Hãy tạo bài viết mới để chia sẻ kiến thức nhiếp ảnh film lên Diễn đàn Cộng đồng.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: context.textSecColor,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 20),
-            ElevatedButton.icon(
-              onPressed: () => _showExpertArticleFormModal(),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-              icon: const Icon(Icons.add),
-              label: const Text(
-                'Tạo Bài Viết Mới',
-                style: TextStyle(fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      color: AppColors.primary,
-      onRefresh: _loadExpertMyArticles,
-      child: ListView.builder(
-        physics: const AlwaysScrollableScrollPhysics(
-          parent: BouncingScrollPhysics(),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final article = items[index];
-          final isPublished = article.status.toUpperCase() == 'PUBLISHED';
-
-          return GestureDetector(
-            onTap: () =>
-                _showPostOrArticleDetailModal(expertArticle: article),
-            child: Container(
-              margin: const EdgeInsets.only(bottom: 16),
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: context.cardColor,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: context.borderColor),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          article.category,
-                          style: const TextStyle(
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      _buildArticleStatusBadge(article.status),
-                      const Spacer(),
-                      Text(
-                        ArticleResponseDTO.formatTimeAgo(
-                            article.updatedAt ?? article.createdAt),
-                        style: TextStyle(
-                            fontSize: 12, color: context.textSecColor),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    article.title,
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.bold,
-                      color: context.textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    article.content,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: context.textSecColor,
-                      height: 1.45,
-                    ),
-                  ),
-                  const Divider(height: 22),
-                  Row(
-                    children: [
-                      TextButton.icon(
-                        onPressed: () =>
-                            _showExpertArticleFormModal(existing: article),
-                        icon: const Icon(Icons.edit_outlined, size: 17),
-                        label: const Text('Sửa'),
-                      ),
-                      TextButton.icon(
-                        onPressed: () => _handleToggleExpertArticleStatus(
-                          article,
-                          isPublished ? 'DRAFT' : 'PUBLISHED',
-                        ),
-                        icon: Icon(
-                          isPublished
-                              ? Icons.unpublished_outlined
-                              : Icons.publish_rounded,
-                          size: 17,
-                        ),
-                        label: Text(isPublished ? 'Ẩn về Nháp' : 'Xuất bản'),
-                      ),
-                      const Spacer(),
-                      IconButton(
-                        tooltip: 'Xóa bài viết',
-                        onPressed: () => _handleDeleteExpertArticle(article),
-                        icon: const Icon(
-                          Icons.delete_outline_rounded,
-                          color: Colors.redAccent,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
   Widget _buildPostCard(BlogPost post) {
     return GestureDetector(
-      onTap: () => _showPostOrArticleDetailModal(post: post),
+      onTap: () => _showPostDetailModal(post: post),
       child: Container(
         margin: const EdgeInsets.only(bottom: 24),
         padding: const EdgeInsets.all(20),
@@ -2911,7 +2158,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
                   icon: Icon(Icons.open_in_new_rounded,
                       size: 18, color: context.textSecColor),
                   tooltip: 'Xem chi tiết bài viết',
-                  onPressed: () => _showPostOrArticleDetailModal(post: post),
+                  onPressed: () => _showPostDetailModal(post: post),
                 ),
               ],
             ),
@@ -2986,43 +2233,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           style: TextStyle(
                             color: post.userReaction == 'like'
                                 ? AppColors.primary
-                                : context.textSecColor,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 4),
-                GestureDetector(
-                  onTap: () => _handleDislike(post),
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: post.userReaction == 'dislike'
-                          ? Colors.grey.withValues(alpha: 0.2)
-                          : Colors.transparent,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          post.userReaction == 'dislike'
-                              ? Icons.thumb_down_rounded
-                              : Icons.thumb_down_alt_outlined,
-                          color: post.userReaction == 'dislike'
-                              ? context.textColor
-                              : context.textSecColor,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          '${post.dislikes}',
-                          style: TextStyle(
-                            color: post.userReaction == 'dislike'
-                                ? context.textColor
                                 : context.textSecColor,
                             fontWeight: FontWeight.bold,
                           ),

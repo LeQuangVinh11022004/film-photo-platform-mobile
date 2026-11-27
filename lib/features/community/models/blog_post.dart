@@ -11,7 +11,6 @@ class BlogPost {
   final List<String> images;
   final String category;
   final String status; // 'PUBLISHED' or 'DRAFT'
-  final bool isApiArticle;
   final bool isCommunityPost;
   int likes;
   int dislikes;
@@ -32,7 +31,6 @@ class BlogPost {
     this.images = const [],
     this.category = 'Kỹ thuật Film',
     this.status = 'PUBLISHED',
-    this.isApiArticle = false,
     this.isCommunityPost = false,
     this.likes = 0,
     this.dislikes = 0,

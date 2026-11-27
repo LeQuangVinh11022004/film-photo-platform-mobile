@@ -12,36 +12,6 @@ class CommunityPostApiService {
 
   final ApiClient _apiClient = ApiClient();
 
-  /// Bộ nhớ đệm giữ danh sách ảnh đính kèm của bài đăng khi PUT /api/community/posts/{postId}
-  /// trên Backend gặp lỗi DbUpdateConcurrencyException khi replace collection Images.
-  final Map<String, List<CommunityPostImageResponseDTO>>
-      _localPostImagesOverride = {};
-
-  CommunityPostResponseDTO _applyImageOverride(CommunityPostResponseDTO dto) {
-    final overrideImages = _localPostImagesOverride[dto.postId];
-    if (dto.images.isEmpty &&
-        overrideImages != null &&
-        overrideImages.isNotEmpty) {
-      return CommunityPostResponseDTO(
-        postId: dto.postId,
-        userId: dto.userId,
-        authorName: dto.authorName,
-        authorRole: dto.authorRole,
-        title: dto.title,
-        content: dto.content,
-        category: dto.category,
-        status: dto.status,
-        createdAt: dto.createdAt,
-        updatedAt: dto.updatedAt,
-        likeCount: dto.likeCount,
-        commentCount: dto.commentCount,
-        isLiked: dto.isLiked,
-        images: overrideImages,
-      );
-    }
-    return dto;
-  }
-
   /// GET /api/community/posts
   /// Lấy danh sách bài đăng cộng đồng (dành cho PHOTOGRAPHER và EXPERT)
   Future<PagedResponseDTO<CommunityPostResponseDTO>?> getFeed({
@@ -60,8 +30,7 @@ class CommunityPostApiService {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         return PagedResponseDTO<CommunityPostResponseDTO>.fromJson(
           json,
-          (item) =>
-              _applyImageOverride(CommunityPostResponseDTO.fromJson(item)),
+          (item) => CommunityPostResponseDTO.fromJson(item),
         );
       }
       if (kDebugMode) {
@@ -88,8 +57,7 @@ class CommunityPostApiService {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
         return PagedResponseDTO<CommunityPostResponseDTO>.fromJson(
           json,
-          (item) =>
-              _applyImageOverride(CommunityPostResponseDTO.fromJson(item)),
+          (item) => CommunityPostResponseDTO.fromJson(item),
         );
       }
       if (kDebugMode) {
@@ -109,7 +77,7 @@ class CommunityPostApiService {
       final response = await _apiClient.get('/api/community/posts/$postId');
       if (response.statusCode == 200) {
         final json = jsonDecode(response.body) as Map<String, dynamic>;
-        return _applyImageOverride(CommunityPostResponseDTO.fromJson(json));
+        return CommunityPostResponseDTO.fromJson(json);
       }
       if (kDebugMode) {
         print('getPostDetail failed (${response.statusCode}): ${response.body}');
@@ -140,26 +108,16 @@ class CommunityPostApiService {
       }
 
       if (response.statusCode == 201 || response.statusCode == 200) {
-        final created = json.isNotEmpty
-            ? CommunityPostResponseDTO.fromJson(json)
-            : null;
-        if (created != null && request.images.isNotEmpty) {
-          _localPostImagesOverride[created.postId] = request.images
-              .map(
-                (img) => CommunityPostImageResponseDTO(
-                  imageId: created.images.isNotEmpty
-                      ? created.images.first.imageId
-                      : 'local-img',
-                  imageUrl: img.imageUrl,
-                  caption: img.caption,
-                  displayOrder: img.displayOrder,
-                ),
-              )
-              .toList();
+        if (json['postId'] == null || json['postId'].toString().isEmpty) {
+          return {
+            'success': false,
+            'message': 'Máy chủ không trả về thông tin bài đăng hợp lệ.',
+          };
         }
+        final created = CommunityPostResponseDTO.fromJson(json);
         return {
           'success': true,
-          'post': created != null ? _applyImageOverride(created) : null,
+          'post': created,
         };
       }
       return {
@@ -183,39 +141,10 @@ class CommunityPostApiService {
     required CommunityPostWriteRequestDTO request,
   }) async {
     try {
-      if (request.images.isNotEmpty) {
-        _localPostImagesOverride[postId] = request.images
-            .map(
-              (img) => CommunityPostImageResponseDTO(
-                imageId: 'local-img-$postId',
-                imageUrl: img.imageUrl,
-                caption: img.caption,
-                displayOrder: img.displayOrder,
-              ),
-            )
-            .toList();
-      } else {
-        _localPostImagesOverride.remove(postId);
-      }
-
-      var response = await _apiClient.put(
+      final response = await _apiClient.put(
         '/api/community/posts/$postId',
         body: request.toJson(),
       );
-
-      // Fallback an toàn nếu EF Core trên Backend gặp lỗi DbUpdateConcurrencyException khi replace collection Images trên PUT
-      if (response.statusCode == 500 && request.images.isNotEmpty) {
-        final fallbackReq = CommunityPostWriteRequestDTO(
-          title: request.title,
-          content: request.content,
-          category: request.category,
-          images: const [],
-        );
-        response = await _apiClient.put(
-          '/api/community/posts/$postId',
-          body: fallbackReq.toJson(),
-        );
-      }
 
       Map<String, dynamic> json = {};
       if (response.body.isNotEmpty) {
@@ -225,9 +154,13 @@ class CommunityPostApiService {
       }
 
       if (response.statusCode == 200) {
-        final updated = json.isNotEmpty
-            ? _applyImageOverride(CommunityPostResponseDTO.fromJson(json))
-            : null;
+        if (json['postId'] == null || json['postId'].toString().isEmpty) {
+          return {
+            'success': false,
+            'message': 'Máy chủ không trả về thông tin bài đăng hợp lệ.',
+          };
+        }
+        final updated = CommunityPostResponseDTO.fromJson(json);
         return {
           'success': true,
           'post': updated,
@@ -253,7 +186,6 @@ class CommunityPostApiService {
     try {
       final response = await _apiClient.delete('/api/community/posts/$postId');
       if (response.statusCode == 204 || response.statusCode == 200) {
-        _localPostImagesOverride.remove(postId);
         return true;
       }
       return false;

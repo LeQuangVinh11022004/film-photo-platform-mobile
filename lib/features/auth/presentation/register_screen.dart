@@ -17,6 +17,7 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
+  final _usernameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -27,6 +28,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _nameController.dispose();
+    _usernameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
@@ -40,13 +42,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final RegisterResponse res = await _authService.register(
       name: _nameController.text.trim(),
+      username: _usernameController.text.trim(),
       email: _emailController.text.trim(),
       password: _passwordController.text,
     );
 
-    setState(() => _isLoading = false);
-
     if (!mounted) return;
+    setState(() => _isLoading = false);
 
     if (res.success == true) {
       toastification.show(
@@ -181,6 +183,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   const SizedBox(height: 16),
 
+                  CustomTextField(
+                    controller: _usernameController,
+                    hintText: 'Tên đăng nhập',
+                    prefixIcon: Icons.person_outline,
+                    validator: validateUsername,
+                  ),
+                  const SizedBox(height: 16),
+
                   // Email Field
                   CustomTextField(
                     controller: _emailController,
@@ -210,8 +220,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (value == null || value.isEmpty) {
                         return 'Vui lòng nhập mật khẩu';
                       }
-                      if (value.length < 6) {
-                        return 'Mật khẩu phải từ 6 ký tự trở lên';
+                      if (value.length < 8 || value.length > 72) {
+                        return 'Mật khẩu phải có từ 8 đến 72 ký tự';
                       }
                       return null;
                     },
