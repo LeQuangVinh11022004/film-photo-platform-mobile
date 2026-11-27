@@ -1,5 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
+import 'package:image_picker/image_picker.dart';
 import '../../../core/network/api_client.dart';
 import '../../booking/models/booking_api_models.dart';
 import '../models/community_post_api_models.dart';
@@ -11,6 +13,55 @@ class CommunityPostApiService {
   CommunityPostApiService._internal();
 
   final ApiClient _apiClient = ApiClient();
+
+  /// POST /api/community/posts/images/upload
+  /// Tải ảnh bài đăng lên storage và nhận URL do backend quản lý.
+  Future<Map<String, dynamic>> uploadPostImage(XFile file) async {
+    try {
+      final baseUrl = _apiClient.baseUrl.replaceFirst(RegExp(r'/+$'), '');
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/api/community/posts/images/upload'),
+      )..files.add(
+          http.MultipartFile.fromBytes(
+            'file',
+            await file.readAsBytes(),
+            filename: file.name.trim().isEmpty
+                ? 'community-image.jpg'
+                : file.name.trim(),
+          ),
+        );
+      final token = _apiClient.authToken;
+      if (token != null && token.isNotEmpty) {
+        request.headers['Authorization'] = 'Bearer $token';
+      }
+
+      final streamed = await _apiClient.client.send(request).timeout(
+            const Duration(seconds: 60),
+          );
+      final response = await http.Response.fromStream(streamed);
+      Map<String, dynamic> json = {};
+      if (response.body.isNotEmpty) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is Map<String, dynamic>) json = decoded;
+      }
+
+      if (response.statusCode == 201 &&
+          json['imageUrl'] is String &&
+          (json['imageUrl'] as String).trim().isNotEmpty) {
+        return {'success': true, 'imageUrl': (json['imageUrl'] as String).trim()};
+      }
+      return {
+        'success': false,
+        'message': json['message']?.toString() ??
+            json['detail']?.toString() ??
+            'Không thể tải ảnh lên (Mã lỗi: ${response.statusCode}).',
+      };
+    } catch (e) {
+      if (kDebugMode) print('uploadPostImage error: $e');
+      return {'success': false, 'message': 'Lỗi khi tải ảnh lên: $e'};
+    }
+  }
 
   /// GET /api/community/posts
   /// Lấy danh sách bài đăng cộng đồng (dành cho PHOTOGRAPHER và EXPERT)
