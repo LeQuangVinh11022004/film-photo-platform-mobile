@@ -42,7 +42,11 @@ class AppUpdateService {
         'https://api.github.com/repos/$_githubOwner/$_githubRepo/releases/latest',
       );
 
-  bool _hasCheckedThisSession = false;
+  DateTime? _lastCheckedAt;
+  String? _dismissedVersion;
+  bool _isChecking = false;
+  bool _isDialogShowing = false;
+  String? _lastError;
 
   /// So sánh 2 chuỗi semantic version (VD: "1.0.19" > "1.0.18").
   /// Trả về > 0 nếu [latest] mới hơn [current].
@@ -71,6 +75,7 @@ class AppUpdateService {
     http.Client? client,
     String? currentVersionOverride,
   }) async {
+    _lastError = null;
     final httpClient = client ?? http.Client();
     final shouldClose = client == null;
     try {
@@ -79,10 +84,12 @@ class AppUpdateService {
         headers: const {
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28',
+          'User-Agent': 'FilmPhotographyPlatform-Mobile',
         },
       ).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200 || response.bodyBytes.isEmpty) {
+        _lastError = 'Máy chủ GitHub phản hồi mã ${response.statusCode}.';
         return null;
       }
 
@@ -130,6 +137,7 @@ class AppUpdateService {
         releasePageUrl: releasePageUrl,
       );
     } catch (e) {
+      _lastError = 'Không thể kết nối kiểm tra cập nhật.';
       if (kDebugMode) {
         debugPrint('[APP_UPDATE] Check failed: $e');
       }
@@ -141,16 +149,32 @@ class AppUpdateService {
     }
   }
 
-  /// Tự động kiểm tra (mỗi phiên chạy 1 lần) và hiển thị popup cập nhật nếu có bản mới.
+  /// Tự động kiểm tra (có cooldown 60 giây khi quay lại app) và hiển thị popup cập nhật nếu có bản mới.
   /// Truyền [force] = true khi người dùng bấm "Kiểm tra cập nhật" thủ công trong Cài đặt.
   Future<void> checkAndPromptUpdate(
     BuildContext context, {
     bool force = false,
   }) async {
-    if (!force && _hasCheckedThisSession) return;
-    _hasCheckedThisSession = true;
+    if (_isChecking || _isDialogShowing) return;
 
-    final updateInfo = await checkForUpdate();
+    final now = DateTime.now();
+    if (!force &&
+        _lastCheckedAt != null &&
+        now.difference(_lastCheckedAt!) < const Duration(seconds: 60)) {
+      return;
+    }
+
+    _isChecking = true;
+    AppUpdateInfo? updateInfo;
+    try {
+      updateInfo = await checkForUpdate();
+      if (_lastError == null) {
+        _lastCheckedAt = DateTime.now();
+      }
+    } finally {
+      _isChecking = false;
+    }
+
     if (!context.mounted) return;
 
     if (updateInfo == null) {
@@ -158,12 +182,17 @@ class AppUpdateService {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Bạn đang dùng phiên bản mới nhất (v$currentAppVersion).',
+              _lastError ??
+                  'Bạn đang dùng phiên bản mới nhất (v$currentAppVersion).',
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: _lastError != null ? Colors.orange : Colors.green,
           ),
         );
       }
+      return;
+    }
+
+    if (!force && _dismissedVersion == updateInfo.latestVersion) {
       return;
     }
 
@@ -174,105 +203,120 @@ class AppUpdateService {
     BuildContext context,
     AppUpdateInfo info,
   ) async {
+    if (_isDialogShowing) return;
+    _isDialogShowing = true;
     final notesPreview = info.releaseNotes.isEmpty
         ? 'Cải thiện hiệu năng, sửa lỗi và đồng bộ API mới nhất.'
         : (info.releaseNotes.length > 350
             ? '${info.releaseNotes.substring(0, 350)}...'
             : info.releaseNotes);
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogCtx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.12),
-                shape: BoxShape.circle,
-              ),
-              child: const Icon(
-                Icons.system_update_rounded,
-                color: AppColors.primary,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Có phiên bản mới!',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    'v${info.currentVersion} → v${info.latestVersion}',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogCtx) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          title: Row(
             children: [
-              Text(
-                notesPreview,
-                style: const TextStyle(fontSize: 13.5, height: 1.45),
-              ),
-              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(12),
+                  color: AppColors.primary.withValues(alpha: 0.12),
+                  shape: BoxShape.circle,
                 ),
-                child: const Text(
-                  'Sau khi tải xong file APK, bấm mở file và chọn "Cập nhật" để cài đè giữ nguyên tài khoản & dữ liệu.',
-                  style: TextStyle(fontSize: 12, height: 1.4),
+                child: const Icon(
+                  Icons.system_update_rounded,
+                  color: AppColors.primary,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Có phiên bản mới!',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
+                    ),
+                    Text(
+                      'v${info.currentVersion} → v${info.latestVersion}',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.primary,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogCtx),
-            child: const Text('Để sau'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  notesPreview,
+                  style: const TextStyle(fontSize: 13.5, height: 1.45),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    'Sau khi tải xong file APK, bấm mở file và chọn "Cập nhật" để cài đè giữ nguyên tài khoản & dữ liệu.',
+                    style: TextStyle(fontSize: 12, height: 1.4),
+                  ),
+                ),
+              ],
+            ),
           ),
-          ElevatedButton.icon(
-            onPressed: () async {
-              Navigator.pop(dialogCtx);
-              final uri = Uri.tryParse(info.downloadUrl);
-              if (uri != null) {
-                await launchUrl(uri, mode: LaunchMode.externalApplication);
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _dismissedVersion = info.latestVersion;
+                Navigator.pop(dialogCtx);
+              },
+              child: const Text('Để sau'),
+            ),
+            ElevatedButton.icon(
+              onPressed: () async {
+                Navigator.pop(dialogCtx);
+                final uri = Uri.tryParse(info.downloadUrl);
+                if (uri != null) {
+                  final launched = await launchUrl(
+                    uri,
+                    mode: LaunchMode.externalApplication,
+                  );
+                  if (!launched) {
+                    await launchUrl(uri, mode: LaunchMode.platformDefault);
+                  }
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              icon: const Icon(Icons.download_rounded, size: 18),
+              label: const Text(
+                'Tải & Cập nhật',
+                style: TextStyle(fontWeight: FontWeight.bold),
               ),
             ),
-            icon: const Icon(Icons.download_rounded, size: 18),
-            label: const Text(
-              'Tải & Cập nhật',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
+    } finally {
+      _isDialogShowing = false;
+    }
   }
 }

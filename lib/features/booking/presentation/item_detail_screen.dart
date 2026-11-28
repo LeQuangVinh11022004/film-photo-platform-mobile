@@ -145,34 +145,14 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         _mySpaceBookings = matchingBookings;
         _spaceEquipment = equipPage?.items ?? [];
         if (page != null && page.totalReviews > 0 && page.averageRating > 0) {
-          _item = BookingItem(
-            id: _item.id,
-            name: _item.name,
-            category: _item.category,
-            location: _item.location,
-            pricePerHour: _item.pricePerHour,
+          _bookingApiService.updateCachedSpaceRating(
+            spaceId,
+            page.averageRating,
+            reviewCount: page.totalReviews,
+          );
+          _item = _item.copyWith(
             rating: page.averageRating,
-            imageUrl: _item.imageUrl,
-            description: _item.description,
-            amenities: _item.amenities,
-            previewImages: _item.previewImages,
-            isFavorite: _item.isFavorite,
-            capacity: _item.capacity,
-            providerName: _item.providerName,
-            lengthM: _item.lengthM,
-            widthM: _item.widthM,
-            heightM: _item.heightM,
-            artisticStyle: _item.artisticStyle,
-            supportedProcesses: _item.supportedProcesses,
-            lightingConditions: _item.lightingConditions,
-            ventilationDetails: _item.ventilationDetails,
-            acousticDetails: _item.acousticDetails,
-            operatingHours: _item.operatingHours,
-            usagePolicies: _item.usagePolicies,
-            availableSlots: _item.availableSlots,
-            parentSpaceId: _item.parentSpaceId,
-            parentSpaceType: _item.parentSpaceType,
-            parentSpaceName: _item.parentSpaceName,
+            reviewCount: page.totalReviews,
           );
         }
         _isLoadingReviews = false;

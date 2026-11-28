@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../core/network/api_client.dart';
 import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
+import 'review_api_service.dart';
 
 class BookingApiService {
   // Singleton pattern
@@ -11,6 +12,79 @@ class BookingApiService {
   BookingApiService._internal();
 
   final ApiClient _apiClient = ApiClient();
+  final Map<String, ({double rating, int reviewCount})> _spaceRatingCache = {};
+
+  /// Cập nhật cache điểm đánh giá & số lượt đánh giá của 1 Studio/Darkroom sau khi tải hoặc gửi review mới.
+  void updateCachedSpaceRating(
+    String spaceId,
+    double averageRating, {
+    int? reviewCount,
+  }) {
+    final key = spaceId.trim().toLowerCase();
+    if (key.isEmpty || averageRating <= 0) return;
+    final prev = _spaceRatingCache[key];
+    _spaceRatingCache[key] = (
+      rating: averageRating,
+      reviewCount: reviewCount ?? prev?.reviewCount ?? 1,
+    );
+  }
+
+  /// Đồng bộ điểm đánh giá & số lượt đánh giá thực tế từ Review API cho danh sách Studio & Phòng tối.
+  /// Gọi song song với pageSize=1 để rất nhẹ và có cache trong phiên.
+  Future<List<BookingItem>> enrichSpaceRatings(
+    List<BookingItem> items, {
+    bool forceRefresh = false,
+  }) async {
+    if (items.isEmpty) return items;
+
+    final reviewService = ReviewApiService();
+    final targets = items.where((item) {
+      if (item.category != BookingCategory.studio &&
+          item.category != BookingCategory.darkroom) {
+        return false;
+      }
+      if (item.id.trim().length < 32) return false;
+      final key = item.id.trim().toLowerCase();
+      return forceRefresh || !_spaceRatingCache.containsKey(key);
+    }).toList();
+
+    if (targets.isNotEmpty) {
+      await Future.wait(targets.map((item) async {
+        try {
+          final page = item.category == BookingCategory.darkroom
+              ? await reviewService.getDarkroomReviews(
+                  darkroomId: item.id,
+                  page: 1,
+                  pageSize: 1,
+                )
+              : await reviewService.getStudioReviews(
+                  studioId: item.id,
+                  page: 1,
+                  pageSize: 1,
+                );
+          if (page != null) {
+            _spaceRatingCache[item.id.trim().toLowerCase()] = (
+              rating: page.totalReviews > 0 ? page.averageRating : 0.0,
+              reviewCount: page.totalReviews,
+            );
+          }
+        } catch (_) {
+          // Giữ nguyên rating hiện có nếu không tải được
+        }
+      }));
+    }
+
+    return items.map((item) {
+      final cached = _spaceRatingCache[item.id.trim().toLowerCase()];
+      if (cached != null) {
+        return item.copyWith(
+          rating: cached.rating > 0 ? cached.rating : item.rating,
+          reviewCount: cached.reviewCount > 0 ? cached.reviewCount : item.reviewCount,
+        );
+      }
+      return item;
+    }).toList();
+  }
 
   /// Lấy danh sách Studios (/api/photographer/studios)
   Future<List<ResourceItemResponseDTO>> getStudios({

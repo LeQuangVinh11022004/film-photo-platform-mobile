@@ -18,7 +18,7 @@ class ItemListScreen extends StatefulWidget {
 }
 
 class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProviderStateMixin {
-  static const int _pageSize = 6;
+  static const int _pageSize = 5;
 
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
@@ -102,12 +102,17 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
         _apiService.getDarkrooms(fromDate: fromDateStr, toDate: toDateStr),
       ]);
 
-      final studioItems = results[0].map((e) => e.toBookingItem()).toList();
-      final darkroomItems = results[1].map((e) => e.toBookingItem()).toList();
-      final equipmentItems = await _apiService.getAllEquipmentItems([
-        ...studioItems,
-        ...darkroomItems,
+      final rawStudios = results[0].map((e) => e.toBookingItem()).toList();
+      final rawDarkrooms = results[1].map((e) => e.toBookingItem()).toList();
+      final enrichedResults = await Future.wait([
+        _apiService.enrichSpaceRatings(rawStudios),
+        _apiService.enrichSpaceRatings(rawDarkrooms),
+        _apiService.getAllEquipmentItems([...rawStudios, ...rawDarkrooms]),
       ]);
+
+      final studioItems = enrichedResults[0];
+      final darkroomItems = enrichedResults[1];
+      final equipmentItems = enrichedResults[2];
 
       if (!mounted) return;
 

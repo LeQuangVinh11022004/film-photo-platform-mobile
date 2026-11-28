@@ -20,7 +20,7 @@ class CommunityScreen extends StatefulWidget {
 }
 
 class _CommunityScreenState extends State<CommunityScreen> {
-  static const int _pageSize = 8;
+  static const int _pageSize = 5;
 
   final CommunityPostApiService _communityPostApiService =
       CommunityPostApiService();

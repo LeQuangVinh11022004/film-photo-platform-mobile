@@ -9,6 +9,8 @@ class BookingItem {
   final String location;
   final double pricePerHour;
   final double rating;
+  final int reviewCount;
+  final int bookingCount;
   final String imageUrl;
   final String description;
   final List<String> amenities;
@@ -42,6 +44,8 @@ class BookingItem {
     required this.location,
     required this.pricePerHour,
     required this.rating,
+    this.reviewCount = 0,
+    this.bookingCount = 0,
     required this.imageUrl,
     required this.description,
     required this.amenities,
@@ -66,6 +70,48 @@ class BookingItem {
   });
 
   String get ratingLabel => rating > 0 ? rating.toStringAsFixed(1) : 'Chưa rõ';
+
+  /// Điểm độ phổ biến dựa trên lượt đánh giá, điểm đánh giá và lượt đặt.
+  double get popularityScore =>
+      (reviewCount * 5.0) + (bookingCount * 3.0) + (rating * 2.0);
+
+  BookingItem copyWith({
+    double? rating,
+    int? reviewCount,
+    int? bookingCount,
+  }) {
+    return BookingItem(
+      id: id,
+      name: name,
+      category: category,
+      location: location,
+      pricePerHour: pricePerHour,
+      rating: rating ?? this.rating,
+      reviewCount: reviewCount ?? this.reviewCount,
+      bookingCount: bookingCount ?? this.bookingCount,
+      imageUrl: imageUrl,
+      description: description,
+      amenities: amenities,
+      previewImages: previewImages,
+      isFavorite: isFavorite,
+      capacity: capacity,
+      providerName: providerName,
+      lengthM: lengthM,
+      widthM: widthM,
+      heightM: heightM,
+      artisticStyle: artisticStyle,
+      supportedProcesses: supportedProcesses,
+      lightingConditions: lightingConditions,
+      ventilationDetails: ventilationDetails,
+      acousticDetails: acousticDetails,
+      operatingHours: operatingHours,
+      usagePolicies: usagePolicies,
+      availableSlots: availableSlots,
+      parentSpaceId: parentSpaceId,
+      parentSpaceType: parentSpaceType,
+      parentSpaceName: parentSpaceName,
+    );
+  }
 
   String get categoryName {
     switch (category) {
