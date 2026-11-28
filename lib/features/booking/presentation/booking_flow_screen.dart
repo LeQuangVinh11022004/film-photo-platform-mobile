@@ -172,7 +172,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     _liveAvailableSlots = List<Map<String, dynamic>>.from(widget.item.availableSlots);
     _initAddons();
     _initSelectedDate();
-    _syncLiveSlotsSubscriptionsAndEquipment();
+    _syncLiveSlotsSubscriptionsAndEquipment(isInitial: true);
   }
 
   String get _resolvedSpaceId {
@@ -184,9 +184,12 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     return widget.item.id.trim();
   }
 
-  Future<void> _syncLiveSlotsSubscriptionsAndEquipment() async {
+  Future<void> _syncLiveSlotsSubscriptionsAndEquipment({bool isInitial = false}) async {
     final spaceId = _resolvedSpaceId;
-    if (spaceId.length < 32) return; // Skip mock non-UUID items
+    if (spaceId.length < 32) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return; // Skip mock non-UUID items
+    }
 
     setState(() => _isLoadingEquipment = true);
 
@@ -232,7 +235,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       setState(() {
         _liveAvailableSlots = converted;
       });
-      if (widget.item.availableSlots.isEmpty && converted.isNotEmpty) {
+      if (isInitial &&
+          widget.item.availableSlots.isEmpty &&
+          converted.isNotEmpty) {
         _initSelectedDateFromSource(converted);
       }
 
@@ -242,6 +247,11 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
 
       // Now if there is an active selected slot, refresh equipment filtered by availabilityId
       final currentSlots = _timeSlots;
+      if (_selectedTimeSlotIndex >= currentSlots.length) {
+        setState(() {
+          _selectedTimeSlotIndex = 0;
+        });
+      }
       if (currentSlots.isNotEmpty) {
         final safeIdx = _selectedTimeSlotIndex < currentSlots.length
             ? _selectedTimeSlotIndex
@@ -641,10 +651,12 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
+        backgroundColor: context.bgColor,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: Icon(Icons.arrow_back_rounded, color: context.textColor),
           onPressed: _prevStep,
         ),
         title: const Text('Tiến trình Đặt chỗ'),
@@ -692,7 +704,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             width: 24,
             height: 24,
             decoration: BoxDecoration(
-              color: isActive ? AppColors.primary : AppColors.inputFill,
+              color: isActive ? AppColors.primary : context.inputColor,
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -714,7 +726,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             style: TextStyle(
               fontSize: 10,
               fontWeight: FontWeight.bold,
-              color: isActive ? AppColors.textPrimary : AppColors.textHint,
+              color: isActive ? context.textColor : AppColors.textHint,
             ),
           ),
         ],
@@ -726,25 +738,29 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     return Container(
       width: 20,
       height: 2,
-      color: AppColors.inputFill,
+      color: context.inputColor,
       margin: const EdgeInsets.only(bottom: 14),
     );
   }
 
   Widget _buildStep1Addons() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _syncLiveSlotsSubscriptionsAndEquipment,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Expanded(
+            Expanded(
               child: Text(
                 'Trang thiết bị đi kèm',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
+                  color: context.textColor,
                 ),
               ),
             ),
@@ -762,7 +778,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: context.isDark
+                      ? AppColors.primary.withValues(alpha: 0.16)
+                      : AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
@@ -781,7 +799,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           'Chọn thêm các trang thiết bị của không gian này để đính kèm trực tiếp vào đơn đặt chỗ.',
           style: TextStyle(
             fontSize: 14,
-            color: AppColors.textSecondary,
+            color: context.textSecColor,
             height: 1.5,
           ),
         ).animate().fadeIn(delay: 100.ms),
@@ -793,20 +811,21 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppColors.inputFill,
+              color: context.inputColor,
               borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: context.borderColor),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.info_outline_rounded,
+                const Icon(Icons.info_outline_rounded,
                     color: AppColors.primary, size: 18),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     'Không có thiết bị khả dụng cho không gian hoặc khung giờ này.',
                     style: TextStyle(
                       fontSize: 12,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                     ),
                   ),
                 ),
@@ -841,10 +860,12 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: isSelected
-                    ? AppColors.primary.withValues(alpha: 0.05)
-                    : AppColors.cardBg,
+                    ? (context.isDark
+                        ? AppColors.primary.withValues(alpha: 0.12)
+                        : AppColors.primarySoft.withValues(alpha: 0.55))
+                    : context.cardColor,
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.border,
+                  color: isSelected ? AppColors.primary : context.borderColor,
                   width: isSelected ? 2 : 1,
                 ),
                 borderRadius: BorderRadius.circular(16),
@@ -856,15 +877,15 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                     padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? AppColors.primary.withValues(alpha: 0.12)
-                          : AppColors.inputFill,
+                          ? AppColors.primary.withValues(alpha: 0.14)
+                          : context.inputColor,
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Icon(
                       addon['icon'],
                       color: isSelected
                           ? AppColors.primary
-                          : AppColors.textSecondary,
+                          : context.textSecColor,
                       size: 24,
                     ),
                   ),
@@ -875,10 +896,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                       children: [
                         Text(
                           addon['name'],
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: context.textColor,
                           ),
                         ),
                         if (availabilityCount != null &&
@@ -886,10 +907,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                           const SizedBox(height: 4),
                           Text(
                             '$availabilityCount slot trống',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
-                              color: Colors.green.shade700,
+                              color: AppColors.success,
                             ),
                           ),
                         ],
@@ -904,15 +925,15 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: AppColors.inputFill,
+                                    color: context.inputColor,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
                                     category,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 11,
                                       fontWeight: FontWeight.w600,
-                                      color: AppColors.textSecondary,
+                                      color: context.textSecColor,
                                     ),
                                   ),
                                 ),
@@ -921,8 +942,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                                   padding: const EdgeInsets.symmetric(
                                       horizontal: 8, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.08),
+                                    color: context.isDark
+                                        ? AppColors.primary
+                                            .withValues(alpha: 0.16)
+                                        : AppColors.primarySoft,
                                     borderRadius: BorderRadius.circular(6),
                                   ),
                                   child: Text(
@@ -937,9 +960,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                               if (quantityTotal != null && quantityTotal > 0)
                                 Text(
                                   '• SL: $quantityTotal',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 11,
-                                    color: AppColors.textSecondary,
+                                    color: context.textSecColor,
                                   ),
                                 ),
                             ],
@@ -951,9 +974,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                             description,
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textSecondary,
+                              color: context.textSecColor,
                               height: 1.35,
                             ),
                           ),
@@ -981,7 +1004,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                           isSelected ? AppColors.primary : Colors.transparent,
                       border: Border.all(
                         color:
-                            isSelected ? AppColors.primary : AppColors.border,
+                            isSelected ? AppColors.primary : context.borderColor,
                         width: 2,
                       ),
                     ),
@@ -995,30 +1018,35 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           );
         }).toList().animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
       ],
-    );
+    ),
+  );
   }
 
   Widget _buildStep2DateTime() {
     final slots = _timeSlots;
 
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        const Text(
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _syncLiveSlotsSubscriptionsAndEquipment,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        children: [
+        Text(
           'Thời gian đặt chỗ',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+            color: context.textColor,
           ),
         ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
         const SizedBox(height: 24),
-        const Text(
+        Text(
           'Chọn Ngày',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 15,
-            color: AppColors.textPrimary,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 12),
@@ -1029,14 +1057,23 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               initialDate: _selectedDate,
               firstDate: DateTime(2024),
               lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
-              builder: (context, child) {
+              builder: (pickerContext, child) {
+                final isDark = context.isDark;
                 return Theme(
-                  data: Theme.of(context).copyWith(
-                    colorScheme: const ColorScheme.light(
-                      primary: AppColors.primary,
-                      onPrimary: Colors.white,
-                      onSurface: AppColors.textPrimary,
-                    ),
+                  data: Theme.of(pickerContext).copyWith(
+                    colorScheme: isDark
+                        ? ColorScheme.dark(
+                            primary: AppColors.primary,
+                            onPrimary: Colors.white,
+                            surface: context.cardColor,
+                            onSurface: context.textColor,
+                          )
+                        : const ColorScheme.light(
+                            primary: AppColors.primary,
+                            onPrimary: Colors.white,
+                            surface: AppColors.cardBg,
+                            onSurface: AppColors.textPrimary,
+                          ),
                   ),
                   child: child!,
                 );
@@ -1063,18 +1100,19 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
-              color: AppColors.inputFill,
+              color: context.inputColor,
               borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: context.borderColor),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
                   '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
+                    color: context.textColor,
                   ),
                 ),
                 const Icon(Icons.calendar_month_rounded, color: AppColors.primary),
@@ -1083,12 +1121,12 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           ),
         ).animate().fadeIn(delay: 100.ms),
         const SizedBox(height: 28),
-        const Text(
+        Text(
           'Chọn Khung Giờ',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             fontSize: 15,
-            color: AppColors.textPrimary,
+            color: context.textColor,
           ),
         ),
         const SizedBox(height: 12),
@@ -1097,15 +1135,15 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
             width: double.infinity,
             decoration: BoxDecoration(
-              color: AppColors.cardBg,
+              color: context.cardColor,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: context.borderColor),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
                 'Không có khung giờ trống cho ngày này',
                 style: TextStyle(
-                  color: AppColors.textSecondary,
+                  color: context.textSecColor,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -1132,10 +1170,10 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                   padding:
                   const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : AppColors.cardBg,
+                    color: isSelected ? AppColors.primary : context.cardColor,
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: isSelected ? AppColors.primary : AppColors.border,
+                      color: isSelected ? AppColors.primary : context.borderColor,
                     ),
                     boxShadow: isSelected
                         ? [
@@ -1150,7 +1188,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                   child: Text(
                     '${slot['slot']} (${slot['hours']}h)',
                     style: TextStyle(
-                      color: isSelected ? Colors.white : AppColors.textPrimary,
+                      color: isSelected ? Colors.white : context.textColor,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -1160,16 +1198,28 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
             }),
           ).animate().fadeIn(delay: 200.ms),
       ],
-    );
+    ),
+  );
   }
 
   Widget _buildStep3Checkout() {
     final slots = _timeSlots;
     if (slots.isEmpty) {
-      return const Center(
-        child: Text(
-          'Không có khung giờ trống cho ngày đã chọn',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+      return RefreshIndicator(
+        color: AppColors.primary,
+        onRefresh: _syncLiveSlotsSubscriptionsAndEquipment,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.all(24),
+          children: [
+            const SizedBox(height: 100),
+            Center(
+              child: Text(
+                'Không có khung giờ trống cho ngày đã chọn',
+                style: TextStyle(color: context.textSecColor, fontSize: 16),
+              ),
+            ),
+          ],
         ),
       );
     }
@@ -1182,80 +1232,84 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     final addonPrice = _calculateAddonPrice(durationHours);
     final totalPrice = basePrice + addonPrice;
 
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        const Text(
+    return RefreshIndicator(
+      color: AppColors.primary,
+      onRefresh: _syncLiveSlotsSubscriptionsAndEquipment,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(24),
+        children: [
+        Text(
           'Tổng quan Đơn đặt',
           style: TextStyle(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: AppColors.textPrimary,
+            color: context.textColor,
           ),
         ).animate().fadeIn(),
         const SizedBox(height: 24),
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.cardBg,
+            color: context.cardColor,
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.border),
+            border: Border.all(color: context.borderColor),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 widget.item.name,
-                style: const TextStyle(
+                style: TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: AppColors.textPrimary,
+                  color: context.textColor,
                 ),
               ),
               const SizedBox(height: 8),
               Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.access_time_rounded,
                     size: 16,
-                    color: AppColors.textSecondary,
+                    color: context.textSecColor,
                   ),
                   const SizedBox(width: 8),
                   Text(
                     '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year} • ${slot['slot']}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                     ),
                   ),
                 ],
               ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Divider(height: 1),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 16),
+                child: Divider(height: 1, color: context.dividerColor),
               ),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text(
+                  Text(
                     'Phí thuê cơ bản',
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(color: context.textSecColor),
                   ),
                   Text(
                     NumberFormat.currency(locale: 'vi', symbol: 'đ')
                         .format(basePrice),
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                     ),
                   ),
                 ],
               ),
               if (_selectedAddons.isNotEmpty) ...[
                 const SizedBox(height: 12),
-                const Text(
+                Text(
                   'Thiết bị đi kèm:',
-                  style: TextStyle(color: AppColors.textSecondary),
+                  style: TextStyle(color: context.textSecColor),
                 ),
                 const SizedBox(height: 8),
                 ..._selectedAddons.map((name) {
@@ -1273,19 +1327,19 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                         Expanded(
                           child: Text(
                             isPerHour ? '• $name (x${hours}h)' : '• $name',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 13,
-                              color: AppColors.textSecondary,
+                              color: context.textSecColor,
                             ),
                           ),
                         ),
                         Text(
                           NumberFormat.currency(locale: 'vi', symbol: 'đ')
                               .format(lineTotal),
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13,
                             fontWeight: FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: context.textColor,
                           ),
                         ),
                       ],
@@ -1301,17 +1355,21 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.green.shade50,
+              color: AppColors.success.withValues(
+                alpha: context.isDark ? 0.16 : 0.08,
+              ),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.green.shade300),
+              border: Border.all(
+                color: AppColors.success.withValues(alpha: 0.4),
+              ),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Icon(Icons.card_membership_rounded,
-                        color: Colors.green.shade700, size: 20),
+                    const Icon(Icons.card_membership_rounded,
+                        color: AppColors.success, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
@@ -1319,13 +1377,15 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
-                          color: Colors.green.shade900,
+                          color: context.textColor,
                         ),
                       ),
                     ),
                     Switch(
                       value: _selectedSubscription != null,
-                      activeThumbColor: Colors.green.shade700,
+                      activeThumbColor: AppColors.success,
+                      activeTrackColor:
+                          AppColors.success.withValues(alpha: 0.35),
                       onChanged: (val) {
                         setState(() {
                           _selectedSubscription =
@@ -1340,7 +1400,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
                     'Đang áp dụng: ${_selectedSubscription!.packageName} (Còn ${_selectedSubscription!.remainingUsesThisPeriod} lượt dùng • Miễn đặt cọc)',
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.green.shade800,
+                      color: context.isDark
+                          ? context.textSecColor
+                          : AppColors.success,
                     ),
                   ),
               ],
@@ -1389,17 +1451,19 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
           ),
         ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
       ],
-    );
+    ),
+  );
   }
 
   Widget _buildBottomBar() {
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: AppColors.cardBg,
+        color: context.cardColor,
+        border: Border(top: BorderSide(color: context.borderColor)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
+            color: Colors.black.withValues(alpha: context.isDark ? 0.2 : 0.05),
             blurRadius: 20,
             offset: const Offset(0, -5),
           ),

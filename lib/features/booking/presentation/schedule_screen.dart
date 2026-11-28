@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:toastification/toastification.dart';
@@ -11,6 +12,12 @@ import '../services/booking_api_service.dart';
 import '../services/review_api_service.dart';
 import 'item_detail_screen.dart';
 import 'payment_screen.dart';
+
+void _cancelLog(String message) {
+  if (kDebugMode) {
+    debugPrint('[CANCEL_BOOKING_UI] $message');
+  }
+}
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -293,57 +300,119 @@ class ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Future<void> _handleCancelBooking(BuildContext sheetContext, BookingResponseDTO booking) async {
-    if (_isCancelling) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Hủy lịch đặt?'),
-        content: const Text(
-          'Bạn chỉ có thể hủy trước khi bắt đầu và check-in. '
-          'Tiền cọc đã thanh toán được hoàn 100% trước ít nhất 48 giờ, '
-          '50% từ 24 đến dưới 48 giờ, và không hoàn dưới 24 giờ. '
-          'Với đơn dùng gói, lượt sử dụng có thể được hoàn lại.',
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Quay lại')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Xác nhận hủy')),
-        ],
-      ),
+    _cancelLog(
+      'Tap Hủy Lịch Đặt | bookingId=${booking.bookingId} | '
+      'status=${booking.status} | depositStatus=${booking.depositStatus} | '
+      'date=${booking.bookingDate} | time=${booking.startTime}-${booking.endTime} | '
+      'isCancelling=$_isCancelling',
     );
-    if (confirmed != true || !mounted) return;
-    setState(() => _isCancelling = true);
+    if (_isCancelling) return;
 
-    final result = await _bookingApiService.cancelBooking(booking.bookingId);
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (dialogContext) => AlertDialog(
+          title: const Text('Hủy lịch đặt?'),
+          content: const Text(
+            'Bạn chỉ có thể hủy trước khi bắt đầu và check-in. '
+            'Tiền cọc đã thanh toán được hoàn 100% trước ít nhất 48 giờ, '
+            '50% từ 24 đến dưới 48 giờ, và không hoàn dưới 24 giờ. '
+            'Với đơn dùng gói, lượt sử dụng có thể được hoàn lại.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('Quay lại'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              child: const Text('Xác nhận hủy'),
+            ),
+          ],
+        ),
+      );
+      _cancelLog('Dialog result: confirmed=$confirmed | mounted=$mounted');
+      if (confirmed != true || !mounted) return;
 
-    if (!mounted) return;
-    setState(() => _isCancelling = false);
+      setState(() => _isCancelling = true);
 
-    if (sheetContext.mounted) {
-      Navigator.pop(sheetContext);
-    }
+      final result = await _bookingApiService.cancelBooking(booking.bookingId);
+      _cancelLog(
+        'API result | success=${result['success']} | source=${result['source']} | '
+        'statusCode=${result['statusCode']} | message=${result['message']} | '
+        'rawBody=${result['rawBody']} | error=${result['error']}',
+      );
 
-    if (result['success'] == true) {
-      final cancellation = result['cancellation'] as BookingCancellationResponseDTO;
-      await _fetchBookings();
       if (!mounted) return;
-      final refundMessage = cancellation.packageUseRestored
-          ? ' Lượt sử dụng gói đã được hoàn lại.'
-          : cancellation.refundAmount > 0
-              ? ' Tiền hoàn: ${_formatCurrency(cancellation.refundAmount)} '
-                  '(${cancellation.refundStatus == 'PENDING_MANUAL' ? 'chờ xử lý thủ công' : cancellation.refundStatus}).'
-              : '';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đã hủy lịch đặt thành công!$refundMessage'),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(result['message']?.toString() ?? 'Không thể hủy lịch đặt.'),
-        ),
-      );
+
+      if (sheetContext.mounted) {
+        Navigator.pop(sheetContext);
+      }
+
+      if (result['success'] == true) {
+        final cancellation = result['cancellation'] as BookingCancellationResponseDTO;
+        await _fetchBookings();
+        if (!mounted) return;
+        final refundMessage = cancellation.packageUseRestored
+            ? ' Lượt sử dụng gói đã được hoàn lại.'
+            : cancellation.refundAmount > 0
+                ? ' Tiền hoàn: ${_formatCurrency(cancellation.refundAmount)} '
+                    '(${cancellation.refundStatus == 'PENDING_MANUAL' ? 'chờ xử lý thủ công' : cancellation.refundStatus}).'
+                : '';
+        toastification.show(
+          context: context,
+          type: ToastificationType.success,
+          style: ToastificationStyle.flatColored,
+          title: const Text('Đã hủy lịch đặt thành công!'),
+          description: refundMessage.isNotEmpty ? Text(refundMessage.trim()) : null,
+          alignment: Alignment.topCenter,
+          autoCloseDuration: const Duration(seconds: 4),
+          showProgressBar: false,
+        );
+      } else {
+        final source = result['source']?.toString() ?? 'UNKNOWN';
+        final statusCode = result['statusCode']?.toString() ?? '';
+        final message =
+            result['message']?.toString() ?? 'Không thể hủy lịch đặt.';
+        _cancelLog(
+          'Cancel failed ($source${statusCode.isNotEmpty ? ' $statusCode' : ''}): $message',
+        );
+        toastification.show(
+          context: context,
+          type: ToastificationType.error,
+          style: ToastificationStyle.flatColored,
+          title: Text(
+            source == 'BE' && statusCode.isNotEmpty
+                ? 'Hủy lịch thất bại (BE $statusCode)'
+                : 'Hủy lịch thất bại ($source)',
+          ),
+          description: Text(message),
+          alignment: Alignment.topCenter,
+          autoCloseDuration: const Duration(seconds: 5),
+          showProgressBar: false,
+        );
+      }
+    } catch (e, stackTrace) {
+      _cancelLog('FE Exception in _handleCancelBooking: $e\n$stackTrace');
+      if (sheetContext.mounted) {
+        Navigator.pop(sheetContext);
+      }
+      if (mounted) {
+        toastification.show(
+          context: context,
+          type: ToastificationType.error,
+          style: ToastificationStyle.flatColored,
+          title: const Text('Lỗi FE khi hủy lịch đặt'),
+          description: Text('$e'),
+          alignment: Alignment.topCenter,
+          autoCloseDuration: const Duration(seconds: 5),
+          showProgressBar: false,
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCancelling = false);
+      }
     }
   }
 
@@ -634,7 +703,12 @@ class ScheduleScreenState extends State<ScheduleScreen> {
                         child: ElevatedButton(
                           onPressed: _isCancelling
                               ? null
-                              : () => _handleCancelBooking(sheetContext, booking),
+                              : () {
+                                  _cancelLog(
+                                    'Button Hủy Lịch Đặt pressed | bookingId=${booking.bookingId} | sheetMounted=${sheetContext.mounted}',
+                                  );
+                                  _handleCancelBooking(sheetContext, booking);
+                                },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: Colors.red.shade50,
                             foregroundColor: Colors.red,

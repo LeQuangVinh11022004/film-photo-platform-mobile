@@ -35,7 +35,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       }
     });
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Đã đánh dấu tất cả thông báo là đã đọc!'), backgroundColor: Colors.green),
+      const SnackBar(
+        content: Text('Đã đánh dấu tất cả thông báo là đã đọc!'),
+        backgroundColor: AppColors.success,
+      ),
     );
   }
 
@@ -44,14 +47,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final unreadCount = _notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
+        backgroundColor: context.bgColor,
+        surfaceTintColor: Colors.transparent,
         title: const Text('Trung Tâm Thông Báo'),
         actions: [
           if (unreadCount > 0)
             TextButton(
               onPressed: _markAllAsRead,
-              child: const Text('Đọc tất cả', style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold, fontSize: 13)),
+              child: const Text(
+                'Đọc tất cả',
+                style: TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
             ),
         ],
       ),
@@ -73,11 +85,18 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       label: Text(_filters[index]),
                       selected: isSelected,
                       selectedColor: AppColors.primary,
-                      backgroundColor: Colors.white,
-                      side: BorderSide(color: isSelected ? Colors.transparent : AppColors.border),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      backgroundColor: context.cardColor,
+                      checkmarkColor: Colors.white,
+                      side: BorderSide(
+                        color: isSelected
+                            ? Colors.transparent
+                            : context.borderColor,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                        color: isSelected ? Colors.white : context.textColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
@@ -101,10 +120,21 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.notifications_off_outlined, size: 64, color: AppColors.textHint),
-                          SizedBox(height: 16),
-                          Text('Chưa có thông báo nào', style: TextStyle(color: AppColors.textSecondary, fontSize: 16, fontWeight: FontWeight.bold)),
+                        children: [
+                          const Icon(
+                            Icons.notifications_off_outlined,
+                            size: 64,
+                            color: AppColors.textHint,
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            'Chưa có thông báo nào',
+                            style: TextStyle(
+                              color: context.textSecColor,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
                         ],
                       ),
                     )
@@ -135,15 +165,15 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         break;
       case NotificationType.community:
         iconData = Icons.forum_rounded;
-        iconColor = Colors.blue.shade700;
+        iconColor = AppColors.info;
         break;
       case NotificationType.promo:
         iconData = Icons.local_offer_rounded;
-        iconColor = Colors.amber.shade800;
+        iconColor = AppColors.warning;
         break;
       case NotificationType.system:
         iconData = Icons.auto_awesome;
-        iconColor = Colors.purple.shade600;
+        iconColor = AppColors.aiGradient.colors.first;
         break;
     }
 
@@ -160,15 +190,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: notif.isRead ? Colors.white : AppColors.primarySoft.withValues(alpha: 0.4),
+          color: notif.isRead
+              ? context.cardColor
+              : (context.isDark
+                  ? AppColors.primary.withValues(alpha: 0.14)
+                  : AppColors.primarySoft.withValues(alpha: 0.45)),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: notif.isRead ? AppColors.border : AppColors.primary.withValues(alpha: 0.3),
+            color: notif.isRead
+                ? context.borderColor
+                : AppColors.primary.withValues(alpha: 0.35),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black
+                  .withValues(alpha: context.isDark ? 0.2 : 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -202,7 +239,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: context.textColor,
                           ),
                         ),
                       ),
@@ -221,9 +258,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     notif.body,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                       height: 1.4,
                     ),
                   ),
@@ -233,14 +270,22 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                     children: [
                       Text(
                         notif.timeAgo,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textHint, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textHint,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       if (notif.route != null)
                         Row(
                           children: [
                             Text(
                               'Xem chi tiết',
-                              style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: iconColor),
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: iconColor,
+                              ),
                             ),
                             const SizedBox(width: 2),
                             Icon(Icons.arrow_forward_rounded, size: 14, color: iconColor),
