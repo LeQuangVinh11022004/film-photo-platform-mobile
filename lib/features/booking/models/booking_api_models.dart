@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'booking_item.dart';
 
 class BookingResponseDTO {
@@ -528,6 +530,7 @@ class ResourceDetailDTO {
   final String ventilationDetails;
   final String acousticDetails;
   final String amenities;
+  final List<String> amenitiesList;
   final String operatingHours;
   final String usagePolicies;
 
@@ -541,14 +544,140 @@ class ResourceDetailDTO {
     this.ventilationDetails = '',
     this.acousticDetails = '',
     this.amenities = '',
+    this.amenitiesList = const [],
     this.operatingHours = '',
     this.usagePolicies = '',
   });
 
+  static String _formatKeyLabel(String rawKey) {
+    final cleaned = rawKey
+        .replaceAllMapped(RegExp(r'([a-z])([A-Z])'), (m) => '${m[1]} ${m[2]}')
+        .replaceAll(RegExp(r'[_\-]+'), ' ')
+        .trim();
+    if (cleaned.isEmpty) return '';
+    return cleaned[0].toUpperCase() + cleaned.substring(1);
+  }
+
+  static String _stripBracesAndQuotes(String raw) {
+    return raw
+        .replaceAll(RegExp(r'^[\[\{\("\x27\s]+|[\]\}\)"\x27\s]+$'), '')
+        .replaceAll(RegExp(r'[\[\]\{\}"]'), '')
+        .trim();
+  }
+
+  static dynamic _tryDecodeJsonString(dynamic value) {
+    if (value is! String) return value;
+    final trimmed = value.trim();
+    if ((trimmed.startsWith('{') && trimmed.endsWith('}')) ||
+        (trimmed.startsWith('[') && trimmed.endsWith(']'))) {
+      try {
+        return jsonDecode(trimmed);
+      } catch (_) {
+        return value;
+      }
+    }
+    return value;
+  }
+
+  /// Trích xuất danh sách tiện ích sạch (không bao giờ còn `{ }`, `[ ]`, `"`).
+  static List<String> parseStringList(dynamic raw) {
+    if (raw == null) return [];
+    final decoded = _tryDecodeJsonString(raw);
+    final result = <String>[];
+
+    void addClean(String text) {
+      final cleaned = _stripBracesAndQuotes(text);
+      if (cleaned.isNotEmpty && !result.contains(cleaned)) {
+        result.add(cleaned);
+      }
+    }
+
+    if (decoded is List) {
+      for (final item in decoded) {
+        if (item == null) continue;
+        if (item is String || item is num || item is bool) {
+          addClean(item.toString());
+        } else {
+          for (final sub in parseStringList(item)) {
+            addClean(sub);
+          }
+        }
+      }
+      return result;
+    }
+
+    if (decoded is Map) {
+      const genericContainerKeys = {
+        'items',
+        'list',
+        'amenities',
+        'features',
+        'equipment',
+        'values',
+        'name',
+        'label',
+        'title',
+        'value',
+      };
+      for (final entry in decoded.entries) {
+        final keyStr = entry.key.toString().trim();
+        final lowerKey = keyStr.toLowerCase();
+        final val = entry.value;
+        if (val == null || val == false) continue;
+
+        if (val == true) {
+          addClean(_formatKeyLabel(keyStr));
+        } else if (val is List) {
+          final subItems = parseStringList(val);
+          if (subItems.isEmpty) continue;
+          if (genericContainerKeys.contains(lowerKey)) {
+            for (final s in subItems) {
+              addClean(s);
+            }
+          } else {
+            addClean('${_formatKeyLabel(keyStr)}: ${subItems.join(', ')}');
+          }
+        } else if (val is Map) {
+          final subItems = parseStringList(val);
+          for (final s in subItems) {
+            addClean(s);
+          }
+        } else {
+          final valStr = _stripBracesAndQuotes(val.toString());
+          if (valStr.isEmpty) continue;
+          if (genericContainerKeys.contains(lowerKey)) {
+            addClean(valStr);
+          } else {
+            addClean('${_formatKeyLabel(keyStr)}: $valStr');
+          }
+        }
+      }
+      return result;
+    }
+
+    final str = decoded.toString().trim();
+    if (str.isEmpty) return [];
+    for (final part in str.split(RegExp(r'[,;\n]'))) {
+      addClean(part);
+    }
+    return result;
+  }
+
+  static String parseToCleanString(dynamic value) {
+    if (value == null) return '';
+    final decoded = _tryDecodeJsonString(value);
+    if (decoded is String) {
+      return _stripBracesAndQuotes(decoded);
+    }
+    final items = parseStringList(decoded);
+    return items.join(', ');
+  }
+
   static String formatOperatingHours(Object? value) {
-    if (value is Map) {
-      final open = value['open'];
-      final close = value['close'];
+    final decoded = _tryDecodeJsonString(value);
+    if (decoded is Map) {
+      final open = decoded['open'];
+      final close = decoded['close'];
       if (open is String &&
           open.trim().isNotEmpty &&
           close is String &&
@@ -562,25 +691,21 @@ class ResourceDetailDTO {
   factory ResourceDetailDTO.fromJson(Map<String, dynamic>? json) {
     if (json == null) return ResourceDetailDTO();
 
-    String parseToString(dynamic value) {
-      if (value == null) return '';
-      if (value is String) return value;
-      if (value is List) return value.map((e) => e.toString()).join(', ');
-      return value.toString();
-    }
+    final parsedAmenities = parseStringList(json['amenities']);
 
     return ResourceDetailDTO(
       lengthM: (json['lengthM'] as num?)?.toDouble() ?? 0.0,
       widthM: (json['widthM'] as num?)?.toDouble() ?? 0.0,
       heightM: (json['heightM'] as num?)?.toDouble() ?? 0.0,
-      artisticStyle: parseToString(json['artisticStyle']),
-      supportedProcesses: parseToString(json['supportedProcesses']),
-      lightingConditions: parseToString(json['lightingConditions']),
-      ventilationDetails: parseToString(json['ventilationDetails']),
-      acousticDetails: parseToString(json['acousticDetails']),
-      amenities: parseToString(json['amenities']),
+      artisticStyle: parseToCleanString(json['artisticStyle']),
+      supportedProcesses: parseToCleanString(json['supportedProcesses']),
+      lightingConditions: parseToCleanString(json['lightingConditions']),
+      ventilationDetails: parseToCleanString(json['ventilationDetails']),
+      acousticDetails: parseToCleanString(json['acousticDetails']),
+      amenities: parsedAmenities.join(', '),
+      amenitiesList: parsedAmenities,
       operatingHours: formatOperatingHours(json['operatingHours']),
-      usagePolicies: parseToString(json['usagePolicies']),
+      usagePolicies: parseToCleanString(json['usagePolicies']),
     );
   }
 }
@@ -688,14 +813,14 @@ class ResourceItemResponseDTO {
       allPreviews.add(defaultImg);
     }
 
-    // Amenities parsing from details
+    // Amenities parsing from details (đã làm sạch hoàn toàn dấu {}, [], ")
     List<String> parsedAmenities = [];
-    if (details != null && details!.amenities.isNotEmpty) {
-      parsedAmenities = details!.amenities
-          .split(RegExp(r'[,;]'))
-          .map((e) => e.trim())
-          .where((e) => e.isNotEmpty)
-          .toList();
+    if (details != null) {
+      if (details!.amenitiesList.isNotEmpty) {
+        parsedAmenities = List<String>.from(details!.amenitiesList);
+      } else if (details!.amenities.isNotEmpty) {
+        parsedAmenities = ResourceDetailDTO.parseStringList(details!.amenities);
+      }
     }
     if (parsedAmenities.isEmpty) {
       parsedAmenities = isDarkroom

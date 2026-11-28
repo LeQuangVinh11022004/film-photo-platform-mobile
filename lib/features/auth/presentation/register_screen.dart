@@ -92,7 +92,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
         leading: Padding(
           padding: const EdgeInsets.only(left: 16.0),
@@ -101,13 +101,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.inputFill,
+                color: context.inputColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, size: 20),
                 tooltip: 'Quay lại Đăng nhập',
-                color: AppColors.textPrimary,
+                color: context.textColor,
                 onPressed: _navigateBack,
               ),
             ),
@@ -125,24 +125,24 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Title & Subtitle
-                  const Text(
+                  Text(
                     'Tạo Tài Khoản',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
+                  Text(
                     'Đăng ký để trải nghiệm đầy đủ tính năng\ntrên nền tảng Nhiếp ảnh Film!',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                       height: 1.4,
                     ),
                   ),
@@ -236,7 +236,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Or continue with
                   Row(
                     children: [
-                      Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+                      Expanded(child: Divider(color: context.borderColor, thickness: 1)),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
@@ -248,7 +248,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+                      Expanded(child: Divider(color: context.borderColor, thickness: 1)),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -263,10 +263,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         'Đã có tài khoản? ',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: context.textSecColor,
                           fontSize: 14,
                         ),
                       ),
