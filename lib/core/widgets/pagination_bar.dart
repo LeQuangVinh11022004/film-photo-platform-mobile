@@ -65,14 +65,19 @@ class PaginationBar extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                'Hiển thị $startItem–$endItem / $totalItems $itemLabel',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: context.textSecColor,
+              Expanded(
+                child: Text(
+                  'Hiển thị $startItem–$endItem / $totalItems $itemLabel',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: context.textSecColor,
+                  ),
                 ),
               ),
+              const SizedBox(width: 8),
               Text(
                 'Trang $safeCurrent / $safeTotalPages',
                 style: const TextStyle(

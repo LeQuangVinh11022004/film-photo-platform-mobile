@@ -3,11 +3,14 @@ import 'package:intl/intl.dart';
 import 'package:toastification/toastification.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/utils/image_utils.dart';
-import '../../../core/widgets/primary_button.dart';
 import '../models/booking_api_models.dart';
 import '../models/service_package.dart';
 import '../services/booking_api_service.dart';
+import '../widgets/service_package_card.dart';
+import '../widgets/service_redeem_subscription_sheet.dart';
+import '../widgets/service_subscription_card.dart';
+import '../widgets/service_subscription_detail_sheet.dart';
+import '../widgets/service_subscription_empty_state.dart';
 import 'payment_screen.dart';
 
 class ServicePackagesScreen extends StatefulWidget {
@@ -139,7 +142,8 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
   }
 
   Future<void> _showSubscriptionDetailModal(
-      PhotographerPackageSubscriptionResponseDTO sub) async {
+    PhotographerPackageSubscriptionResponseDTO sub,
+  ) async {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -155,158 +159,11 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
     if (!mounted) return;
     Navigator.pop(context);
 
-    showModalBottomSheet(
+    await showServiceSubscriptionDetailSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: context.cardColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (ctx) {
-        return Padding(
-          padding: const EdgeInsets.fromLTRB(24, 20, 24, 32),
-          child: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.borderColor,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        detailed.packageName,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: context.textColor,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildStatusChip(detailed.status),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Nhà cung cấp: ${detailed.providerName}',
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.textSecColor,
-                  ),
-                ),
-                Divider(height: 24, color: context.dividerColor),
-                _buildInfoRow('Mã Subscription:', detailed.subscriptionId),
-                _buildInfoRow(
-                  'Hiệu lực:',
-                  '${_formatDate(detailed.startsAt)} - ${_formatDate(detailed.endsAt)}',
-                ),
-                _buildInfoRow(
-                  'Kỳ hiện tại:',
-                  '${_formatDate(detailed.usagePeriodStart)} - ${_formatDate(detailed.usagePeriodEnd)}',
-                ),
-                _buildInfoRow(
-                  'Số lượt sử dụng/tháng:',
-                  '${detailed.usesPerMonth} lượt',
-                ),
-                _buildInfoRow(
-                  'Đã dùng / Đang giữ chỗ:',
-                  '${detailed.usedThisPeriod} / ${detailed.reservedThisPeriod} lượt',
-                ),
-                _buildInfoRow(
-                  'Số lượt còn lại kỳ này:',
-                  '${detailed.remainingUsesThisPeriod} lượt',
-                  highlight: true,
-                ),
-                if (detailed.items.isNotEmpty) ...[
-                  const SizedBox(height: 16),
-                  Text(
-                    'Chi tiết các bước trong Gói:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 14,
-                      color: context.textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...detailed.items.map(
-                    (item) => Container(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: context.inputColor,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: context.borderColor),
-                      ),
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            radius: 14,
-                            backgroundColor: AppColors.primary,
-                            child: Text(
-                              '${item.stepOrder}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '[${item.componentType}] ${item.resourceName}',
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                    color: context.textColor,
-                                  ),
-                                ),
-                                if (item.includedDurationMinutes != null)
-                                  Text(
-                                    'Thời lượng: ${item.includedDurationMinutes} phút • SL: ${item.quantity}',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: context.textSecColor,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                const SizedBox(height: 20),
-                if (detailed.status.toUpperCase() == 'ACTIVE' &&
-                    detailed.remainingUsesThisPeriod > 0)
-                  PrimaryButton(
-                    text: 'ĐẶT LỊCH SỬ DỤNG GÓI NGAY',
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      _showRedeemSubscriptionSheet(detailed);
-                    },
-                  ),
-              ],
-            ),
-          ),
-        );
-      },
+      detailed: detailed,
+      formatDate: _formatDate,
+      onRedeemPressed: () => _showRedeemSubscriptionSheet(detailed),
     );
   }
 
@@ -333,19 +190,21 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
       DateTime(dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second);
 
   DateTime? _combineDateAndTime(String date, String time) {
-    final day = DateTime.tryParse(date.length >= 10 ? date.substring(0, 10) : date);
+    final day =
+        DateTime.tryParse(date.length >= 10 ? date.substring(0, 10) : date);
     final parts = time.split(':');
     if (day == null || parts.length < 2) return null;
     final hour = int.tryParse(parts[0]);
     final minute = int.tryParse(parts[1]);
-    final second = parts.length > 2 ? int.tryParse(parts[2].split('.').first) ?? 0 : 0;
+    final second =
+        parts.length > 2 ? int.tryParse(parts[2].split('.').first) ?? 0 : 0;
     if (hour == null || minute == null) return null;
     return DateTime(day.year, day.month, day.day, hour, minute, second);
   }
 
   Future<void> _showRedeemSubscriptionSheet(
-      PhotographerPackageSubscriptionResponseDTO sub) async {
-    // Group items by stepOrder
+    PhotographerPackageSubscriptionResponseDTO sub,
+  ) async {
     final stepNumbers = sub.items.map((e) => e.stepOrder).toSet().toList()
       ..sort();
     if (stepNumbers.isEmpty) {
@@ -392,7 +251,8 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
 
       equipmentIdsByStep[step] = equipItems;
 
-      final equipAvailability = <String, List<PhotographerEquipmentAvailabilityResponseDTO>>{};
+      final equipAvailability =
+          <String, List<PhotographerEquipmentAvailabilityResponseDTO>>{};
       for (final eqId in equipItems) {
         equipAvailability[eqId] =
             await _apiService.getEquipmentAvailability(equipmentId: eqId);
@@ -401,13 +261,14 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
       final roomSlots = await _apiService.getAvailableSlots(
         spaceId: roomItem.resourceId,
       );
-      // Backend chỉ nhận slot phòng mà mọi thiết bị của bước đều có lịch phủ trọn khung giờ đó
       final slots = equipItems.isEmpty
           ? roomSlots
           : roomSlots
               .where((slot) => _isRoomSlotCoveredByEquipment(
                     slot,
-                    equipItems.map((id) => equipAvailability[id] ?? const []).toList(),
+                    equipItems
+                        .map((id) => equipAvailability[id] ?? const [])
+                        .toList(),
                   ))
               .toList();
       stepSlots[step] = slots;
@@ -418,299 +279,32 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
     if (!mounted) return;
     Navigator.pop(context);
 
-    bool isSubmitting = false;
-
-    showModalBottomSheet(
+    final redeemed = await showServiceRedeemSubscriptionSheet(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: context.cardColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
-      ),
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(
-              left: 24,
-              right: 24,
-              top: 20,
-              bottom: MediaQuery.of(ctx).viewInsets.bottom + 28,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      width: 40,
-                      height: 4,
-                      decoration: BoxDecoration(
-                        color: context.borderColor,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Đặt Lịch Từ Gói: ${sub.packageName}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: context.textColor,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Chọn khung giờ trống cho từng bước trong gói (Miễn phí đặt cọc - Trừ 1 lượt dùng).',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: context.textSecColor,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ...stepNumbers.map((step) {
-                    final stepItems =
-                        sub.items.where((i) => i.stepOrder == step).toList();
-                    final roomItem = stepItems.firstWhere(
-                      (i) =>
-                          i.componentType.toUpperCase() == 'STUDIO' ||
-                          i.componentType.toUpperCase() == 'DARKROOM',
-                      orElse: () => stepItems.first,
-                    );
-                    final slots = stepSlots[step] ?? [];
-                    final selectedId = selectedAvailabilityByStep[step];
-
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: context.inputColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: context.borderColor),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Bước $step: ${roomItem.resourceName} (${roomItem.componentType})',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: context.textColor,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          if (slots.isEmpty)
-                            Text(
-                              equipmentIdsByStep[step]?.isNotEmpty ?? false
-                                  ? 'Không có khung giờ nào còn đủ phòng và thiết bị cho bước này.'
-                                  : 'Hiện chưa có khung giờ trống cho phòng này.',
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.error,
-                              ),
-                            )
-                          else
-                            DropdownButtonFormField<String>(
-                              initialValue: selectedId,
-                              isExpanded: true,
-                              dropdownColor: context.cardColor,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: context.textColor,
-                              ),
-                              decoration: InputDecoration(
-                                filled: true,
-                                fillColor: context.cardColor,
-                                contentPadding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 10,
-                                ),
-                                border: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: context.borderColor,
-                                  ),
-                                ),
-                                enabledBorder: OutlineInputBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                  borderSide: BorderSide(
-                                    color: context.borderColor,
-                                  ),
-                                ),
-                              ),
-                              items: slots.map((s) {
-                                return DropdownMenuItem<String>(
-                                  value: s.availabilityId,
-                                  child: Text(
-                                    '${s.date} • ${s.startTime} - ${s.endTime}',
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: context.textColor,
-                                    ),
-                                  ),
-                                );
-                              }).toList(),
-                              onChanged: (val) {
-                                setModalState(() {
-                                  selectedAvailabilityByStep[step] = val;
-                                });
-                              },
-                            ),
-                        ],
-                      ),
-                    );
-                  }),
-                  const SizedBox(height: 12),
-                  PrimaryButton(
-                    text: 'XÁC NHẬN ĐẶT LỊCH THEO GÓI',
-                    isLoading: isSubmitting,
-                    onPressed: () async {
-                      final segments = <PackageBookingSegmentRequestDTO>[];
-                      for (final step in stepNumbers) {
-                        final availId = selectedAvailabilityByStep[step];
-                        if (availId == null || availId.isEmpty) {
-                          toastification.show(
-                            context: context,
-                            type: ToastificationType.warning,
-                            style: ToastificationStyle.flatColored,
-                            title: const Text('Thiếu khung giờ'),
-                            description: Text(
-                              'Vui lòng chọn khung giờ hợp lệ cho Bước $step.',
-                            ),
-                            alignment: Alignment.topCenter,
-                            autoCloseDuration: const Duration(seconds: 3),
-                            showProgressBar: false,
-                          );
-                          return;
-                        }
-                        segments.add(
-                          PackageBookingSegmentRequestDTO(
-                            stepOrder: step,
-                            availabilityId: availId,
-                            equipmentIds: equipmentIdsByStep[step] ?? const [],
-                          ),
-                        );
-                      }
-
-                      setModalState(() => isSubmitting = true);
-                      final result = await _apiService.createPackageBooking(
-                        subscriptionId: sub.subscriptionId,
-                        segments: segments,
-                      );
-                      if (!ctx.mounted) return;
-                      setModalState(() => isSubmitting = false);
-
-                      if (result['success'] == true) {
-                        Navigator.pop(ctx);
-                        await _fetchSubscriptions();
-                        if (!mounted) return;
-                        toastification.show(
-                          context: context,
-                          type: ToastificationType.success,
-                          style: ToastificationStyle.flatColored,
-                          title: const Text('Đặt lịch theo gói thành công!'),
-                          description: const Text(
-                            'Đơn đặt lịch đã được xác nhận ngay mà không cần đặt cọc.',
-                          ),
-                          alignment: Alignment.topCenter,
-                          autoCloseDuration: const Duration(seconds: 4),
-                          showProgressBar: false,
-                        );
-                      } else {
-                        if (!mounted) return;
-                        toastification.show(
-                          context: context,
-                          type: ToastificationType.error,
-                          style: ToastificationStyle.flatColored,
-                          title: const Text('Đặt lịch theo gói thất bại'),
-                          description: Text(
-                            result['message']?.toString() ??
-                                'Không thể tạo đơn đặt lịch theo gói.',
-                          ),
-                          alignment: Alignment.topCenter,
-                          autoCloseDuration: const Duration(seconds: 4),
-                          showProgressBar: false,
-                        );
-                      }
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
+      subscription: sub,
+      stepNumbers: stepNumbers,
+      stepSlots: stepSlots,
+      initialSelectedAvailabilityByStep: selectedAvailabilityByStep,
+      equipmentIdsByStep: equipmentIdsByStep,
+      apiService: _apiService,
     );
-  }
 
-  Widget _buildInfoRow(String label, String value, {bool highlight = false}) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 13,
-              color: context.textSecColor,
-            ),
-          ),
-          const SizedBox(width: 12),
-          Flexible(
-            child: Text(
-              value,
-              textAlign: TextAlign.right,
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.bold,
-                color: highlight ? AppColors.primary : context.textColor,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusChip(String status) {
-    final upper = status.toUpperCase();
-    Color bg = AppColors.primary.withValues(alpha: 0.12);
-    Color fg = AppColors.primary;
-    String label = status;
-
-    if (upper == 'ACTIVE') {
-      bg = AppColors.success.withValues(alpha: context.isDark ? 0.18 : 0.1);
-      fg = AppColors.success;
-      label = 'Đang hoạt động';
-    } else if (upper == 'PENDING_PAYMENT') {
-      bg = AppColors.warning.withValues(alpha: context.isDark ? 0.18 : 0.12);
-      fg = AppColors.warning;
-      label = 'Chờ thanh toán';
-    } else if (upper == 'EXPIRED' || upper == 'CANCELLED') {
-      bg = AppColors.error.withValues(alpha: context.isDark ? 0.18 : 0.1);
-      fg = AppColors.error;
-      label = upper == 'EXPIRED' ? 'Hết hạn' : 'Đã hủy';
-    }
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11,
-          fontWeight: FontWeight.bold,
-          color: fg,
+    if (redeemed == true && mounted) {
+      await _fetchSubscriptions();
+      if (!mounted) return;
+      toastification.show(
+        context: context,
+        type: ToastificationType.success,
+        style: ToastificationStyle.flatColored,
+        title: const Text('Đặt lịch theo gói thành công!'),
+        description: const Text(
+          'Đơn đặt lịch đã được xác nhận ngay mà không cần đặt cọc.',
         ),
-      ),
-    );
+        alignment: Alignment.topCenter,
+        autoCloseDuration: const Duration(seconds: 4),
+        showProgressBar: false,
+      );
+    }
   }
 
   @override
@@ -786,166 +380,10 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
         itemCount: _packages.length,
         itemBuilder: (context, index) {
           final pkg = _packages[index];
-          return Container(
-            margin: const EdgeInsets.only(bottom: 20),
-            decoration: BoxDecoration(
-              color: context.cardColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: context.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black
-                      .withValues(alpha: context.isDark ? 0.2 : 0.05),
-                  blurRadius: 12,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Stack(
-                  children: [
-                    SafeNetworkImage(
-                      url: pkg.imageUrl,
-                      height: 160,
-                      width: double.infinity,
-                      borderRadius:
-                          const BorderRadius.vertical(top: Radius.circular(20)),
-                    ),
-                    if (pkg.isPopular)
-                      Positioned(
-                        top: 12,
-                        left: 12,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 10, vertical: 4),
-                          decoration: BoxDecoration(
-                            gradient: AppColors.goldGradient,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: const Text(
-                            'COMBO BÁN CHẠY NHẤT',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Flexible(
-                            child: Text(
-                              pkg.category,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          Text(
-                            pkg.durationText,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textSecColor,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Text(
-                        pkg.name,
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: context.textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        pkg.description,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: context.textSecColor,
-                          height: 1.4,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        'Gói dịch vụ bao gồm:',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: context.textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...pkg.includes.map(
-                        (inc) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4.0),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.check_circle_rounded,
-                                  size: 16, color: AppColors.success),
-                              const SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  inc,
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: context.textColor,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            flex: 2,
-                            child: FittedBox(
-                              fit: BoxFit.scaleDown,
-                              alignment: Alignment.centerLeft,
-                              child: Text(
-                                _formatCurrency(pkg.price),
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w800,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            flex: 3,
-                            child: PrimaryButton(
-                              text: 'MUA GÓI COMBO',
-                              onPressed: () => _handlePurchasePackage(pkg),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+          return ServicePackageCard(
+            package: pkg,
+            formattedPrice: _formatCurrency(pkg.price),
+            onPurchase: () => _handlePurchasePackage(pkg),
           );
         },
       ),
@@ -979,47 +417,9 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
     }
 
     if (_subscriptions.isEmpty) {
-      return RefreshIndicator(
-        color: AppColors.primary,
-        backgroundColor: context.cardColor,
+      return ServiceSubscriptionEmptyState(
         onRefresh: _fetchSubscriptions,
-        child: ListView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(32),
-          children: [
-            const SizedBox(height: 60),
-            Icon(
-              Icons.card_membership_rounded,
-              size: 68,
-              color: AppColors.textHint.withValues(alpha: 0.6),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              'Bạn chưa có gói dịch vụ nào đã đăng ký',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 17,
-                fontWeight: FontWeight.bold,
-                color: context.textColor,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Hãy chọn mua một Gói Combo ở tab bên cạnh để tiết kiệm chi phí thuê Studio, Phòng tối và Thiết bị hàng tháng.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: context.textSecColor,
-                height: 1.4,
-              ),
-            ),
-            const SizedBox(height: 24),
-            PrimaryButton(
-              text: 'KHÁM PHÁ GÓI COMBO',
-              onPressed: () => _tabController.animateTo(0),
-            ),
-          ],
-        ),
+        onExplorePressed: () => _tabController.animateTo(0),
       );
     }
 
@@ -1035,113 +435,12 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
         itemCount: _subscriptions.length,
         itemBuilder: (context, index) {
           final sub = _subscriptions[index];
-          final canBook = sub.status.toUpperCase() == 'ACTIVE' &&
-              sub.remainingUsesThisPeriod > 0;
-
-          return Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(18),
-            decoration: BoxDecoration(
-              color: context.cardColor,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: context.borderColor),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black
-                      .withValues(alpha: context.isDark ? 0.2 : 0.05),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Expanded(
-                      child: Text(
-                        sub.packageName,
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.bold,
-                          color: context.textColor,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    _buildStatusChip(sub.status),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  sub.providerName,
-                  style: TextStyle(
-                    fontSize: 13,
-                    color: context.textSecColor,
-                  ),
-                ),
-                Divider(height: 22, color: context.dividerColor),
-                _buildInfoRow(
-                  'Hạn sử dụng:',
-                  '${_formatDate(sub.startsAt)} - ${_formatDate(sub.endsAt)}',
-                ),
-                _buildInfoRow(
-                  'Lượt dùng trong kỳ:',
-                  'Đã dùng ${sub.usedThisPeriod}/${sub.usesPerMonth} (Còn ${sub.remainingUsesThisPeriod} lượt)',
-                  highlight: true,
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => _showSubscriptionDetailModal(sub),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: context.isDark
-                              ? AppColors.primaryLight
-                              : AppColors.primary,
-                          side: BorderSide(
-                            color: context.isDark
-                                ? AppColors.primaryLight
-                                : AppColors.primary,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                        ),
-                        child: const Text(
-                          'Chi Tiết Gói',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                    if (canBook) ...[
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () => _showRedeemSubscriptionSheet(sub),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                          ),
-                          child: const Text(
-                            'Đặt Lịch Theo Gói',
-                            style: TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
+          return ServiceSubscriptionCard(
+            subscription: sub,
+            validityText:
+                '${_formatDate(sub.startsAt)} - ${_formatDate(sub.endsAt)}',
+            onDetailTap: () => _showSubscriptionDetailModal(sub),
+            onRedeemTap: () => _showRedeemSubscriptionSheet(sub),
           );
         },
       ),
