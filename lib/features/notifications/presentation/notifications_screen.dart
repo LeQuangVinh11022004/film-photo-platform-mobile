@@ -10,7 +10,7 @@ class NotificationsScreen extends StatefulWidget {
 }
 
 class _NotificationsScreenState extends State<NotificationsScreen> {
-  final List<NotificationItem> _notifications = NotificationItem.sampleNotifications;
+  final List<NotificationItem> _notifications = NotificationItem.notifications;
   int _selectedFilterIndex = 0; // 0: All, 1: Booking, 2: Community, 3: Promo
 
   final List<String> _filters = ['Tất cả', 'Lịch đặt', 'Cộng đồng', 'Khuyến mãi'];

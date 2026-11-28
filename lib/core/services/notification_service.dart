@@ -103,6 +103,6 @@ class NotificationService {
       routeArgs: routeArgs,
     );
 
-    NotificationItem.sampleNotifications.insert(0, newNotif);
+    NotificationItem.notifications.insert(0, newNotif);
   }
 }

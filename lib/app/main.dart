@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:toastification/toastification.dart';
 import '../core/theme/app_theme.dart';
 import '../features/ai_tools/presentation/ai_assistant_screen.dart';
-import '../features/ai_tools/presentation/ai_restoration_screen.dart';
 import '../features/auth/presentation/login_screen.dart';
 import '../features/auth/presentation/register_screen.dart';
 import '../features/auth/presentation/forgot_password_screen.dart';
@@ -78,7 +77,6 @@ class FilmPhotographyApp extends StatelessWidget {
             '/studio-comparison': (context) => const StudioComparisonScreen(),
             '/booking-checkin': (context) => const BookingCheckinScreen(),
             '/payment': (context) => const PaymentScreen(),
-            '/ai-restoration': (context) => const AIRestorationScreen(),
             '/ai-assistant': (context) => const AIAssistantScreen(),
             '/digital-collections': (context) => const DigitalCollectionsScreen(),
             '/notifications': (context) => const NotificationsScreen(),

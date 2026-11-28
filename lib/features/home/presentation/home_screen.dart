@@ -4,6 +4,7 @@ import 'package:toastification/toastification.dart';
 import '../../../core/services/favorite_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../../../core/widgets/pagination_bar.dart';
 import '../../booking/models/booking_api_models.dart';
 import '../../booking/models/booking_item.dart';
 import '../../booking/services/booking_api_service.dart';
@@ -24,10 +25,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
 
   // API Data state
+  static const int _popularPageSize = 6;
   final BookingApiService _bookingApiService = BookingApiService();
   List<BookingItem> _apiItems = [];
   bool _isLoadingItems = true;
   bool _hasLoadError = false;
+  int _popularPage = 1;
 
   @override
   void initState() {
@@ -84,14 +87,6 @@ class _HomeScreenState extends State<HomeScreen> {
       'gradient': AppColors.aiGradient,
       'route': '/ai-assistant',
       'badge': 'HOT AI',
-    },
-    {
-      'title': 'AI Phục Chế Ảnh 4K',
-      'subtitle': 'Tự động làm nét, khử xước & phục hồi màu phim cổ',
-      'icon': Icons.auto_fix_high_rounded,
-      'gradient': AppColors.goldGradient,
-      'route': '/ai-restoration',
-      'badge': 'NEW',
     },
     {
       'title': 'Gói Combo Bundle',
@@ -364,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final unreadNotifs = NotificationItem.sampleNotifications.where((n) => !n.isRead).length;
+    final unreadNotifs = NotificationItem.notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -644,7 +639,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     return Padding(
                       padding: EdgeInsets.only(right: 10.0),
                       child: GestureDetector(
-                        onTap: () => setState(() => _selectedCategoryIndex = index),
+                        onTap: () => setState(() {
+                          _selectedCategoryIndex = index;
+                          _popularPage = 1;
+                        }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -743,7 +741,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text('Phổ biến & Được yêu thích', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textColor)),
                     GestureDetector(
                       onTap: () {
-                        Navigator.pushNamed(context, '/item-list');
+                        BookingCategory? initialCategory;
+                        if (_selectedCategoryIndex == 1) {
+                          initialCategory = BookingCategory.studio;
+                        } else if (_selectedCategoryIndex == 2) {
+                          initialCategory = BookingCategory.darkroom;
+                        } else if (_selectedCategoryIndex == 3) {
+                          initialCategory = BookingCategory.equipment;
+                        }
+                        Navigator.pushNamed(
+                          context,
+                          '/item-list',
+                          arguments: initialCategory,
+                        );
                       },
                       child: const Text('Tất cả', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
                     ),
@@ -752,20 +762,46 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Section 2 Vertical List
+            // Section 2 Vertical List (có phân trang)
             SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
-              sliver: _filteredItems.isEmpty
-                  ? const SliverToBoxAdapter(child: SizedBox())
-                  : SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final item = _filteredItems[index];
-                          return _buildPopularCard(context, item);
-                        },
-                        childCount: _filteredItems.length,
-                      ),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+              sliver: Builder(
+                builder: (context) {
+                  final filtered = _filteredItems;
+                  if (filtered.isEmpty) {
+                    return const SliverToBoxAdapter(child: SizedBox());
+                  }
+                  final totalPages =
+                      (filtered.length / _popularPageSize).ceil().clamp(1, 9999);
+                  final safePage = _popularPage.clamp(1, totalPages);
+                  final pageItems = filtered
+                      .skip((safePage - 1) * _popularPageSize)
+                      .take(_popularPageSize)
+                      .toList();
+
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index == pageItems.length) {
+                          return PaginationBar(
+                            currentPage: safePage,
+                            totalPages: totalPages,
+                            totalItems: filtered.length,
+                            pageSize: _popularPageSize,
+                            itemLabel: 'mục',
+                            onPageChanged: (page) {
+                              setState(() => _popularPage = page);
+                            },
+                          );
+                        }
+                        final item = pageItems[index];
+                        return _buildPopularCard(context, item);
+                      },
+                      childCount: pageItems.length + 1,
                     ),
+                  );
+                },
+              ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],

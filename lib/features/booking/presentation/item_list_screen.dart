@@ -4,6 +4,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../../../core/widgets/pagination_bar.dart';
 import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
 import '../services/booking_api_service.dart';
@@ -17,34 +18,75 @@ class ItemListScreen extends StatefulWidget {
 }
 
 class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProviderStateMixin {
+  static const int _pageSize = 6;
+
   late TabController _tabController;
   final TextEditingController _searchController = TextEditingController();
   final BookingApiService _apiService = BookingApiService();
+  final ScrollController _studioScrollController = ScrollController();
+  final ScrollController _darkroomScrollController = ScrollController();
+  final ScrollController _equipmentScrollController = ScrollController();
 
   bool _isLoading = true;
+  bool _hasAppliedRouteArg = false;
   String _searchQuery = '';
   List<BookingItem> _studios = [];
   List<BookingItem> _darkrooms = [];
+  List<BookingItem> _equipments = [];
+
+  int _studioPage = 1;
+  int _darkroomPage = 1;
+  int _equipmentPage = 1;
 
   // Filter Date
   DateTime? _selectedFromDate;
   DateTime? _selectedToDate;
 
+  int _categoryToTabIndex(BookingCategory? category) {
+    switch (category) {
+      case BookingCategory.darkroom:
+        return 1;
+      case BookingCategory.equipment:
+        return 2;
+      case BookingCategory.studio:
+      case null:
+        return 0;
+    }
+  }
+
   @override
   void initState() {
     super.initState();
-    int initialIndex = 0;
-    if (widget.initialCategory == BookingCategory.darkroom) {
-      initialIndex = 1;
-    }
-    _tabController = TabController(length: 2, vsync: this, initialIndex: initialIndex);
+    _tabController = TabController(
+      length: 3,
+      vsync: this,
+      initialIndex: _categoryToTabIndex(widget.initialCategory),
+    );
     _loadData();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_hasAppliedRouteArg) {
+      _hasAppliedRouteArg = true;
+      final args = ModalRoute.of(context)?.settings.arguments;
+      if (args is BookingCategory) {
+        final targetIndex = _categoryToTabIndex(args);
+        if (_tabController.index != targetIndex) {
+          _tabController.index = targetIndex;
+        }
+      }
+    }
   }
 
   @override
   void dispose() {
     _tabController.dispose();
     _searchController.dispose();
+    _studioScrollController.dispose();
+    _darkroomScrollController.dispose();
+    _equipmentScrollController.dispose();
     super.dispose();
   }
 
@@ -60,14 +102,22 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
         _apiService.getDarkrooms(fromDate: fromDateStr, toDate: toDateStr),
       ]);
 
-      final studioDtos = results[0];
-      final darkroomDtos = results[1];
+      final studioItems = results[0].map((e) => e.toBookingItem()).toList();
+      final darkroomItems = results[1].map((e) => e.toBookingItem()).toList();
+      final equipmentItems = await _apiService.getAllEquipmentItems([
+        ...studioItems,
+        ...darkroomItems,
+      ]);
 
       if (!mounted) return;
 
       setState(() {
-        _studios = studioDtos.map((e) => e.toBookingItem()).toList();
-        _darkrooms = darkroomDtos.map((e) => e.toBookingItem()).toList();
+        _studios = studioItems;
+        _darkrooms = darkroomItems;
+        _equipments = equipmentItems;
+        _studioPage = 1;
+        _darkroomPage = 1;
+        _equipmentPage = 1;
         _isLoading = false;
       });
     } catch (e) {
@@ -129,6 +179,7 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
   Widget build(BuildContext context) {
     final filteredStudios = _filterItems(_studios);
     final filteredDarkrooms = _filterItems(_darkrooms);
+    final filteredEquipments = _filterItems(_equipments);
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -142,7 +193,7 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
           onPressed: () => Navigator.of(context).maybePop(),
         ),
         title: Text(
-          'Danh Sách Studio & Phòng Tối',
+          'Studio, Phòng Tối & Thiết Bị',
           style: GoogleFonts.inter(
             fontWeight: FontWeight.bold,
             fontSize: 18,
@@ -176,17 +227,22 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
               ),
               labelColor: Colors.white,
               unselectedLabelColor: context.textSecColor,
-              labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 13),
-              unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 13),
+              labelStyle: GoogleFonts.inter(fontWeight: FontWeight.bold, fontSize: 12),
+              unselectedLabelStyle: GoogleFonts.inter(fontWeight: FontWeight.w600, fontSize: 12),
               tabs: [
                 Tab(
                   height: 38,
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.camera_alt_outlined, size: 17),
-                      const SizedBox(width: 8),
-                      Text('Studio (${_studios.length})'),
+                      const Icon(Icons.camera_alt_outlined, size: 15),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'Studio (${_studios.length})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -195,9 +251,30 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.wb_twilight_rounded, size: 17),
-                      const SizedBox(width: 8),
-                      Text('Phòng Tối (${_darkrooms.length})'),
+                      const Icon(Icons.wb_twilight_rounded, size: 15),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'Phòng Tối (${_darkrooms.length})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Tab(
+                  height: 38,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.photo_camera_back_outlined, size: 15),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          'Thiết Bị (${_equipments.length})',
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
                     ],
                   ),
                 ),
@@ -230,7 +307,12 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
                     child: TextField(
                       controller: _searchController,
                       style: GoogleFonts.inter(fontSize: 13, color: context.textColor),
-                      onChanged: (val) => setState(() => _searchQuery = val.trim()),
+                      onChanged: (val) => setState(() {
+                        _searchQuery = val.trim();
+                        _studioPage = 1;
+                        _darkroomPage = 1;
+                        _equipmentPage = 1;
+                      }),
                       decoration: InputDecoration(
                         isDense: true,
                         hintText: 'Tìm kiếm tên, địa chỉ...',
@@ -241,7 +323,12 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
                                 icon: const Icon(Icons.cancel_rounded, size: 18, color: AppColors.textSecondary),
                                 onPressed: () {
                                   _searchController.clear();
-                                  setState(() => _searchQuery = '');
+                                  setState(() {
+                                    _searchQuery = '';
+                                    _studioPage = 1;
+                                    _darkroomPage = 1;
+                                    _equipmentPage = 1;
+                                  });
                                 },
                               )
                             : null,
@@ -325,8 +412,54 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
                     child: TabBarView(
                       controller: _tabController,
                       children: [
-                        _buildResourceList(filteredStudios, isDarkroom: false),
-                        _buildResourceList(filteredDarkrooms, isDarkroom: true),
+                        _buildResourceList(
+                          filteredStudios,
+                          category: BookingCategory.studio,
+                          currentPage: _studioPage,
+                          scrollController: _studioScrollController,
+                          onPageChanged: (page) {
+                            setState(() => _studioPage = page);
+                            if (_studioScrollController.hasClients) {
+                              _studioScrollController.animateTo(
+                                0,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOut,
+                              );
+                            }
+                          },
+                        ),
+                        _buildResourceList(
+                          filteredDarkrooms,
+                          category: BookingCategory.darkroom,
+                          currentPage: _darkroomPage,
+                          scrollController: _darkroomScrollController,
+                          onPageChanged: (page) {
+                            setState(() => _darkroomPage = page);
+                            if (_darkroomScrollController.hasClients) {
+                              _darkroomScrollController.animateTo(
+                                0,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOut,
+                              );
+                            }
+                          },
+                        ),
+                        _buildResourceList(
+                          filteredEquipments,
+                          category: BookingCategory.equipment,
+                          currentPage: _equipmentPage,
+                          scrollController: _equipmentScrollController,
+                          onPageChanged: (page) {
+                            setState(() => _equipmentPage = page);
+                            if (_equipmentScrollController.hasClients) {
+                              _equipmentScrollController.animateTo(
+                                0,
+                                duration: const Duration(milliseconds: 250),
+                                curve: Curves.easeOut,
+                              );
+                            }
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -336,7 +469,30 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
     );
   }
 
-  Widget _buildResourceList(List<BookingItem> items, {required bool isDarkroom}) {
+  Widget _buildResourceList(
+    List<BookingItem> items, {
+    required BookingCategory category,
+    required int currentPage,
+    required ScrollController scrollController,
+    required ValueChanged<int> onPageChanged,
+  }) {
+    final String categoryLabel;
+    final IconData emptyIcon;
+    switch (category) {
+      case BookingCategory.studio:
+        categoryLabel = 'studio';
+        emptyIcon = Icons.camera_alt_outlined;
+        break;
+      case BookingCategory.darkroom:
+        categoryLabel = 'phòng tối';
+        emptyIcon = Icons.wb_twilight_rounded;
+        break;
+      case BookingCategory.equipment:
+        categoryLabel = 'thiết bị';
+        emptyIcon = Icons.photo_camera_back_outlined;
+        break;
+    }
+
     if (items.isEmpty) {
       return Center(
         child: SingleChildScrollView(
@@ -354,14 +510,14 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
                   border: Border.all(color: context.borderColor),
                 ),
                 child: Icon(
-                  isDarkroom ? Icons.wb_twilight_rounded : Icons.camera_alt_outlined,
+                  emptyIcon,
                   size: 44,
                   color: AppColors.textHint,
                 ),
               ),
               const SizedBox(height: 20),
               Text(
-                'Không tìm thấy ${isDarkroom ? "phòng tối" : "studio"} nào',
+                'Không tìm thấy $categoryLabel nào',
                 style: GoogleFonts.inter(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -388,6 +544,9 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
                       _searchQuery = '';
                       _selectedFromDate = null;
                       _selectedToDate = null;
+                      _studioPage = 1;
+                      _darkroomPage = 1;
+                      _equipmentPage = 1;
                     });
                     _loadData();
                   },
@@ -408,12 +567,30 @@ class _ItemListScreenState extends State<ItemListScreen> with SingleTickerProvid
       );
     }
 
+    final totalPages = (items.length / _pageSize).ceil().clamp(1, 9999);
+    final safePage = currentPage.clamp(1, totalPages);
+    final pageItems = items
+        .skip((safePage - 1) * _pageSize)
+        .take(_pageSize)
+        .toList();
+
     return ListView.builder(
+      controller: scrollController,
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      itemCount: items.length,
+      itemCount: pageItems.length + 1,
       itemBuilder: (context, index) {
-        final item = items[index];
-        return _buildItemCard(item).animate().fadeIn(duration: 300.ms, delay: (index * 50).ms).slideY(begin: 0.05);
+        if (index == pageItems.length) {
+          return PaginationBar(
+            currentPage: safePage,
+            totalPages: totalPages,
+            totalItems: items.length,
+            pageSize: _pageSize,
+            itemLabel: categoryLabel,
+            onPageChanged: onPageChanged,
+          );
+        }
+        final item = pageItems[index];
+        return _buildItemCard(item).animate().fadeIn(duration: 250.ms, delay: (index * 40).ms).slideY(begin: 0.04);
       },
     );
   }

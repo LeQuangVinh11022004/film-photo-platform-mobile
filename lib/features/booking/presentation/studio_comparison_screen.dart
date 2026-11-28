@@ -14,20 +14,19 @@ class StudioComparisonScreen extends StatefulWidget {
 
 class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
   final BookingApiService _bookingApiService = BookingApiService();
-  List<BookingItem> _all = List<BookingItem>.from(BookingItem.sampleItems);
-  late BookingItem _item1;
-  late BookingItem _item2;
+  List<BookingItem> _all = [];
+  BookingItem? _item1;
+  BookingItem? _item2;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _item1 = _all[0];
-    _item2 = _all.length > 1 ? _all[1] : _all[0];
     _loadLiveSpaces();
   }
 
   Future<void> _loadLiveSpaces() async {
+    setState(() => _isLoading = true);
     try {
       final results = await Future.wait<List<ResourceItemResponseDTO>>([
         _bookingApiService.getStudios(),
@@ -36,17 +35,15 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
       if (!mounted) return;
       final studios = results[0].map((e) => e.toBookingItem()).toList();
       final darkrooms = results[1].map((e) => e.toBookingItem()).toList();
-      final combined = [...studios, ...darkrooms];
-      if (combined.length >= 2) {
-        setState(() {
-          _all = combined;
-          _item1 = combined[0];
-          _item2 = combined[1];
-          _isLoading = false;
-        });
-      } else {
-        setState(() => _isLoading = false);
-      }
+      final equipment = await _bookingApiService.getAllEquipmentItems([...studios, ...darkrooms]);
+      if (!mounted) return;
+      final combined = [...studios, ...darkrooms, ...equipment];
+      setState(() {
+        _all = combined;
+        _item1 = combined.isNotEmpty ? combined[0] : null;
+        _item2 = combined.length > 1 ? combined[1] : _item1;
+        _isLoading = false;
+      });
     } catch (_) {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -56,26 +53,53 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('So Sánh Không Gian & Thiết Bị')),
+        body: const Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      );
+    }
+
+    if (_all.length < 2 || _item1 == null || _item2 == null) {
+      return Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(title: const Text('So Sánh Không Gian & Thiết Bị')),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.compare_arrows_rounded, size: 56, color: AppColors.textHint),
+                const SizedBox(height: 14),
+                const Text(
+                  'Cần ít nhất 2 địa điểm hoặc thiết bị để so sánh',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                ),
+                const SizedBox(height: 12),
+                TextButton.icon(
+                  onPressed: _loadLiveSpaces,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Tải lại dữ liệu'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final item1 = _item1!;
+    final item2 = _item2!;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('So Sánh Không Gian & Thiết Bị'),
-        actions: [
-          if (_isLoading)
-            const Padding(
-              padding: EdgeInsets.only(right: 16),
-              child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-            ),
-        ],
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -98,7 +122,7 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
               // Item Pickers Row
               Row(
                 children: [
-                  Expanded(child: _buildItemPicker(1, _item1)),
+                  Expanded(child: _buildItemPicker(1, item1)),
                   const Padding(
                     padding: EdgeInsets.symmetric(horizontal: 8.0),
                     child: CircleAvatar(
@@ -107,7 +131,7 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                       child: Text('VS', style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                     ),
                   ),
-                  Expanded(child: _buildItemPicker(2, _item2)),
+                  Expanded(child: _buildItemPicker(2, item2)),
                 ],
               ),
               const SizedBox(height: 24),
@@ -128,29 +152,29 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                 child: Column(
                   children: [
                     _buildCompHeader(),
-                    _buildCompRow('Loại hình', _item1.categoryName, _item2.categoryName),
-                    _buildCompRow('Đơn giá thuê', '${_item1.pricePerHour.toInt()}đ / giờ', '${_item2.pricePerHour.toInt()}đ / giờ'),
-                    _buildCompRow('Đánh giá ⭐', _item1.ratingLabel, _item2.ratingLabel),
-                    _buildCompRow('Vị trí', _item1.location, _item2.location),
+                    _buildCompRow('Loại hình', item1.categoryName, item2.categoryName),
+                    _buildCompRow('Đơn giá thuê', '${item1.pricePerHour.toInt()}đ / giờ', '${item2.pricePerHour.toInt()}đ / giờ'),
+                    _buildCompRow('Đánh giá ⭐', item1.ratingLabel, item2.ratingLabel),
+                    _buildCompRow('Vị trí', item1.location, item2.location),
                     _buildCompRow(
                       'Sức chứa chuẩn',
-                      'Tối đa ${_item1.capacity} người',
-                      'Tối đa ${_item2.capacity} người',
+                      'Tối đa ${item1.capacity} người',
+                      'Tối đa ${item2.capacity} người',
                     ),
                     _buildCompRow(
                       'Phong cách / Quy trình',
-                      _item1.artisticStyle.isNotEmpty
-                          ? _item1.artisticStyle
-                          : (_item1.supportedProcesses.isNotEmpty
-                              ? _item1.supportedProcesses
+                      item1.artisticStyle.isNotEmpty
+                          ? item1.artisticStyle
+                          : (item1.supportedProcesses.isNotEmpty
+                              ? item1.supportedProcesses
                               : 'Tiêu chuẩn Film'),
-                      _item2.artisticStyle.isNotEmpty
-                          ? _item2.artisticStyle
-                          : (_item2.supportedProcesses.isNotEmpty
-                              ? _item2.supportedProcesses
+                      item2.artisticStyle.isNotEmpty
+                          ? item2.artisticStyle
+                          : (item2.supportedProcesses.isNotEmpty
+                              ? item2.supportedProcesses
                               : 'Tiêu chuẩn Film'),
                     ),
-                    _buildCompRow('Số tiện ích', '${_item1.amenities.length} trang bị', '${_item2.amenities.length} trang bị'),
+                    _buildCompRow('Số tiện ích', '${item1.amenities.length} trang bị', '${item2.amenities.length} trang bị'),
                   ],
                 ),
               ),
@@ -162,7 +186,7 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/detail', arguments: _item1);
+                        Navigator.pushNamed(context, '/detail', arguments: item1);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.primary,
@@ -176,7 +200,7 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        Navigator.pushNamed(context, '/detail', arguments: _item2);
+                        Navigator.pushNamed(context, '/detail', arguments: item2);
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: AppColors.textPrimary,

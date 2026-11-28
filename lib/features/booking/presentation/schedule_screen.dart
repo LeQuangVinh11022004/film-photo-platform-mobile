@@ -3,6 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../../auth/services/auth_service.dart';
 import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
 import '../models/review_api_models.dart';
@@ -676,7 +677,43 @@ class ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   /// POST /api/photographer/bookings/{bookingId}/review
-  void _showReviewBookingModal(BookingResponseDTO booking) {
+  Future<void> _showReviewBookingModal(BookingResponseDTO booking) async {
+    final currentUserId =
+        AuthService().currentUser?.userId.trim().toLowerCase() ?? '';
+    if (currentUserId.isNotEmpty && booking.spaceId.length >= 32) {
+      final spaceType = _resolveSpaceType(booking);
+      final existingPage = spaceType == 'DARKROOM'
+          ? await _reviewApiService.getDarkroomReviews(
+              darkroomId: booking.spaceId,
+              page: 1,
+              pageSize: 100,
+            )
+          : await _reviewApiService.getStudioReviews(
+              studioId: booking.spaceId,
+              page: 1,
+              pageSize: 100,
+            );
+      if (!mounted) return;
+      final alreadyReviewed = (existingPage?.items ?? []).any(
+        (r) => r.customerUserId.trim().toLowerCase() == currentUserId,
+      );
+      if (alreadyReviewed) {
+        toastification.show(
+          context: context,
+          type: ToastificationType.info,
+          style: ToastificationStyle.flatColored,
+          title: const Text('Bạn đã đánh giá rồi'),
+          description: Text(
+            'Mỗi tài khoản chỉ được gửi 1 đánh giá cho "${booking.spaceName}".',
+          ),
+          alignment: Alignment.topCenter,
+          autoCloseDuration: const Duration(seconds: 3),
+          showProgressBar: false,
+        );
+        return;
+      }
+    }
+
     int selectedRating = 5;
     final commentController = TextEditingController();
     bool isSubmitting = false;

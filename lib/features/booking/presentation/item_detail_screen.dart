@@ -6,6 +6,7 @@ import '../../../core/services/favorite_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/primary_button.dart';
+import '../../auth/services/auth_service.dart';
 import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
 import '../models/review_api_models.dart';
@@ -34,6 +35,15 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   List<PhotographerEquipmentResponseDTO> _spaceEquipment = [];
   bool _isLoadingReviews = false;
   bool _reviewsError = false;
+
+  bool get _hasCurrentUserReviewed {
+    final currentUserId =
+        AuthService().currentUser?.userId.trim().toLowerCase() ?? '';
+    if (currentUserId.isEmpty) return false;
+    return _apiReviews.any(
+      (r) => r.customerUserId.trim().toLowerCase() == currentUserId,
+    );
+  }
 
   String get _resolvedSpaceType {
     if (_item.category == BookingCategory.equipment) {
@@ -77,11 +87,9 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is BookingItem) {
         _item = args;
-      } else {
-        _item = BookingItem.sampleItems[0];
+        _isInitialized = true;
+        _loadSpaceReviewsAndBookings();
       }
-      _isInitialized = true;
-      _loadSpaceReviewsAndBookings();
     }
   }
 
@@ -98,12 +106,12 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
               ? _reviewApiService.getDarkroomReviews(
                   darkroomId: spaceId,
                   page: 1,
-                  pageSize: 20,
+                  pageSize: 100,
                 )
               : _reviewApiService.getStudioReviews(
                   studioId: spaceId,
                   page: 1,
-                  pageSize: 20,
+                  pageSize: 100,
                 );
 
       final results = await Future.wait([
@@ -190,6 +198,22 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   /// Tự động kiểm tra khách hàng đã có đơn đặt chỗ CONFIRMED (hoặc COMPLETED) tại không gian này chưa
   /// mà không bắt khách hàng phải tự chọn đơn đặt chỗ.
   void _showWriteReviewModal(BuildContext context) {
+    if (_hasCurrentUserReviewed) {
+      toastification.show(
+        context: context,
+        type: ToastificationType.info,
+        style: ToastificationStyle.flatColored,
+        title: const Text('Bạn đã đánh giá rồi'),
+        description: Text(
+          'Mỗi tài khoản chỉ được gửi 1 đánh giá cho "${_item.name}".',
+        ),
+        alignment: Alignment.topCenter,
+        autoCloseDuration: const Duration(seconds: 3),
+        showProgressBar: false,
+      );
+      return;
+    }
+
     final BookingResponseDTO? confirmedBooking =
         _mySpaceBookings.isNotEmpty ? _mySpaceBookings.first : null;
 
@@ -408,6 +432,16 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isInitialized) {
+      return Scaffold(
+        backgroundColor: context.bgColor,
+        appBar: AppBar(title: const Text('Chi tiết')),
+        body: const Center(
+          child: Text('Không tìm thấy thông tin dịch vụ.'),
+        ),
+      );
+    }
+
     final List<String> allImages = [_item.imageUrl, ..._item.previewImages];
 
     return Scaffold(
@@ -986,20 +1020,51 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                             ),
                           ),
                         const SizedBox(width: 8),
-                        TextButton.icon(
-                          onPressed: () => _showWriteReviewModal(context),
-                          icon: const Icon(Icons.edit_rounded, size: 15),
-                          label: const Text(
-                            'Viết đánh giá',
-                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                        if (_hasCurrentUserReviewed)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 5,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.green.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 14,
+                                  color: Colors.green,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Đã đánh giá',
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 12,
+                                    color: Colors.green,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        else
+                          TextButton.icon(
+                            onPressed: () => _showWriteReviewModal(context),
+                            icon: const Icon(Icons.edit_rounded, size: 15),
+                            label: const Text(
+                              'Viết đánh giá',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                            style: TextButton.styleFrom(
+                              foregroundColor: AppColors.primary,
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              minimumSize: Size.zero,
+                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            ),
                           ),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.primary,
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                            minimumSize: Size.zero,
-                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                          ),
-                        ),
                       ],
                     ).animate().fadeIn(delay: 600.ms),
                     const SizedBox(height: 14),
