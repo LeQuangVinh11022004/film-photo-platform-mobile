@@ -33,6 +33,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
   List<SpaceReviewResponseDTO> _apiReviews = [];
   List<BookingResponseDTO> _mySpaceBookings = [];
   List<PhotographerEquipmentResponseDTO> _spaceEquipment = [];
+  List<DarkroomChemicalResponseDTO> _darkroomChemicals = [];
   bool _isLoadingReviews = false;
   bool _reviewsError = false;
 
@@ -114,6 +115,11 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                   pageSize: 100,
                 );
 
+      final Future<List<DarkroomChemicalResponseDTO>> chemicalsFuture =
+          _resolvedSpaceType == 'DARKROOM'
+              ? _bookingApiService.getDarkroomChemicals(spaceId)
+              : Future.value(<DarkroomChemicalResponseDTO>[]);
+
       final results = await Future.wait([
         reviewFuture,
         _bookingApiService.getMyBookings(page: 1, pageSize: 50),
@@ -122,6 +128,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           page: 1,
           pageSize: 20,
         ),
+        chemicalsFuture,
       ]);
 
       if (!mounted) return;
@@ -130,6 +137,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
       final bookingsPage = results[1] as PagedResponseDTO<BookingResponseDTO>?;
       final equipPage =
           results[2] as PagedResponseDTO<PhotographerEquipmentResponseDTO>?;
+      final chemicals = results[3] as List<DarkroomChemicalResponseDTO>;
 
       final matchingBookings = (bookingsPage?.items ?? [])
           .where((b) =>
@@ -144,6 +152,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         _apiReviews = page?.items ?? [];
         _mySpaceBookings = matchingBookings;
         _spaceEquipment = equipPage?.items ?? [];
+        _darkroomChemicals = chemicals;
         if (page != null && page.totalReviews > 0 && page.averageRating > 0) {
           _bookingApiService.updateCachedSpaceRating(
             spaceId,
@@ -165,6 +174,54 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         _reviewsError = true;
       });
     }
+  }
+
+  Future<void> _handleRefresh() async {
+    final spaceId = _resolvedSpaceId;
+    if (spaceId.length < 32) return;
+
+    Future<void> refreshSpaceInfo() async {
+      try {
+        if (_item.category == BookingCategory.studio) {
+          final studios = await _bookingApiService.getStudios();
+          final matched = studios.where(
+            (s) => s.resourceId.toLowerCase() == spaceId.toLowerCase(),
+          );
+          if (matched.isNotEmpty && mounted) {
+            final updated = matched.first.toBookingItem();
+            updated.isFavorite = FavoriteService().isFavorite(updated.id);
+            setState(() {
+              _item = updated.copyWith(
+                rating: _item.rating,
+                reviewCount: _item.reviewCount,
+              );
+            });
+          }
+        } else if (_item.category == BookingCategory.darkroom) {
+          final darkrooms = await _bookingApiService.getDarkrooms();
+          final matched = darkrooms.where(
+            (d) => d.resourceId.toLowerCase() == spaceId.toLowerCase(),
+          );
+          if (matched.isNotEmpty && mounted) {
+            final updated = matched.first.toBookingItem();
+            updated.isFavorite = FavoriteService().isFavorite(updated.id);
+            setState(() {
+              _item = updated.copyWith(
+                rating: _item.rating,
+                reviewCount: _item.reviewCount,
+              );
+            });
+          }
+        }
+      } catch (e) {
+        debugPrint('Không thể làm mới thông tin không gian: $e');
+      }
+    }
+
+    await Future.wait([
+      refreshSpaceInfo(),
+      _loadSpaceReviewsAndBookings(),
+    ]);
   }
 
   void _showBookingDialog() {
@@ -426,9 +483,16 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
 
     return Scaffold(
       backgroundColor: context.bgColor,
-      body: CustomScrollView(
-        physics: const BouncingScrollPhysics(),
-        slivers: [
+      body: RefreshIndicator(
+        color: AppColors.primary,
+        backgroundColor: context.cardColor,
+        edgeOffset: MediaQuery.paddingOf(context).top + kToolbarHeight,
+        onRefresh: _handleRefresh,
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(
+            parent: BouncingScrollPhysics(),
+          ),
+          slivers: [
           // Sliver App Bar with Image Carousel
           SliverAppBar(
             expandedHeight: 370,
@@ -906,6 +970,114 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
                       }),
                     ],
 
+                    if (_resolvedSpaceType == 'DARKROOM' &&
+                        _darkroomChemicals.isNotEmpty) ...[
+                      const SizedBox(height: 28),
+                      Text(
+                        'Hóa chất cho thuê tại không gian (${_darkroomChemicals.length})',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: context.textColor,
+                        ),
+                      ).animate().fadeIn(delay: 360.ms),
+                      const SizedBox(height: 12),
+                      ..._darkroomChemicals.map((chem) {
+                        final price = chem.unitSellingPrice.round();
+                        final priceFormatted = price.toString().replaceAllMapped(
+                          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+                          (Match m) => '${m[1]}.',
+                        );
+                        final qtyText = chem.stockQuantity % 1 == 0
+                            ? chem.stockQuantity.toInt().toString()
+                            : chem.stockQuantity.toString();
+                        final metaParts = <String>[
+                          if (chem.brand.trim().isNotEmpty) chem.brand.trim(),
+                          if (chem.chemicalType.trim().isNotEmpty)
+                            chem.chemicalType.trim(),
+                          if (chem.stockQuantity > 0 ||
+                              chem.stockUnit.trim().isNotEmpty)
+                            'Tồn: $qtyText${chem.stockUnit.trim().isNotEmpty ? ' ${chem.stockUnit.trim()}' : ''}',
+                        ];
+                        final expiryDisplay =
+                            _formatChemicalExpiry(chem.expiresOn);
+
+                        return Container(
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: context.cardColor,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: context.borderColor),
+                          ),
+                          child: Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color:
+                                      AppColors.primary.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: const Icon(
+                                  Icons.science_rounded,
+                                  color: AppColors.primary,
+                                  size: 20,
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      chem.name,
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                        color: context.textColor,
+                                      ),
+                                    ),
+                                    if (metaParts.isNotEmpty) ...[
+                                      const SizedBox(height: 3),
+                                      Text(
+                                        metaParts.join(' • '),
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: context.textSecColor,
+                                        ),
+                                      ),
+                                    ],
+                                    if (expiryDisplay != null) ...[
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        'HSD: $expiryDisplay',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          color: context.textSecColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              if (price > 0) ...[
+                                const SizedBox(width: 8),
+                                Text(
+                                  '$priceFormattedđ',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                    color: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        );
+                      }),
+                    ],
+
                     const SizedBox(height: 28),
 
                     // Description Section
@@ -1117,6 +1289,7 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
           ),
         ],
       ),
+      ),
       // Floating Bottom Bar for Booking
       bottomSheet: Container(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
@@ -1197,5 +1370,17 @@ class _ItemDetailScreenState extends State<ItemDetailScreen> {
         ),
       ],
     );
+  }
+
+  String? _formatChemicalExpiry(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    final trimmed = raw.trim();
+    final parsed = DateTime.tryParse(trimmed);
+    if (parsed != null) {
+      final d = parsed.day.toString().padLeft(2, '0');
+      final m = parsed.month.toString().padLeft(2, '0');
+      return '$d/$m/${parsed.year}';
+    }
+    return trimmed;
   }
 }

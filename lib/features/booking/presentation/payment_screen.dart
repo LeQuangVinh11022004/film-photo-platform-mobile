@@ -376,9 +376,11 @@ class _PaymentScreenState extends State<PaymentScreen>
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
-          backgroundColor: Colors.white,
-          shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          backgroundColor: context.cardColor,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(24),
+            side: BorderSide(color: context.borderColor),
+          ),
           contentPadding: const EdgeInsets.all(24),
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -387,31 +389,31 @@ class _PaymentScreenState extends State<PaymentScreen>
                 width: 72,
                 height: 72,
                 decoration: BoxDecoration(
-                  color: Colors.green.shade50,
+                  color: AppColors.success.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.check_circle_rounded,
-                  color: Colors.green.shade600,
+                  color: AppColors.success,
                   size: 48,
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Thanh Toán Thành Công!',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: context.textColor,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 displayMessage,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textSecondary,
+                  color: context.textSecColor,
                   height: 1.4,
                 ),
                 textAlign: TextAlign.center,
@@ -422,15 +424,15 @@ class _PaymentScreenState extends State<PaymentScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.inputFill,
+                    color: context.inputColor,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     'Mã giao dịch: $displayTxId',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -440,17 +442,17 @@ class _PaymentScreenState extends State<PaymentScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.inputFill,
+                  color: context.inputColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Flexible(
+                    Flexible(
                       child: Text(
                         'Tổng tiền đã trả:',
                         style: TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary),
+                            fontSize: 13, color: context.textSecColor),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -482,7 +484,15 @@ class _PaymentScreenState extends State<PaymentScreen>
                       : 'Hoàn tất & Về Trang chủ',
                   onPressed: () {
                     Navigator.pop(ctx);
-                    Navigator.pop(context, true);
+                    if (_isPackagePurchase) {
+                      Navigator.pop(context, true);
+                    } else {
+                      Navigator.pushNamedAndRemoveUntil(
+                        context,
+                        '/home',
+                        (route) => false,
+                      );
+                    }
                   },
                 ),
               ),
@@ -508,8 +518,8 @@ class _PaymentScreenState extends State<PaymentScreen>
           label,
           style: TextStyle(
             color: valueColor == null
-                ? AppColors.textSecondary
-                : AppColors.textPrimary,
+                ? context.textSecColor
+                : context.textColor,
             fontSize: fontSize,
             fontWeight: valueColor == null ? FontWeight.normal : FontWeight.bold,
           ),
@@ -521,7 +531,7 @@ class _PaymentScreenState extends State<PaymentScreen>
             style: TextStyle(
               fontWeight: isBoldValue ? fontWeight : FontWeight.normal,
               fontSize: fontSize,
-              color: valueColor ?? AppColors.textPrimary,
+              color: valueColor ?? context.textColor,
             ),
             textAlign: TextAlign.right,
             maxLines: 2,
@@ -538,15 +548,15 @@ class _PaymentScreenState extends State<PaymentScreen>
     NumberFormat.currency(locale: 'vi', symbol: 'đ').format(_amount);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
-        title: const Text(
-          'Thanh Toán Đặt Chỗ',
-          style: TextStyle(
-            color: AppColors.primary,
-            fontWeight: FontWeight.bold,
-          ),
+        backgroundColor: context.bgColor,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_rounded, color: context.textColor),
+          onPressed: () => Navigator.of(context).maybePop(),
         ),
+        title: const Text('Thanh Toán Đặt Chỗ'),
       ),
       body: SafeArea(
         child: SingleChildScrollView(
@@ -558,11 +568,13 @@ class _PaymentScreenState extends State<PaymentScreen>
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.cardColor,
                   borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: context.borderColor),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.05),
+                      color: Colors.black
+                          .withValues(alpha: context.isDark ? 0.2 : 0.05),
                       blurRadius: 10,
                       offset: const Offset(0, 3),
                     ),
@@ -583,10 +595,10 @@ class _PaymentScreenState extends State<PaymentScreen>
                     const SizedBox(height: 4),
                     Text(
                       'Mã đơn: $_bookingId',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
+                        color: context.textSecColor,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -607,7 +619,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                       value: _timeSlot,
                       fontWeight: FontWeight.bold,
                     ),
-                    const Divider(height: 24),
+                    Divider(height: 24, color: context.dividerColor),
                     _buildSummaryRow(
                       label: 'Tổng thanh toán:',
                       value: formattedAmount,
@@ -619,12 +631,12 @@ class _PaymentScreenState extends State<PaymentScreen>
                 ),
               ),
               const SizedBox(height: 28),
-              const Text(
+              Text(
                 'CHỌN CỔNG THANH TOÁN',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: context.textColor,
                 ),
               ),
               const SizedBox(height: 12),
@@ -633,7 +645,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                 name: 'Cổng thanh toán VNPay',
                 subtitle: 'Thanh toán đặt cọc qua cổng VNPay Sandbox',
                 icon: Icons.account_balance_rounded,
-                color: Colors.blue.shade700,
+                color: AppColors.info,
               ),
               const SizedBox(height: 32),
               PrimaryButton(
@@ -664,15 +676,20 @@ class _PaymentScreenState extends State<PaymentScreen>
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: isSelected
+              ? (context.isDark
+                  ? AppColors.primary.withValues(alpha: 0.12)
+                  : AppColors.primarySoft.withValues(alpha: 0.45))
+              : context.cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppColors.primary : Colors.transparent,
-            width: 2,
+            color: isSelected ? AppColors.primary : context.borderColor,
+            width: isSelected ? 2 : 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.04),
+              color: Colors.black
+                  .withValues(alpha: context.isDark ? 0.18 : 0.04),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -695,10 +712,10 @@ class _PaymentScreenState extends State<PaymentScreen>
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -706,9 +723,9 @@ class _PaymentScreenState extends State<PaymentScreen>
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -722,7 +739,7 @@ class _PaymentScreenState extends State<PaymentScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.border,
+                  color: isSelected ? AppColors.primary : context.borderColor,
                   width: 2,
                 ),
               ),
@@ -907,7 +924,10 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: context.bgColor,
       appBar: AppBar(
+        backgroundColor: context.bgColor,
+        surfaceTintColor: Colors.transparent,
         title: const Text('Cổng Thanh Toán'),
         actions: [
           IconButton(
@@ -926,14 +946,14 @@ class _PaymentWebViewPageState extends State<_PaymentWebViewPage> {
             ),
           if (_hasWebError)
             Container(
-              color: Colors.black.withValues(alpha: 0.85),
+              color: AppColors.textPrimary.withValues(alpha: 0.9),
               padding: const EdgeInsets.all(24),
               child: Center(
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const Icon(Icons.shield_outlined,
-                        color: Colors.amber, size: 52),
+                        color: AppColors.warning, size: 52),
                     const SizedBox(height: 16),
                     const Text(
                       'Lỗi chứng chỉ SSL / Kết nối',

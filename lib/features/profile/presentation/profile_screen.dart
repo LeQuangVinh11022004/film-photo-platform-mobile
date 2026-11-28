@@ -890,12 +890,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               color: AppColors.primary, size: 20),
                         ),
                         const SizedBox(width: 12),
-                        Text(
-                          'Studio & Phòng Tối Đã Lưu',
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                            color: context.textColor,
+                        Flexible(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              'Studio & Phòng Tối Đã Lưu',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: context.textColor,
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
@@ -978,7 +984,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                       ),
                                     ],
                                   ),
-                                  child: Row(
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16),
+                                    child: InkWell(
+                                      borderRadius: BorderRadius.circular(16),
+                                      onTap: () {
+                                        Navigator.pushNamed(
+                                          context,
+                                          '/detail',
+                                          arguments: item,
+                                        );
+                                      },
+                                      child: Row(
                                     children: [
                                       // Thumbnail
                                       ClipRRect(
@@ -1076,12 +1094,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                                     ),
                                                   ),
                                                   const SizedBox(width: 8),
-                                                  Text(
-                                                    '${(item.pricePerHour / 1000).toStringAsFixed(0)}k/h',
-                                                    style: const TextStyle(
-                                                      fontSize: 12,
-                                                      fontWeight: FontWeight.w700,
-                                                      color: AppColors.primary,
+                                                  Flexible(
+                                                    child: Text(
+                                                      '${(item.pricePerHour / 1000).toStringAsFixed(0)}k/h',
+                                                      maxLines: 1,
+                                                      overflow: TextOverflow.ellipsis,
+                                                      style: const TextStyle(
+                                                        fontSize: 12,
+                                                        fontWeight: FontWeight.w700,
+                                                        color: AppColors.primary,
+                                                      ),
                                                     ),
                                                   ),
                                                 ],
@@ -1114,6 +1136,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                                         ),
                                       ),
                                     ],
+                                  ),
+                                    ),
                                   ),
                                 );
                               },

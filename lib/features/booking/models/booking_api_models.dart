@@ -788,3 +788,41 @@ class DepositPaymentResponseDTO {
     );
   }
 }
+
+class DarkroomChemicalResponseDTO {
+  final String chemicalId;
+  final String darkroomId;
+  final String name;
+  final String chemicalType;
+  final String brand;
+  final double stockQuantity;
+  final String stockUnit;
+  final double unitSellingPrice;
+  final String? expiresOn;
+
+  const DarkroomChemicalResponseDTO({
+    required this.chemicalId,
+    required this.darkroomId,
+    required this.name,
+    required this.chemicalType,
+    required this.brand,
+    required this.stockQuantity,
+    required this.stockUnit,
+    required this.unitSellingPrice,
+    this.expiresOn,
+  });
+
+  factory DarkroomChemicalResponseDTO.fromJson(Map<String, dynamic> json) {
+    return DarkroomChemicalResponseDTO(
+      chemicalId: json['chemicalId']?.toString() ?? '',
+      darkroomId: json['darkroomId']?.toString() ?? '',
+      name: json['name']?.toString() ?? '',
+      chemicalType: json['chemicalType']?.toString() ?? '',
+      brand: json['brand']?.toString() ?? '',
+      stockQuantity: (json['stockQuantity'] as num?)?.toDouble() ?? 0,
+      stockUnit: json['stockUnit']?.toString() ?? '',
+      unitSellingPrice: (json['unitSellingPrice'] as num?)?.toDouble() ?? 0,
+      expiresOn: json['expiresOn']?.toString(),
+    );
+  }
+}

@@ -105,8 +105,10 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
+        backgroundColor: context.bgColor,
+        surfaceTintColor: Colors.transparent,
         title: const Text('So Sánh Không Gian'),
       ),
       body: SafeArea(
@@ -122,8 +124,9 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                     child: Container(
                       padding: const EdgeInsets.all(4),
                       decoration: BoxDecoration(
-                        color: AppColors.inputFill,
+                        color: context.inputColor,
                         borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: context.borderColor),
                       ),
                       child: Row(
                         children: [
@@ -149,7 +152,7 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                                       size: 16,
                                       color: _selectedSpaceTab == 0
                                           ? Colors.white
-                                          : AppColors.textSecondary,
+                                          : context.textSecColor,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
@@ -159,7 +162,7 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                                         fontSize: 13,
                                         color: _selectedSpaceTab == 0
                                             ? Colors.white
-                                            : AppColors.textPrimary,
+                                            : context.textColor,
                                       ),
                                     ),
                                   ],
@@ -189,7 +192,7 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                                       size: 16,
                                       color: _selectedSpaceTab == 1
                                           ? Colors.white
-                                          : AppColors.textSecondary,
+                                          : context.textSecColor,
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
@@ -199,7 +202,7 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                                         fontSize: 13,
                                         color: _selectedSpaceTab == 1
                                             ? Colors.white
-                                            : AppColors.textPrimary,
+                                            : context.textColor,
                                       ),
                                     ),
                                   ],
@@ -244,23 +247,26 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
               Text(
                 'Cần ít nhất 2 $_currentSpaceLabel để so sánh cùng loại',
                 textAlign: TextAlign.center,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: context.textColor,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 'Hiện có ${list.length} $_currentSpaceLabel khả dụng.',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textSecondary,
+                  color: context.textSecColor,
                 ),
               ),
               const SizedBox(height: 12),
               TextButton.icon(
                 onPressed: _loadLiveSpaces,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                ),
                 icon: const Icon(Icons.refresh_rounded),
                 label: const Text('Tải lại dữ liệu'),
               ),
@@ -278,10 +284,10 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
         children: [
           Text(
             'So Sánh Trực Quan 2 $_currentSpaceLabel',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              color: context.textColor,
             ),
           ),
           const SizedBox(height: 6),
@@ -289,9 +295,9 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
             _selectedSpaceTab == 0
                 ? 'Đối chiếu mức giá, diện tích, ánh sáng & phong cách giữa 2 Studio'
                 : 'Đối chiếu mức giá, quy trình tráng rọi, thông gió & tiện ích giữa 2 Phòng Tối',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: context.textSecColor,
             ),
           ),
           const SizedBox(height: 20),
@@ -323,11 +329,13 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
           // Specs Comparison Table Card
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.cardColor,
               borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: context.borderColor),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black
+                      .withValues(alpha: context.isDark ? 0.2 : 0.05),
                   blurRadius: 12,
                   offset: const Offset(0, 4),
                 ),
@@ -442,12 +450,20 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
               ),
               const SizedBox(width: 12),
               Expanded(
-                child: ElevatedButton(
+                child: OutlinedButton(
                   onPressed: () {
                     Navigator.pushNamed(context, '/detail', arguments: item2);
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.textPrimary,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: context.isDark
+                        ? AppColors.primaryLight
+                        : AppColors.primary,
+                    side: BorderSide(
+                      color: context.isDark
+                          ? AppColors.primaryLight
+                          : AppColors.primary,
+                      width: 1.5,
+                    ),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -456,7 +472,6 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                   child: Text(
                     'Đặt $_currentSpaceLabel 2',
                     style: const TextStyle(
-                      color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
                     ),
@@ -474,10 +489,12 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: context.cardColor,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.3),
+          color: slot == 1
+              ? AppColors.primary.withValues(alpha: 0.45)
+              : context.borderColor,
           width: 1.5,
         ),
       ),
@@ -495,18 +512,20 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 13,
-              color: AppColors.textPrimary,
+              color: context.textColor,
             ),
           ),
           const SizedBox(height: 6),
           DropdownButton<BookingItem>(
             value: selected,
             isExpanded: true,
+            dropdownColor: context.cardColor,
             underline: const SizedBox(),
             icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+            style: TextStyle(fontSize: 12, color: context.textColor),
             items: options.map((item) {
               return DropdownMenuItem<BookingItem>(
                 value: item,
@@ -514,7 +533,7 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
                   item.name,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12),
+                  style: TextStyle(fontSize: 12, color: context.textColor),
                 ),
               );
             }).toList(),
@@ -545,19 +564,19 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
   Widget _buildCompHeader() {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: const BoxDecoration(
-        color: AppColors.inputFill,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: context.inputColor,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
       ),
       child: Row(
         children: [
-          const SizedBox(
+          SizedBox(
             width: 90,
             child: Text(
               'Tiêu chí',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textSecondary,
+                color: context.textSecColor,
                 fontSize: 12,
               ),
             ),
@@ -577,9 +596,9 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
             child: Text(
               '$_currentSpaceLabel 2',
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: context.textColor,
                 fontSize: 12,
               ),
             ),
@@ -592,8 +611,8 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
   Widget _buildCompRow(String label, String val1, String val2) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.border, width: 0.5)),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: context.borderColor, width: 0.5)),
       ),
       child: Row(
         children: [
@@ -601,10 +620,10 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
             width: 90,
             child: Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
+                color: context.textSecColor,
               ),
             ),
           ),
@@ -612,10 +631,10 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
             child: Text(
               val1,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: context.textColor,
               ),
             ),
           ),
@@ -623,10 +642,10 @@ class _StudioComparisonScreenState extends State<StudioComparisonScreen> {
             child: Text(
               val2,
               textAlign: TextAlign.center,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: context.textColor,
               ),
             ),
           ),
