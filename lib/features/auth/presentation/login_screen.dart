@@ -153,7 +153,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     if (_checkingAuth) {
       return Scaffold(
-        backgroundColor: AppColors.background,
+        backgroundColor: context.bgColor,
         body: const Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
@@ -161,7 +161,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -198,24 +198,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   const SizedBox(height: 24),
 
                   // Header Title & Subtitle
-                  const Text(
+                  Text(
                     'Đăng Nhập',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 32,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
+                  Text(
                     'Chào mừng bạn quay trở lại!\nKhám phá thế giới Nhiếp ảnh Film',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                       height: 1.4,
                     ),
                   ),
@@ -260,7 +260,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         minimumSize: Size.zero,
                         tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                       ),
-                      child: const Text(
+                      child: Text(
                         'Quên mật khẩu?',
                         style: TextStyle(
                           color: AppColors.primary,
@@ -283,7 +283,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   // Or continue with text
                   Row(
                     children: [
-                      Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+                      Expanded(child: Divider(color: context.borderColor, thickness: 1)),
                       const Padding(
                         padding: EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
@@ -295,7 +295,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         ),
                       ),
-                      Expanded(child: Divider(color: AppColors.border, thickness: 1)),
+                      Expanded(child: Divider(color: context.borderColor, thickness: 1)),
                     ],
                   ),
                   const SizedBox(height: 24),
@@ -310,10 +310,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text(
+                      Text(
                         'Chưa có tài khoản? ',
                         style: TextStyle(
-                          color: AppColors.textSecondary,
+                          color: context.textSecColor,
                           fontSize: 14,
                         ),
                       ),

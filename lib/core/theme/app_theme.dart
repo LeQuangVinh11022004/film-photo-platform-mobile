@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
@@ -20,6 +21,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
+        systemOverlayStyle: SystemUiOverlayStyle.dark,
         titleTextStyle: GoogleFonts.inter(
           color: AppColors.textPrimary,
           fontSize: 18,
@@ -109,6 +111,7 @@ class AppTheme {
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
+        systemOverlayStyle: SystemUiOverlayStyle.light,
         titleTextStyle: GoogleFonts.inter(
           color: Colors.white,
           fontSize: 18,
@@ -116,6 +119,29 @@ class AppTheme {
         ),
         iconTheme: const IconThemeData(color: Colors.white),
       ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: const Color(0xFF1E1E1E),
+        surfaceTintColor: Colors.transparent,
+        titleTextStyle: GoogleFonts.inter(
+          color: const Color(0xFFF5F5F5),
+          fontSize: 18,
+          fontWeight: FontWeight.bold,
+        ),
+        contentTextStyle: GoogleFonts.inter(
+          color: const Color(0xFFD0D0D0),
+          fontSize: 14,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      ),
+      popupMenuTheme: const PopupMenuThemeData(
+        color: Color(0xFF1E1E1E),
+        surfaceTintColor: Colors.transparent,
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        contentTextStyle: TextStyle(color: Colors.white),
+      ),
+      canvasColor: const Color(0xFF1E1E1E),
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,

@@ -158,7 +158,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -175,7 +175,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                     width: 40,
                     height: 4,
                     decoration: BoxDecoration(
-                      color: AppColors.border,
+                      color: context.borderColor,
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -187,10 +187,10 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                     Expanded(
                       child: Text(
                         detailed.packageName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: context.textColor,
                         ),
                       ),
                     ),
@@ -200,9 +200,9 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                 const SizedBox(height: 6),
                 Text(
                   'Nhà cung cấp: ${detailed.providerName}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: context.textSecColor,
                   ),
                 ),
                 const Divider(height: 24),
@@ -230,12 +230,12 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                 ),
                 if (detailed.items.isNotEmpty) ...[
                   const SizedBox(height: 16),
-                  const Text(
+                  Text(
                     'Chi tiết các bước trong Gói:',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -244,7 +244,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                       margin: const EdgeInsets.only(bottom: 8),
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: AppColors.inputFill,
+                        color: context.inputColor,
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Row(
@@ -268,18 +268,18 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                               children: [
                                 Text(
                                   '[${item.componentType}] ${item.resourceName}',
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.bold,
                                     fontSize: 13,
-                                    color: AppColors.textPrimary,
+                                    color: context.textColor,
                                   ),
                                 ),
                                 if (item.includedDurationMinutes != null)
                                   Text(
                                     'Thời lượng: ${item.includedDurationMinutes} phút • SL: ${item.quantity}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
-                                      color: AppColors.textSecondary,
+                                      color: context.textSecColor,
                                     ),
                                   ),
                               ],
@@ -421,7 +421,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.white,
+      backgroundColor: context.cardColor,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
@@ -444,7 +444,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
-                        color: AppColors.border,
+                        color: context.borderColor,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
@@ -452,18 +452,18 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                   const SizedBox(height: 16),
                   Text(
                     'Đặt Lịch Từ Gói: ${sub.packageName}',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     'Chọn khung giờ trống cho từng bước trong gói (Miễn phí đặt cọc - Trừ 1 lượt dùng).',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                     ),
                   ),
                   const SizedBox(height: 16),
@@ -483,7 +483,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                       margin: const EdgeInsets.only(bottom: 16),
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: AppColors.inputFill,
+                        color: context.inputColor,
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Column(
@@ -491,10 +491,10 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                         children: [
                           Text(
                             'Bước $step: ${roomItem.resourceName} (${roomItem.componentType})',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 14,
-                              color: AppColors.textPrimary,
+                              color: context.textColor,
                             ),
                           ),
                           const SizedBox(height: 8),
@@ -514,7 +514,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                               isExpanded: true,
                               decoration: InputDecoration(
                                 filled: true,
-                                fillColor: Colors.white,
+                                fillColor: context.inputColor,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 12,
                                   vertical: 10,
@@ -635,9 +635,9 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
         children: [
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: AppColors.textSecondary,
+              color: context.textSecColor,
             ),
           ),
           const SizedBox(width: 12),
@@ -648,7 +648,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.bold,
-                color: highlight ? AppColors.primary : AppColors.textPrimary,
+                color: highlight ? AppColors.primary : context.textColor,
               ),
             ),
           ),
@@ -697,13 +697,13 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
-        title: const Text('Gói Dịch Vụ & Subscription'),
+        title: Text('Gói Dịch Vụ & Subscription'),
         bottom: TabBar(
           controller: _tabController,
           labelColor: AppColors.primary,
-          unselectedLabelColor: AppColors.textSecondary,
+          unselectedLabelColor: context.textSecColor,
           indicatorColor: AppColors.primary,
           labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
           tabs: [
@@ -759,7 +759,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
           return Container(
             margin: const EdgeInsets.only(bottom: 20),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -792,7 +792,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                             gradient: AppColors.goldGradient,
                             borderRadius: BorderRadius.circular(8),
                           ),
-                          child: const Text(
+                          child: Text(
                             'COMBO BÁN CHẠY NHẤT',
                             style: TextStyle(
                               color: Colors.white,
@@ -825,9 +825,9 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                           ),
                           Text(
                             pkg.durationText,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.textSecondary,
+                              color: context.textSecColor,
                             ),
                           ),
                         ],
@@ -835,28 +835,28 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                       const SizedBox(height: 6),
                       Text(
                         pkg.name,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: context.textColor,
                         ),
                       ),
                       const SizedBox(height: 8),
                       Text(
                         pkg.description,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.textSecondary,
+                          color: context.textSecColor,
                           height: 1.4,
                         ),
                       ),
                       const SizedBox(height: 14),
-                      const Text(
+                      Text(
                         'Gói dịch vụ bao gồm:',
                         style: TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
-                          color: AppColors.textPrimary,
+                          color: context.textColor,
                         ),
                       ),
                       const SizedBox(height: 8),
@@ -871,9 +871,9 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                               Expanded(
                                 child: Text(
                                   inc,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 12,
-                                    color: AppColors.textPrimary,
+                                    color: context.textColor,
                                   ),
                                 ),
                               ),
@@ -950,22 +950,22 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
               color: AppColors.textHint.withValues(alpha: 0.6),
             ),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Bạn chưa có gói dịch vụ nào đã đăng ký',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
+                color: context.textColor,
               ),
             ),
             const SizedBox(height: 8),
-            const Text(
+            Text(
               'Hãy chọn mua một Gói Combo ở tab bên cạnh để tiết kiệm chi phí thuê Studio, Phòng tối và Thiết bị hàng tháng.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
-                color: AppColors.textSecondary,
+                color: context.textSecColor,
                 height: 1.4,
               ),
             ),
@@ -997,7 +997,7 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
             margin: const EdgeInsets.only(bottom: 16),
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: context.cardColor,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
@@ -1016,10 +1016,10 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                     Expanded(
                       child: Text(
                         sub.packageName,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 17,
                           fontWeight: FontWeight.bold,
-                          color: AppColors.textPrimary,
+                          color: context.textColor,
                         ),
                       ),
                     ),
@@ -1029,9 +1029,9 @@ class _ServicePackagesScreenState extends State<ServicePackagesScreen>
                 const SizedBox(height: 4),
                 Text(
                   sub.providerName,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.textSecondary,
+                    color: context.textSecColor,
                   ),
                 ),
                 const Divider(height: 22),

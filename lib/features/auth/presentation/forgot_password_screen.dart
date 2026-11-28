@@ -39,7 +39,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
         leading: Padding(
           padding: const EdgeInsets.only(left: 16.0),
@@ -48,13 +48,13 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.inputFill,
+                color: context.inputColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, size: 20),
                 tooltip: 'Quay lại Đăng nhập',
-                color: AppColors.textPrimary,
+                color: context.textColor,
                 onPressed: _navigateBack,
               ),
             ),
@@ -90,24 +90,24 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   const SizedBox(height: 24),
 
                   // Title & Description
-                  const Text(
+                  Text(
                     'Quên Mật Khẩu?',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
+                  Text(
                     'Khôi phục mật khẩu hiện chưa được hỗ trợ. Vui lòng liên hệ quản trị viên.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                       height: 1.4,
                     ),
                   ),
@@ -150,15 +150,15 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                     },
                     style: OutlinedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 16),
-                      side: const BorderSide(color: AppColors.border, width: 1.5),
+                      side: BorderSide(color: context.borderColor, width: 1.5),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: const Text(
+                    child: Text(
                       'Đã có mã? Đặt lại mật khẩu',
                       style: TextStyle(
-                        color: AppColors.textPrimary,
+                        color: context.textColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 15,
                       ),
@@ -170,7 +170,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.arrow_back, size: 16, color: AppColors.textSecondary),
+                      Icon(Icons.arrow_back, size: 16, color: context.textSecColor),
                       const SizedBox(width: 6),
                       GestureDetector(
                         onTap: _navigateBack,

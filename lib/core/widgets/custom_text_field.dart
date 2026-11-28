@@ -36,10 +36,10 @@ class _CustomTextFieldState extends State<CustomTextField> {
         if (widget.labelText != null) ...[
           Text(
             widget.labelText!,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: context.textColor,
             ),
           ),
           const SizedBox(height: 6),
@@ -49,9 +49,9 @@ class _CustomTextFieldState extends State<CustomTextField> {
           obscureText: widget.isPassword ? _obscureText : false,
           keyboardType: widget.keyboardType,
           validator: widget.validator,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 15,
-            color: AppColors.textPrimary,
+            color: context.textColor,
             fontWeight: FontWeight.w500,
           ),
           decoration: InputDecoration(
@@ -61,13 +61,13 @@ class _CustomTextFieldState extends State<CustomTextField> {
               fontSize: 14,
             ),
             filled: true,
-            fillColor: AppColors.inputFill,
+            fillColor: context.inputColor,
             contentPadding: const EdgeInsets.symmetric(
               horizontal: 16,
               vertical: 16,
             ),
             prefixIcon: widget.prefixIcon != null
-                ? Icon(widget.prefixIcon, color: AppColors.textSecondary, size: 20)
+                ? Icon(widget.prefixIcon, color: context.textSecColor, size: 20)
                 : null,
             suffixIcon: widget.isPassword
                 ? IconButton(
@@ -75,7 +75,7 @@ class _CustomTextFieldState extends State<CustomTextField> {
                       _obscureText
                           ? Icons.visibility_off_outlined
                           : Icons.visibility_outlined,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                       size: 20,
                     ),
                     onPressed: () {

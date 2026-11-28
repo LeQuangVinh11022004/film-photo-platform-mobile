@@ -54,7 +54,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
         leading: Padding(
           padding: const EdgeInsets.only(left: 16.0),
@@ -63,13 +63,13 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: AppColors.inputFill,
+                color: context.inputColor,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: IconButton(
                 icon: const Icon(Icons.arrow_back, size: 20),
                 tooltip: 'Quay lại Đăng nhập',
-                color: AppColors.textPrimary,
+                color: context.textColor,
                 onPressed: _navigateToLogin,
               ),
             ),
@@ -105,24 +105,24 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   const SizedBox(height: 20),
 
                   // Title & Subtitle
-                  const Text(
+                  Text(
                     'Đặt Lại Mật Khẩu',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                       letterSpacing: -0.5,
                     ),
                   ),
                   const SizedBox(height: 10),
-                  const Text(
+                  Text(
                     'Đặt lại mật khẩu hiện chưa được hỗ trợ. Vui lòng liên hệ quản trị viên.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w500,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                       height: 1.4,
                     ),
                   ),
@@ -205,7 +205,7 @@ class _ResetPasswordScreenState extends State<ResetPasswordScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.arrow_back, size: 16, color: AppColors.textSecondary),
+                      Icon(Icons.arrow_back, size: 16, color: context.textSecColor),
                       const SizedBox(width: 6),
                       GestureDetector(
                         onTap: _navigateToLogin,

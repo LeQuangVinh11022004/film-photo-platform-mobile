@@ -33,7 +33,9 @@ class _SocialButtonState extends State<SocialButton> {
           width: 58,
           height: 48,
           decoration: BoxDecoration(
-            color: _isHovered ? AppColors.inputFill : AppColors.socialBg,
+            color: _isHovered
+                ? context.borderColor
+                : (context.isDark ? context.inputColor : AppColors.socialBg),
             borderRadius: BorderRadius.circular(12),
             boxShadow: _isHovered
                 ? [

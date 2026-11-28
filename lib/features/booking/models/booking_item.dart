@@ -152,19 +152,11 @@ class BookingItem {
       previews.add(defaultImg);
     }
 
-    // Amenities parsing từ details
+    // Amenities parsing từ details (dùng chung bộ làm sạch dấu {}, [], ")
     List<String> parsedAmenities = [];
     final details = json['details'] as Map<String, dynamic>?;
     if (details != null && details['amenities'] != null) {
-      final aVal = details['amenities'];
-      if (aVal is List) {
-        parsedAmenities = aVal.map((e) => e.toString().trim()).where((e) => e.isNotEmpty).toList();
-      } else {
-        final aStr = aVal.toString();
-        if (aStr.isNotEmpty) {
-          parsedAmenities = aStr.split(RegExp(r'[,;]')).map((e) => e.trim()).where((e) => e.isNotEmpty).toList();
-        }
-      }
+      parsedAmenities = ResourceDetailDTO.parseStringList(details['amenities']);
     }
 
     if (parsedAmenities.isEmpty) {

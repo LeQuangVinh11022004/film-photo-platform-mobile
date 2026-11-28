@@ -44,7 +44,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     final unreadCount = _notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
         title: const Text('Trung Tâm Thông Báo'),
         actions: [
@@ -73,11 +73,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                       label: Text(_filters[index]),
                       selected: isSelected,
                       selectedColor: AppColors.primary,
-                      backgroundColor: Colors.white,
-                      side: BorderSide(color: isSelected ? Colors.transparent : AppColors.border),
+                      backgroundColor: context.cardColor,
+                      side: BorderSide(color: isSelected ? Colors.transparent : context.borderColor),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
                       labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textPrimary,
+                        color: isSelected ? Colors.white : context.textColor,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
@@ -101,10 +101,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.notifications_off_outlined, size: 64, color: AppColors.textHint),
-                          SizedBox(height: 16),
-                          Text('Chưa có thông báo nào', style: TextStyle(color: AppColors.textSecondary, fontSize: 16, fontWeight: FontWeight.bold)),
+                        children: [
+                          const Icon(Icons.notifications_off_outlined, size: 64, color: AppColors.textHint),
+                          const SizedBox(height: 16),
+                          Text('Chưa có thông báo nào', style: TextStyle(color: context.textSecColor, fontSize: 16, fontWeight: FontWeight.bold)),
                         ],
                       ),
                     )
@@ -160,15 +160,19 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: notif.isRead ? Colors.white : AppColors.primarySoft.withValues(alpha: 0.4),
+          color: notif.isRead
+              ? context.cardColor
+              : (context.isDark
+                  ? AppColors.primary.withValues(alpha: 0.14)
+                  : AppColors.primarySoft.withValues(alpha: 0.4)),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: notif.isRead ? AppColors.border : AppColors.primary.withValues(alpha: 0.3),
+            color: notif.isRead ? context.borderColor : AppColors.primary.withValues(alpha: 0.35),
             width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.03),
+              color: Colors.black.withValues(alpha: context.isDark ? 0.2 : 0.03),
               blurRadius: 10,
               offset: const Offset(0, 4),
             ),
@@ -202,7 +206,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: notif.isRead ? FontWeight.w600 : FontWeight.bold,
-                            color: AppColors.textPrimary,
+                            color: context.textColor,
                           ),
                         ),
                       ),
@@ -221,9 +225,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
                   const SizedBox(height: 8),
                   Text(
                     notif.body,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                       height: 1.4,
                     ),
                   ),

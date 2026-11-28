@@ -376,7 +376,7 @@ class _PaymentScreenState extends State<PaymentScreen>
       barrierDismissible: false,
       builder: (ctx) {
         return AlertDialog(
-          backgroundColor: Colors.white,
+          backgroundColor: context.cardColor,
           shape:
           RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           contentPadding: const EdgeInsets.all(24),
@@ -397,21 +397,21 @@ class _PaymentScreenState extends State<PaymentScreen>
                 ),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 'Thanh Toán Thành Công!',
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: context.textColor,
                 ),
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 8),
               Text(
                 displayMessage,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13,
-                  color: AppColors.textSecondary,
+                  color: context.textSecColor,
                   height: 1.4,
                 ),
                 textAlign: TextAlign.center,
@@ -422,15 +422,15 @@ class _PaymentScreenState extends State<PaymentScreen>
                   width: double.infinity,
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: AppColors.inputFill,
+                    color: context.inputColor,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
                     'Mã giao dịch: $displayTxId',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -440,17 +440,17 @@ class _PaymentScreenState extends State<PaymentScreen>
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: AppColors.inputFill,
+                  color: context.inputColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    const Flexible(
+                    Flexible(
                       child: Text(
                         'Tổng tiền đã trả:',
                         style: TextStyle(
-                            fontSize: 13, color: AppColors.textSecondary),
+                            fontSize: 13, color: context.textSecColor),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
@@ -508,8 +508,8 @@ class _PaymentScreenState extends State<PaymentScreen>
           label,
           style: TextStyle(
             color: valueColor == null
-                ? AppColors.textSecondary
-                : AppColors.textPrimary,
+                ? context.textSecColor
+                : context.textColor,
             fontSize: fontSize,
             fontWeight: valueColor == null ? FontWeight.normal : FontWeight.bold,
           ),
@@ -521,7 +521,7 @@ class _PaymentScreenState extends State<PaymentScreen>
             style: TextStyle(
               fontWeight: isBoldValue ? fontWeight : FontWeight.normal,
               fontSize: fontSize,
-              color: valueColor ?? AppColors.textPrimary,
+              color: valueColor ?? context.textColor,
             ),
             textAlign: TextAlign.right,
             maxLines: 2,
@@ -538,9 +538,9 @@ class _PaymentScreenState extends State<PaymentScreen>
     NumberFormat.currency(locale: 'vi', symbol: 'đ').format(_amount);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: context.bgColor,
       appBar: AppBar(
-        title: const Text(
+        title: Text(
           'Thanh Toán Đặt Chỗ',
           style: TextStyle(
             color: AppColors.primary,
@@ -558,7 +558,7 @@ class _PaymentScreenState extends State<PaymentScreen>
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: context.cardColor,
                   borderRadius: BorderRadius.circular(20),
                   boxShadow: [
                     BoxShadow(
@@ -571,7 +571,7 @@ class _PaymentScreenState extends State<PaymentScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'TỔNG QUAN ĐƠN HÀNG',
                       style: TextStyle(
                         fontSize: 13,
@@ -583,10 +583,10 @@ class _PaymentScreenState extends State<PaymentScreen>
                     const SizedBox(height: 4),
                     Text(
                       'Mã đơn: $_bookingId',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: AppColors.textSecondary,
+                        color: context.textSecColor,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -619,12 +619,12 @@ class _PaymentScreenState extends State<PaymentScreen>
                 ),
               ),
               const SizedBox(height: 28),
-              const Text(
+              Text(
                 'CHỌN CỔNG THANH TOÁN',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+                  color: context.textColor,
                 ),
               ),
               const SizedBox(height: 12),
@@ -664,7 +664,7 @@ class _PaymentScreenState extends State<PaymentScreen>
         duration: const Duration(milliseconds: 180),
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: context.cardColor,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: isSelected ? AppColors.primary : Colors.transparent,
@@ -695,10 +695,10 @@ class _PaymentScreenState extends State<PaymentScreen>
                 children: [
                   Text(
                     name,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 14,
-                      color: AppColors.textPrimary,
+                      color: context.textColor,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
@@ -706,9 +706,9 @@ class _PaymentScreenState extends State<PaymentScreen>
                   const SizedBox(height: 2),
                   Text(
                     subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
-                      color: AppColors.textSecondary,
+                      color: context.textSecColor,
                     ),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
@@ -722,7 +722,7 @@ class _PaymentScreenState extends State<PaymentScreen>
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(
-                  color: isSelected ? AppColors.primary : AppColors.border,
+                  color: isSelected ? AppColors.primary : context.borderColor,
                   width: 2,
                 ),
               ),
