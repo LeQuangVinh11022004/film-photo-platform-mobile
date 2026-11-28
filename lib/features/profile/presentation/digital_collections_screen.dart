@@ -12,7 +12,7 @@ class DigitalCollectionsScreen extends StatefulWidget {
 }
 
 class _DigitalCollectionsScreenState extends State<DigitalCollectionsScreen> {
-  final List<PhotoCollection> _collections = PhotoCollection.sampleCollections;
+  final List<PhotoCollection> _collections = PhotoCollection.collections;
 
   @override
   Widget build(BuildContext context) {
@@ -33,6 +33,18 @@ class _DigitalCollectionsScreenState extends State<DigitalCollectionsScreen> {
 
               if (url != null && mounted) {
                 setState(() {
+                  if (_collections.isEmpty) {
+                    _collections.add(
+                      PhotoCollection(
+                        id: 'ALB-${DateTime.now().millisecondsSinceEpoch}',
+                        albumName: 'Album Ảnh Film Của Tôi',
+                        coverImage: url,
+                        description: 'Bộ sưu tập ảnh film số hóa bạn đã tải lên.',
+                        photoCount: 0,
+                        photos: [],
+                      ),
+                    );
+                  }
                   _collections[0].photos.insert(
                     0,
                     FilmPhoto(
@@ -47,7 +59,7 @@ class _DigitalCollectionsScreenState extends State<DigitalCollectionsScreen> {
                   );
                 });
                 messenger.showSnackBar(
-                  const SnackBar(content: Text('Đã thêm 1 ảnh mới vào Album đầu tiên!'), backgroundColor: Colors.green),
+                  const SnackBar(content: Text('Đã thêm 1 ảnh mới vào Album!'), backgroundColor: Colors.green),
                 );
               }
             },
@@ -55,7 +67,30 @@ class _DigitalCollectionsScreenState extends State<DigitalCollectionsScreen> {
         ],
       ),
       body: SafeArea(
-        child: ListView.builder(
+        child: _collections.isEmpty
+            ? Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(32),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.photo_library_outlined, size: 64, color: AppColors.textHint),
+                      const SizedBox(height: 16),
+                      Text(
+                        'Chưa có album ảnh nào',
+                        style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: context.textColor),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Nhấn biểu tượng thêm ảnh ở góc trên để tải ảnh film số hóa của bạn lên.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 13, color: context.textSecColor),
+                      ),
+                    ],
+                  ),
+                ),
+              )
+            : ListView.builder(
           padding: EdgeInsets.all(20),
           physics: const BouncingScrollPhysics(),
           itemCount: _collections.length,

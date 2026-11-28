@@ -4,6 +4,7 @@ import 'package:toastification/toastification.dart';
 import '../../../core/services/favorite_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../../../core/widgets/pagination_bar.dart';
 import '../../booking/models/booking_api_models.dart';
 import '../../booking/models/booking_item.dart';
 import '../../booking/services/booking_api_service.dart';
@@ -24,10 +25,12 @@ class _HomeScreenState extends State<HomeScreen> {
   String _searchQuery = '';
 
   // API Data state
+  static const int _popularPageSize = 5;
   final BookingApiService _bookingApiService = BookingApiService();
   List<BookingItem> _apiItems = [];
   bool _isLoadingItems = true;
   bool _hasLoadError = false;
+  int _popularPage = 1;
 
   @override
   void initState() {
@@ -54,10 +57,33 @@ class _HomeScreenState extends State<HomeScreen> {
         _bookingApiService.getDarkrooms(),
       ]);
 
-      final studios = results[0].map((e) => e.toBookingItem()).toList();
-      final darkrooms = results[1].map((e) => e.toBookingItem()).toList();
-      final equipment = await _bookingApiService.getAllEquipmentItems([...studios, ...darkrooms]);
-      final List<BookingItem> combined = [...studios, ...darkrooms, ...equipment];
+      final rawStudios = results[0].map((e) => e.toBookingItem()).toList();
+      final rawDarkrooms = results[1].map((e) => e.toBookingItem()).toList();
+      final rawSpaces = [...rawStudios, ...rawDarkrooms];
+
+      final enrichedResults = await Future.wait([
+        _bookingApiService.enrichSpaceRatings(rawSpaces),
+        _bookingApiService.getAllEquipmentItems(rawSpaces),
+        _bookingApiService.getMyBookings(page: 1, pageSize: 50).catchError((_) => null),
+      ]);
+      final rawRatedSpaces = enrichedResults[0] as List<BookingItem>;
+      final equipment = enrichedResults[1] as List<BookingItem>;
+      final bookingsPage = enrichedResults[2] as PagedResponseDTO<BookingResponseDTO>?;
+
+      final bookingCounts = <String, int>{};
+      for (final b in (bookingsPage?.items ?? const <BookingResponseDTO>[])) {
+        final status = b.status.toUpperCase();
+        if (status == 'CANCELLED' || status == 'EXPIRED') continue;
+        final key = b.spaceId.trim().toLowerCase();
+        if (key.isEmpty) continue;
+        bookingCounts[key] = (bookingCounts[key] ?? 0) + 1;
+      }
+
+      final spaces = rawRatedSpaces.map((item) {
+        final count = bookingCounts[item.id.trim().toLowerCase()] ?? 0;
+        return count > item.bookingCount ? item.copyWith(bookingCount: count) : item;
+      }).toList();
+      final List<BookingItem> combined = [...spaces, ...equipment];
 
       if (mounted) {
         setState(() {
@@ -84,14 +110,6 @@ class _HomeScreenState extends State<HomeScreen> {
       'gradient': AppColors.aiGradient,
       'route': '/ai-assistant',
       'badge': 'HOT AI',
-    },
-    {
-      'title': 'AI Phục Chế Ảnh 4K',
-      'subtitle': 'Tự động làm nét, khử xước & phục hồi màu phim cổ',
-      'icon': Icons.auto_fix_high_rounded,
-      'gradient': AppColors.goldGradient,
-      'route': '/ai-restoration',
-      'badge': 'NEW',
     },
     {
       'title': 'Gói Combo Bundle',
@@ -131,6 +149,23 @@ class _HomeScreenState extends State<HomeScreen> {
     '🎞️ Phòng tối',
     '🎥 Thiết bị',
   ];
+
+  /// Danh sách "Phổ biến & Được yêu thích": ưu tiên sắp theo lượt đánh giá, lượt đặt và điểm đánh giá
+  List<BookingItem> get _popularItems {
+    final list = List<BookingItem>.from(_filteredItems);
+    if (_sortBy == 'default') {
+      list.sort((a, b) {
+        final scoreCmp = b.popularityScore.compareTo(a.popularityScore);
+        if (scoreCmp != 0) return scoreCmp;
+        final revCmp = b.reviewCount.compareTo(a.reviewCount);
+        if (revCmp != 0) return revCmp;
+        final bookCmp = b.bookingCount.compareTo(a.bookingCount);
+        if (bookCmp != 0) return bookCmp;
+        return b.rating.compareTo(a.rating);
+      });
+    }
+    return list;
+  }
 
   List<BookingItem> get _filteredItems {
     List<BookingItem> list = List.from(_apiItems);
@@ -364,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final unreadNotifs = NotificationItem.sampleNotifications.where((n) => !n.isRead).length;
+    final unreadNotifs = NotificationItem.notifications.where((n) => !n.isRead).length;
 
     return Scaffold(
       backgroundColor: context.bgColor,
@@ -644,7 +679,10 @@ class _HomeScreenState extends State<HomeScreen> {
                     return Padding(
                       padding: EdgeInsets.only(right: 10.0),
                       child: GestureDetector(
-                        onTap: () => setState(() => _selectedCategoryIndex = index),
+                        onTap: () => setState(() {
+                          _selectedCategoryIndex = index;
+                          _popularPage = 1;
+                        }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           padding: EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -743,7 +781,19 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text('Phổ biến & Được yêu thích', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textColor)),
                     GestureDetector(
                       onTap: () {
-                        Navigator.pushNamed(context, '/item-list');
+                        BookingCategory? initialCategory;
+                        if (_selectedCategoryIndex == 1) {
+                          initialCategory = BookingCategory.studio;
+                        } else if (_selectedCategoryIndex == 2) {
+                          initialCategory = BookingCategory.darkroom;
+                        } else if (_selectedCategoryIndex == 3) {
+                          initialCategory = BookingCategory.equipment;
+                        }
+                        Navigator.pushNamed(
+                          context,
+                          '/item-list',
+                          arguments: initialCategory,
+                        );
                       },
                       child: const Text('Tất cả', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: AppColors.primary)),
                     ),
@@ -752,20 +802,46 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Section 2 Vertical List
+            // Section 2 Vertical List (có phân trang, xếp hạng theo lượt đánh giá & lượt đặt)
             SliverPadding(
-              padding: EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
-              sliver: _filteredItems.isEmpty
-                  ? const SliverToBoxAdapter(child: SizedBox())
-                  : SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          final item = _filteredItems[index];
-                          return _buildPopularCard(context, item);
-                        },
-                        childCount: _filteredItems.length,
-                      ),
+              padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 4.0),
+              sliver: Builder(
+                builder: (context) {
+                  final filtered = _popularItems;
+                  if (filtered.isEmpty) {
+                    return const SliverToBoxAdapter(child: SizedBox());
+                  }
+                  final totalPages =
+                      (filtered.length / _popularPageSize).ceil().clamp(1, 9999);
+                  final safePage = _popularPage.clamp(1, totalPages);
+                  final pageItems = filtered
+                      .skip((safePage - 1) * _popularPageSize)
+                      .take(_popularPageSize)
+                      .toList();
+
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate(
+                      (context, index) {
+                        if (index == pageItems.length) {
+                          return PaginationBar(
+                            currentPage: safePage,
+                            totalPages: totalPages,
+                            totalItems: filtered.length,
+                            pageSize: _popularPageSize,
+                            itemLabel: 'mục',
+                            onPageChanged: (page) {
+                              setState(() => _popularPage = page);
+                            },
+                          );
+                        }
+                        final item = pageItems[index];
+                        return _buildPopularCard(context, item);
+                      },
+                      childCount: pageItems.length + 1,
                     ),
+                  );
+                },
+              ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 24)),
           ],
@@ -912,19 +988,34 @@ class _HomeScreenState extends State<HomeScreen> {
                       Expanded(child: Text(item.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: context.textColor))),
                       Row(
                         children: [
-                          Icon(Icons.star_rounded, color: Colors.amber, size: 16),
-                          SizedBox(width: 2),
-                          Text(item.ratingLabel, style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textColor)),
+                          const Icon(Icons.star_rounded, color: Colors.amber, size: 16),
+                          const SizedBox(width: 2),
+                          Text(
+                            item.reviewCount > 0
+                                ? '${item.ratingLabel} (${item.reviewCount})'
+                                : item.ratingLabel,
+                            style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textColor),
+                          ),
                         ],
                       ),
                     ],
                   ),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(item.location, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, color: context.textSecColor)),
-                  SizedBox(height: 8),
-                  Text(
-                    '${item.pricePerHour.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ / giờ',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        '${item.pricePerHour.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ / giờ',
+                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppColors.primary),
+                      ),
+                      if (item.bookingCount > 0)
+                        Text(
+                          '${item.bookingCount} lượt đặt',
+                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: context.textSecColor),
+                        ),
+                    ],
                   ),
                 ],
               ),

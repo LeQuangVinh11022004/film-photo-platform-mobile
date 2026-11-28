@@ -5,19 +5,23 @@ import 'package:image_picker/image_picker.dart';
 import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/utils/image_utils.dart';
+import '../../../core/widgets/pagination_bar.dart';
 import '../../auth/services/auth_service.dart';
 import '../models/blog_post.dart';
 import '../models/community_post_api_models.dart';
 import '../services/community_post_api_service.dart';
 
 class CommunityScreen extends StatefulWidget {
-  const CommunityScreen({super.key});
+  final int initialViewMode;
+  const CommunityScreen({super.key, this.initialViewMode = 0});
 
   @override
   State<CommunityScreen> createState() => _CommunityScreenState();
 }
 
 class _CommunityScreenState extends State<CommunityScreen> {
+  static const int _pageSize = 5;
+
   final CommunityPostApiService _communityPostApiService =
       CommunityPostApiService();
 
@@ -28,6 +32,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
   bool _isLoadingMyPosts = false;
   bool _myPostsError = false;
   bool _feedError = false;
+
+  int _feedPage = 1;
+  int _feedTotalCount = 0;
+  int _myPostsPage = 1;
+  int _myPostsTotalCount = 0;
 
   /// Chế độ hiển thị:
   /// 0 = Diễn đàn Chung (GET /api/community/posts)
@@ -51,6 +60,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
   @override
   void initState() {
     super.initState();
+    _viewMode = widget.initialViewMode;
     _scrollController.addListener(() {
       if (_scrollController.offset > 300 && !_showFab) {
         setState(() => _showFab = true);
@@ -69,22 +79,32 @@ class _CommunityScreenState extends State<CommunityScreen> {
     super.dispose();
   }
 
-  /// Gọi GET /api/community/posts cho Diễn đàn chung.
-  Future<void> _loadCommunityFeed({String? category}) async {
+  bool get _isLocalFeedFilterActive =>
+      _selectedFilterIndex != 0 || _searchQuery.isNotEmpty;
+
+  /// Gọi GET /api/community/posts cho Diễn đàn chung (hỗ trợ phân trang server-side).
+  Future<void> _loadCommunityFeed({String? category, int? page}) async {
     if (!mounted) return;
-    setState(() => _isLoadingFeed = true);
+    final targetPage = page ?? _feedPage;
+    final useLargeBatch = _isLocalFeedFilterActive;
+    setState(() {
+      _isLoadingFeed = true;
+      _feedPage = targetPage;
+    });
 
     try {
-      final page = await _communityPostApiService.getFeed(
-          category: category,
-          page: 1,
-          pageSize: 50,
-        );
+      final result = await _communityPostApiService.getFeed(
+        category: category,
+        page: useLargeBatch ? 1 : targetPage,
+        pageSize: useLargeBatch ? 50 : _pageSize,
+      );
       if (!mounted) return;
       setState(() {
-        _feedError = page == null;
-        if (page != null) {
-          _posts = page.items.map((dto) => dto.toBlogPost()).toList();
+        _feedError = result == null;
+        if (result != null) {
+          _posts = result.items.map((dto) => dto.toBlogPost()).toList();
+          _feedTotalCount =
+              result.totalCount > 0 ? result.totalCount : result.items.length;
         }
         _isLoadingFeed = false;
       });
@@ -98,20 +118,29 @@ class _CommunityScreenState extends State<CommunityScreen> {
     }
   }
 
-  /// Gọi GET /api/community/posts/mine cho cả PHOTOGRAPHER và EXPERT
-  Future<void> _loadMyCommunityPosts() async {
+  /// Gọi GET /api/community/posts/mine cho cả PHOTOGRAPHER và EXPERT (hỗ trợ phân trang server-side).
+  Future<void> _loadMyCommunityPosts({int? page}) async {
     if (!mounted) return;
-    setState(() => _isLoadingMyPosts = true);
+    final targetPage = page ?? _myPostsPage;
+    final useLargeBatch = _searchQuery.isNotEmpty;
+    setState(() {
+      _isLoadingMyPosts = true;
+      _myPostsPage = targetPage;
+    });
 
     try {
-      final page = await _communityPostApiService.getMyPosts(
-        page: 1,
-        pageSize: 50,
+      final result = await _communityPostApiService.getMyPosts(
+        page: useLargeBatch ? 1 : targetPage,
+        pageSize: useLargeBatch ? 50 : _pageSize,
       );
       if (!mounted) return;
       setState(() {
-        _myPostsError = page == null;
-        if (page != null) _myCommunityPosts = page.items;
+        _myPostsError = result == null;
+        if (result != null) {
+          _myCommunityPosts = result.items;
+          _myPostsTotalCount =
+              result.totalCount > 0 ? result.totalCount : result.items.length;
+        }
         _isLoadingMyPosts = false;
       });
     } catch (e) {
@@ -990,19 +1019,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
     CommunityCommentResponseDTO? replyingTo;
     CommunityCommentResponseDTO? editingComment;
 
-    final List<Map<String, String>> fallbackComments = [
-      {
-        'author': 'An Nhiên',
-        'text': 'Bài viết chia sẻ rất bổ ích, cảm ơn bạn!',
-        'time': '30 phút trước',
-      },
-      {
-        'author': 'Minh Đức Film',
-        'text': 'Tone màu này tráng D-76 ra cực đậm và chi tiết.',
-        'time': '1 giờ trước',
-      },
-    ];
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -1040,9 +1056,7 @@ class _CommunityScreenState extends State<CommunityScreen> {
             Future.microtask(fetchLiveComments);
           }
 
-          final totalDisplayCount = isLiveCommunityPost
-              ? apiComments.length
-              : fallbackComments.length;
+          final totalDisplayCount = apiComments.length;
 
           return Padding(
             padding: EdgeInsets.only(
@@ -1299,74 +1313,11 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                   );
                                 },
                               ))
-                        : ListView.separated(
-                            physics: const BouncingScrollPhysics(),
-                            itemCount: fallbackComments.length,
-                            separatorBuilder: (_, _) =>
-                                Divider(color: context.inputColor),
-                            itemBuilder: (_, index) {
-                              final c = fallbackComments[index];
-                              return Padding(
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12.0),
-                                child: Row(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 20,
-                                      backgroundColor: AppColors.primary
-                                          .withValues(alpha: 0.15),
-                                      child: Text(
-                                        c['author']![0],
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
-                                          color: AppColors.primary,
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 14),
-                                    Expanded(
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Row(
-                                            mainAxisAlignment:
-                                                MainAxisAlignment.spaceBetween,
-                                            children: [
-                                              Text(
-                                                c['author']!,
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 14,
-                                                  color: context.textColor,
-                                                ),
-                                              ),
-                                              Text(
-                                                c['time']!,
-                                                style: const TextStyle(
-                                                  fontSize: 12,
-                                                  color: AppColors.textHint,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                          const SizedBox(height: 6),
-                                          Text(
-                                            c['text']!,
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: context.textSecColor,
-                                              height: 1.4,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              );
-                            },
+                        : const Center(
+                            child: Text(
+                              'Chưa có bình luận nào cho bài viết này.',
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
                           ),
                   ),
                   if (replyingTo != null || editingComment != null)
@@ -1509,25 +1460,6 @@ class _CommunityScreenState extends State<CommunityScreen> {
                                         showProgressBar: false,
                                       );
                                     }
-                                  } else {
-                                    final authorName = AuthService()
-                                        .currentUser
-                                        ?.fullName
-                                        .trim();
-                                    setModalState(() {
-                                      fallbackComments.add({
-                                        'author': (authorName != null &&
-                                                authorName.isNotEmpty)
-                                            ? authorName
-                                            : 'Bạn',
-                                        'text': text,
-                                        'time': 'Vừa xong',
-                                      });
-                                    });
-                                    setState(() {
-                                      post.commentsCount++;
-                                    });
-                                    commentController.clear();
                                   }
                                 },
                           child: Container(
@@ -1731,9 +1663,19 @@ class _CommunityScreenState extends State<CommunityScreen> {
                 child: TextField(
                   controller: _searchController,
                   onChanged: (val) {
+                    final wasLocal = _isLocalFeedFilterActive;
+                    final prevSearch = _searchQuery;
                     setState(() {
                       _searchQuery = val.trim();
+                      _feedPage = 1;
+                      _myPostsPage = 1;
                     });
+                    if (wasLocal != _isLocalFeedFilterActive) {
+                      _loadCommunityFeed(page: 1);
+                    }
+                    if (prevSearch.isEmpty != _searchQuery.isEmpty) {
+                      _loadMyCommunityPosts(page: 1);
+                    }
                   },
                   decoration: InputDecoration(
                     hintText: 'Tìm kiếm bài viết, chủ đề, tác giả...',
@@ -1746,10 +1688,17 @@ class _CommunityScreenState extends State<CommunityScreen> {
                         ? IconButton(
                             icon: const Icon(Icons.clear, size: 18),
                             onPressed: () {
+                              final wasLocal = _isLocalFeedFilterActive;
                               _searchController.clear();
                               setState(() {
                                 _searchQuery = '';
+                                _feedPage = 1;
+                                _myPostsPage = 1;
                               });
+                              if (wasLocal != _isLocalFeedFilterActive) {
+                                _loadCommunityFeed(page: 1);
+                              }
+                              _loadMyCommunityPosts(page: 1);
                             },
                           )
                         : null,
@@ -1789,9 +1738,14 @@ class _CommunityScreenState extends State<CommunityScreen> {
                           ),
                         ),
                         onPressed: () {
+                          final wasLocal = _isLocalFeedFilterActive;
                           setState(() {
                             _selectedFilterIndex = index;
+                            _feedPage = 1;
                           });
+                          if (wasLocal != _isLocalFeedFilterActive) {
+                            _loadCommunityFeed(page: 1);
+                          }
                         },
                       ),
                     );
@@ -1872,18 +1826,51 @@ class _CommunityScreenState extends State<CommunityScreen> {
       );
     }
 
+    final bool isLocalPaged = _isLocalFeedFilterActive;
+    final int totalItems = isLocalPaged
+        ? posts.length
+        : (_feedTotalCount > posts.length ? _feedTotalCount : posts.length);
+    final int totalPages = (totalItems / _pageSize).ceil().clamp(1, 9999);
+    final int safePage = _feedPage.clamp(1, totalPages);
+    final List<BlogPost> displayedPosts = isLocalPaged
+        ? posts.skip((safePage - 1) * _pageSize).take(_pageSize).toList()
+        : posts;
+
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: _loadCommunityFeed,
+      onRefresh: () => _loadCommunityFeed(page: safePage),
       child: ListView.builder(
         controller: _scrollController,
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 100),
-        itemCount: posts.length,
+        itemCount: displayedPosts.length + 1,
         itemBuilder: (context, index) {
-          final post = posts[index];
+          if (index == displayedPosts.length) {
+            return PaginationBar(
+              currentPage: safePage,
+              totalPages: totalPages,
+              totalItems: totalItems,
+              pageSize: _pageSize,
+              itemLabel: 'bài viết',
+              onPageChanged: (newPage) {
+                if (_scrollController.hasClients) {
+                  _scrollController.animateTo(
+                    0,
+                    duration: const Duration(milliseconds: 250),
+                    curve: Curves.easeOut,
+                  );
+                }
+                if (isLocalPaged) {
+                  setState(() => _feedPage = newPage);
+                } else {
+                  _loadCommunityFeed(page: newPage);
+                }
+              },
+            );
+          }
+          final post = displayedPosts[index];
           return _buildPostCard(post);
         },
       ),
@@ -1960,17 +1947,43 @@ class _CommunityScreenState extends State<CommunityScreen> {
       );
     }
 
+    final bool isLocalPaged = _searchQuery.isNotEmpty;
+    final int totalItems = isLocalPaged
+        ? items.length
+        : (_myPostsTotalCount > items.length ? _myPostsTotalCount : items.length);
+    final int totalPages = (totalItems / _pageSize).ceil().clamp(1, 9999);
+    final int safePage = _myPostsPage.clamp(1, totalPages);
+    final List<CommunityPostResponseDTO> displayedItems = isLocalPaged
+        ? items.skip((safePage - 1) * _pageSize).take(_pageSize).toList()
+        : items;
+
     return RefreshIndicator(
       color: AppColors.primary,
-      onRefresh: _loadMyCommunityPosts,
+      onRefresh: () => _loadMyCommunityPosts(page: safePage),
       child: ListView.builder(
         physics: const AlwaysScrollableScrollPhysics(
           parent: BouncingScrollPhysics(),
         ),
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 110),
-        itemCount: items.length,
+        itemCount: displayedItems.length + 1,
         itemBuilder: (context, index) {
-          final postDto = items[index];
+          if (index == displayedItems.length) {
+            return PaginationBar(
+              currentPage: safePage,
+              totalPages: totalPages,
+              totalItems: totalItems,
+              pageSize: _pageSize,
+              itemLabel: 'bài viết',
+              onPageChanged: (newPage) {
+                if (isLocalPaged) {
+                  setState(() => _myPostsPage = newPage);
+                } else {
+                  _loadMyCommunityPosts(page: newPage);
+                }
+              },
+            );
+          }
+          final postDto = displayedItems[index];
           final blogPost = postDto.toBlogPost();
 
           return GestureDetector(

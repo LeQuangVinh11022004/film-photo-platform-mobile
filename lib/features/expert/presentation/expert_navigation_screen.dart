@@ -15,7 +15,8 @@ class ExpertNavigationScreen extends StatefulWidget {
   State<ExpertNavigationScreen> createState() => _ExpertNavigationScreenState();
 }
 
-class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
+class _ExpertNavigationScreenState extends State<ExpertNavigationScreen>
+    with WidgetsBindingObserver {
   int _currentIndex = 0;
 
   // Màu nhận diện riêng của Expert.
@@ -24,11 +25,25 @@ class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
         AppUpdateService().checkAndPromptUpdate(context);
       }
     });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && mounted) {
+      AppUpdateService().checkAndPromptUpdate(context);
+    }
   }
 
   @override

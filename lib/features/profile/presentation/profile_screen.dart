@@ -11,9 +11,11 @@ import '../../auth/services/auth_service.dart';
 import '../../booking/models/booking_api_models.dart';
 import '../../booking/models/booking_item.dart';
 import '../../booking/models/review_api_models.dart';
+import '../../booking/presentation/schedule_screen.dart';
 import '../../booking/services/booking_api_service.dart';
 import '../../booking/services/review_api_service.dart';
 import '../../community/models/community_post_api_models.dart';
+import '../../community/presentation/community_screen.dart';
 import '../../community/services/community_post_api_service.dart';
 import '../../../app/main.dart'; // Import themeNotifier
 
@@ -66,6 +68,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   List<CommunityPostResponseDTO> _loadedMyCommunityPosts = [];
   List<SpaceReviewResponseDTO> _loadedSpaceReviews = [];
+  Map<String, BookingItem> _loadedSpacesById = {};
 
   Future<void> _loadProfileApiStats() async {
     try {
@@ -117,8 +120,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
         }
       }
 
+      final Map<String, BookingItem> spacesMap = {
+        for (final s in studios) s.resourceId.toLowerCase(): s.toBookingItem(),
+        for (final d in darkrooms) d.resourceId.toLowerCase(): d.toBookingItem(),
+      };
+
       if (!mounted) return;
       setState(() {
+        _loadedSpacesById = spacesMap;
         if (page != null) {
           _loadedBookings = page.items;
           _totalBookingsCount = page.totalCount > 0
@@ -371,15 +380,40 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             SizedBox(height: 20),
-            Text(
-              'Lịch Sử Đặt Phòng & Thiết Bị',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: context.textColor,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Lịch Sử Đặt Phòng & Thiết Bị',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: context.textColor,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      this.context,
+                      MaterialPageRoute(
+                        builder: (_) => const ScheduleScreen(),
+                      ),
+                    ).then((_) => _loadProfileApiStats());
+                  },
+                  child: const Text(
+                    'Xem tất cả',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            SizedBox(height: 20),
+            SizedBox(height: 16),
             Expanded(
               child: apiBookings.isNotEmpty
                   ? ListView.builder(
@@ -389,68 +423,86 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         final b = apiBookings[index];
                         final priceFormatted =
                             '${b.totalAmount.toInt().toString().replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ';
-                        return Container(
-                          margin: const EdgeInsets.only(bottom: 12),
-                          padding: const EdgeInsets.all(16),
-                          decoration: BoxDecoration(
-                            color: context.cardColor,
-                            border: Border.all(color: context.borderColor),
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
+                        return InkWell(
+                          borderRadius: BorderRadius.circular(16),
+                          onTap: () {
+                            Navigator.pop(context);
+                            Navigator.push(
+                              this.context,
+                              MaterialPageRoute(
+                                builder: (_) => const ScheduleScreen(),
+                              ),
+                            ).then((_) => _loadProfileApiStats());
+                          },
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: context.cardColor,
+                              border: Border.all(color: context.borderColor),
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        b.spaceName.isNotEmpty
+                                            ? b.spaceName
+                                            : 'Đơn đặt chỗ #${b.bookingId.substring(0, 6)}',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 15,
+                                          color: context.textColor,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 6),
+                                      Text(
+                                        '${b.bookingDate} • ${b.startTime} - ${b.endTime}',
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: context.textSecColor,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.end,
                                   children: [
                                     Text(
-                                      b.spaceName.isNotEmpty
-                                          ? b.spaceName
-                                          : 'Đơn đặt chỗ #${b.bookingId.substring(0, 6)}',
-                                      style: TextStyle(
-                                        fontWeight: FontWeight.bold,
+                                      priceFormatted,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.w800,
                                         fontSize: 15,
-                                        color: context.textColor,
+                                        color: AppColors.primary,
                                       ),
                                     ),
-                                    const SizedBox(height: 6),
+                                    const SizedBox(height: 4),
                                     Text(
-                                      '${b.bookingDate} • ${b.startTime} - ${b.endTime}',
+                                      b.status,
                                       style: TextStyle(
-                                        fontSize: 13,
-                                        color: context.textSecColor,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: b.status.toUpperCase() ==
+                                                'CONFIRMED'
+                                            ? Colors.green
+                                            : AppColors.primary,
                                       ),
                                     ),
                                   ],
                                 ),
-                              ),
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  Text(
-                                    priceFormatted,
-                                    style: const TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    b.status,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                      color: b.status.toUpperCase() ==
-                                              'CONFIRMED'
-                                          ? Colors.green
-                                          : AppColors.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
+                                const SizedBox(width: 6),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  size: 20,
+                                  color: context.textSecColor,
+                                ),
+                              ],
+                            ),
                           ),
                         );
                       },
@@ -500,13 +552,38 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             SizedBox(height: 20),
-            Text(
-              'Bài Đăng Cộng Đồng ($totalCount)',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: context.textColor,
-              ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Expanded(
+                  child: Text(
+                    'Bài Đăng Cộng Đồng ($totalCount)',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: context.textColor,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    Navigator.push(
+                      this.context,
+                      MaterialPageRoute(
+                        builder: (_) => const CommunityScreen(initialViewMode: 1),
+                      ),
+                    ).then((_) => _loadProfileApiStats());
+                  },
+                  child: const Text(
+                    'Mở Diễn đàn',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
             ),
             SizedBox(height: 16),
             Expanded(
@@ -515,34 +592,60 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       physics: const BouncingScrollPhysics(),
                       children: [
                         ..._loadedMyCommunityPosts.map(
-                          (post) => Container(
-                            margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: context.cardColor,
-                              border: Border.all(color: context.borderColor),
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  post.title,
-                                  style: TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
-                                    color: context.textColor,
-                                  ),
+                          (post) => InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              Navigator.pop(context);
+                              Navigator.push(
+                                this.context,
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      const CommunityScreen(initialViewMode: 1),
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  '${post.category ?? 'Cộng đồng Film'} • ${post.likeCount} thích • ${post.commentCount} bình luận',
-                                  style: TextStyle(
-                                    fontSize: 12,
+                              ).then((_) => _loadProfileApiStats());
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(bottom: 12),
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: context.cardColor,
+                                border: Border.all(color: context.borderColor),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: Row(
+                                children: [
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          post.title,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 15,
+                                            color: context.textColor,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 6),
+                                        Text(
+                                          '${post.category ?? 'Cộng đồng Film'} • ${post.likeCount} thích • ${post.commentCount} bình luận',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: context.textSecColor,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Icon(
+                                    Icons.chevron_right_rounded,
+                                    size: 20,
                                     color: context.textSecColor,
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -656,49 +759,83 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   itemCount: _loadedSpaceReviews.length,
                   itemBuilder: (context, index) {
                     final r = _loadedSpaceReviews[index];
-                    return Container(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      padding: const EdgeInsets.all(14),
-                      decoration: BoxDecoration(
-                        color: context.cardColor,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: context.borderColor),
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                r.customerName,
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: context.textColor,
-                                ),
-                              ),
-                              Text(
-                                '${r.rating} ⭐ • ${r.spaceType}',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 12,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                          if (r.comment != null &&
-                              r.comment!.trim().isNotEmpty) ...[
-                            const SizedBox(height: 6),
-                            Text(
-                              r.comment!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: context.textSecColor,
+                    final spaceItem =
+                        _loadedSpacesById[r.spaceId.toLowerCase()];
+                    return InkWell(
+                      borderRadius: BorderRadius.circular(16),
+                      onTap: () {
+                        if (spaceItem == null) return;
+                        Navigator.pop(context);
+                        Navigator.pushNamed(
+                          this.context,
+                          '/detail',
+                          arguments: spaceItem,
+                        ).then((_) => _loadProfileApiStats());
+                      },
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: context.cardColor,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: context.borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    mainAxisAlignment:
+                                        MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Expanded(
+                                        child: Text(
+                                          spaceItem?.name ?? r.customerName,
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.bold,
+                                            color: context.textColor,
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        '${r.rating} ⭐ • ${r.spaceType}',
+                                        style: const TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  if (r.comment != null &&
+                                      r.comment!.trim().isNotEmpty) ...[
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      r.comment!,
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: context.textSecColor,
+                                      ),
+                                    ),
+                                  ],
+                                ],
                               ),
                             ),
+                            if (spaceItem != null) ...[
+                              const SizedBox(width: 8),
+                              Icon(
+                                Icons.chevron_right_rounded,
+                                size: 20,
+                                color: context.textSecColor,
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     );
                   },
