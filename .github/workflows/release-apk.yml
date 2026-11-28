@@ -25,12 +25,12 @@ jobs:
         uses: actions/checkout@v4
 
       # 2. Cài đặt môi trường Java (Bắt buộc cho Gradle của Android)
+      # Không bật cache: 'gradle' ở đây để tránh xung đột với gradle/actions/setup-gradle@v4
       - name: Setup Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: 'temurin'
           java-version: '17' # Tương thích tốt nhất với Gradle mới
-          cache: 'gradle'
 
       # 3. Cài đặt môi trường Flutter
       - name: Setup Flutter
@@ -43,9 +43,7 @@ jobs:
       - name: Cache Pub Dependencies
         uses: actions/cache@v4
         with:
-          path: |
-            ~/.pub-cache
-            .dart_tool
+          path: ~/.pub-cache
           key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
           restore-keys: |
             pub-${{ runner.os }}-
@@ -53,21 +51,45 @@ jobs:
       - name: Setup Gradle Cache
         uses: gradle/actions/setup-gradle@v4
         with:
-          cache-read-only: false
+          # Trên tag build chỉ đọc cache từ nhánh main (không tốn ~35s upload cache riêng của tag mà tag sau không đọc được)
+          cache-read-only: ${{ startsWith(github.ref, 'refs/tags/') }}
+
+      # 3c. Tận dụng Android NDK có sẵn trên ubuntu-latest để KHÔNG tốn ~2-3 phút tải & giải nén NDK 28.2 mỗi lần build
+      - name: Use Pre-installed Android NDK
+        run: |
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          if [ -n "$ANDROID_NDK_LATEST_HOME" ] && [ -d "$ANDROID_NDK_LATEST_HOME" ]; then
+            NDK_VER=$(basename "$ANDROID_NDK_LATEST_HOME")
+          elif [ -d "$SDK_DIR/ndk" ]; then
+            NDK_VER=$(ls -1 "$SDK_DIR/ndk" | sort -V | tail -n 1)
+          fi
+          if [ -n "$NDK_VER" ]; then
+            echo "ANDROID_NDK_VERSION=${NDK_VER}" >> "$GITHUB_ENV"
+            echo "Using pre-installed Android NDK: ${NDK_VER} (from ${SDK_DIR}/ndk)"
+          else
+            echo "No pre-installed NDK found in ${SDK_DIR}/ndk, falling back to flutter.ndkVersion"
+          fi
 
       # 4. Tải các gói phụ thuộc
       - name: Install Dependencies
         run: flutter pub get
 
-      # 4b. Giải mã file Keystore (Chữ ký ứng dụng) từ GitHub Secrets
-      # Lưu ý: Để cài đè (update) lên bản cũ mà không phải gỡ app, BẮT BUỘC phải ký cùng 1 Keystore cố định
-      - name: Decode Keystore
+      # 4b. Giải mã & kiểm tra file Keystore (Chữ ký ứng dụng) từ GitHub Secrets
+      # Kiểm tra ngay bằng keytool để nếu sai mật khẩu/base64 thì báo lỗi trong 1 giây thay vì chờ build 5 phút
+      - name: Decode & Verify Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-            ls -l android/app/upload-keystore.jks
+            printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/upload-keystore.jks
+            ls -lh android/app/upload-keystore.jks
+            if ! keytool -list -keystore android/app/upload-keystore.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+              echo "::error::Keystore verification FAILED! Hãy kiểm tra lại 4 GitHub Secrets: KEYSTORE_BASE64 (copy từ keystore-base64.txt mới nhất), KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD."
+              exit 1
+            fi
+            echo "Keystore verified OK (alias matched)."
           else
             echo "::warning::KEYSTORE_BASE64 is empty! APK will be signed with ephemeral debug key and CANNOT update over previous installs."
           fi
@@ -96,9 +118,11 @@ jobs:
       - name: Build APK
         run: >
           flutter build apk --release
+          --no-pub
           --target-platform android-arm64
           --build-name=${{ steps.version.outputs.build_name }}
           --build-number=${{ steps.version.outputs.build_number }}
+          --dart-define=APP_VERSION=${{ steps.version.outputs.build_name }}
           -t lib/app/main.dart
         env:
           KEYSTORE_PATH: ${{ secrets.KEYSTORE_BASE64 != '' && 'upload-keystore.jks' || '' }}

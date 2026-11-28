@@ -1,0 +1,71 @@
+name: Warm Release Build Cache
+
+# GitHub Actions cô lập cache theo từng tag (v1.0.21 KHÔNG đọc được cache lưu ở v1.0.20),
+# nhưng MỌI tag đều đọc được cache lưu trên nhánh mặc định (main).
+# Workflow này chỉ chạy khi dependencies/android config thay đổi (hoặc bấm tay),
+# giúp nạp sẵn Flutter + Pub + Gradle cache lên nhánh main cho tất cả các lần release tag sau đó.
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'pubspec.lock'
+      - 'android/**'
+      - '.github/workflows/release-apk.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: warm-cache-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  warm-cache:
+    name: Warm Flutter & Gradle Cache on main
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Cache Pub Dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
+          restore-keys: |
+            pub-${{ runner.os }}-
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-read-only: false
+
+      - name: Use Pre-installed Android NDK
+        run: |
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          if [ -n "$ANDROID_NDK_LATEST_HOME" ] && [ -d "$ANDROID_NDK_LATEST_HOME" ]; then
+            NDK_VER=$(basename "$ANDROID_NDK_LATEST_HOME")
+          elif [ -d "$SDK_DIR/ndk" ]; then
+            NDK_VER=$(ls -1 "$SDK_DIR/ndk" | sort -V | tail -n 1)
+          fi
+          if [ -n "$NDK_VER" ]; then
+            echo "ANDROID_NDK_VERSION=${NDK_VER}" >> "$GITHUB_ENV"
+            echo "Using pre-installed Android NDK: ${NDK_VER} (from ${SDK_DIR}/ndk)"
+          fi
+
+      - name: Install Dependencies
+        run: flutter pub get
+
+      - name: Warm Gradle & Flutter Build Cache
+        run: flutter build apk --release --no-pub --target-platform android-arm64 -t lib/app/main.dart

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/services/app_update_service.dart';
 import '../../../core/services/notification_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../ai_tools/presentation/ai_tools_hub_screen.dart';
@@ -23,6 +24,9 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationService().requestPermission();
+      if (mounted) {
+        AppUpdateService().checkAndPromptUpdate(context);
+      }
     });
   }
 

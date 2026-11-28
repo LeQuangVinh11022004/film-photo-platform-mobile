@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../core/services/app_update_service.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../community/presentation/community_screen.dart';
 import './schedules/expert_schedule_screen.dart';
@@ -19,6 +20,16 @@ class _ExpertNavigationScreenState extends State<ExpertNavigationScreen> {
 
   // Màu nhận diện riêng của Expert.
   static const Color _expertAccent = Color(0xFF7C5CFC);
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        AppUpdateService().checkAndPromptUpdate(context);
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
