@@ -3,10 +3,13 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:intl/intl.dart';
 import 'package:toastification/toastification.dart';
 import '../../../core/theme/app_colors.dart';
-import '../../../core/widgets/primary_button.dart';
 import '../models/booking_api_models.dart';
 import '../models/booking_item.dart';
 import '../services/booking_api_service.dart';
+import '../widgets/booking_flow_addons_step.dart';
+import '../widgets/booking_flow_checkout_step.dart';
+import '../widgets/booking_flow_date_time_step.dart';
+import '../widgets/booking_flow_step_header.dart';
 import 'payment_screen.dart';
 
 class BookingFlowScreen extends StatefulWidget {
@@ -46,49 +49,49 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
 
     final formattedSlots = <Map<String, dynamic>>[];
     for (int i = 0; i < sourceSlots.length; i++) {
-    final slotMap = sourceSlots[i];
-    final availabilityId = slotMap['availabilityId']?.toString() ?? '';
+      final slotMap = sourceSlots[i];
+      final availabilityId = slotMap['availabilityId']?.toString() ?? '';
 
-    DateTime? startAt;
-    DateTime? endAt;
+      DateTime? startAt;
+      DateTime? endAt;
 
-    final rawStart = slotMap['startAt'];
-    if (rawStart is DateTime) {
-    startAt = rawStart;
-    } else if (rawStart is String) {
-    startAt = DateTime.tryParse(rawStart);
-    }
+      final rawStart = slotMap['startAt'];
+      if (rawStart is DateTime) {
+        startAt = rawStart;
+      } else if (rawStart is String) {
+        startAt = DateTime.tryParse(rawStart);
+      }
 
-    final rawEnd = slotMap['endAt'];
-    if (rawEnd is DateTime) {
-    endAt = rawEnd;
-    } else if (rawEnd is String) {
-    endAt = DateTime.tryParse(rawEnd);
-    }
+      final rawEnd = slotMap['endAt'];
+      if (rawEnd is DateTime) {
+        endAt = rawEnd;
+      } else if (rawEnd is String) {
+        endAt = DateTime.tryParse(rawEnd);
+      }
 
-    if (startAt != null && endAt != null) {
-    final utcStart = startAt.toUtc();
-    final utcEnd = endAt.toUtc();
+      if (startAt != null && endAt != null) {
+        final utcStart = startAt.toUtc();
+        final utcEnd = endAt.toUtc();
 
-    if (utcStart.year == _selectedDate.year &&
-    utcStart.month == _selectedDate.month &&
-    utcStart.day == _selectedDate.day) {
-    final startFormatted = DateFormat('HH:mm').format(utcStart);
-    final endFormatted = DateFormat('HH:mm').format(utcEnd);
-    final diffMinutes = utcEnd.difference(utcStart).inMinutes;
-    final hours = (diffMinutes / 60).round();
+        if (utcStart.year == _selectedDate.year &&
+            utcStart.month == _selectedDate.month &&
+            utcStart.day == _selectedDate.day) {
+          final startFormatted = DateFormat('HH:mm').format(utcStart);
+          final endFormatted = DateFormat('HH:mm').format(utcEnd);
+          final diffMinutes = utcEnd.difference(utcStart).inMinutes;
+          final hours = (diffMinutes / 60).round();
 
-    formattedSlots.add({
-    'slot': '$startFormatted - $endFormatted',
-    'hours': hours > 0 ? hours : 1,
-    'durationHours': diffMinutes / 60,
-    'price': slotMap['price'],
-    'availabilityId': availabilityId,
-    'startAt': utcStart,
-    'endAt': utcEnd,
-    });
-    }
-    }
+          formattedSlots.add({
+            'slot': '$startFormatted - $endFormatted',
+            'hours': hours > 0 ? hours : 1,
+            'durationHours': diffMinutes / 60,
+            'price': slotMap['price'],
+            'availabilityId': availabilityId,
+            'startAt': utcStart,
+            'endAt': utcEnd,
+          });
+        }
+      }
     }
 
     return formattedSlots;
@@ -169,10 +172,11 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   @override
   void initState() {
     super.initState();
-    _liveAvailableSlots = List<Map<String, dynamic>>.from(widget.item.availableSlots);
+    _liveAvailableSlots =
+        List<Map<String, dynamic>>.from(widget.item.availableSlots);
     _initAddons();
     _initSelectedDate();
-    _syncLiveSlotsSubscriptionsAndEquipment();
+    _syncLiveSlotsSubscriptionsAndEquipment(isInitial: true);
   }
 
   String get _resolvedSpaceId {
@@ -184,9 +188,14 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     return widget.item.id.trim();
   }
 
-  Future<void> _syncLiveSlotsSubscriptionsAndEquipment() async {
+  Future<void> _syncLiveSlotsSubscriptionsAndEquipment({
+    bool isInitial = false,
+  }) async {
     final spaceId = _resolvedSpaceId;
-    if (spaceId.length < 32) return; // Skip mock non-UUID items
+    if (spaceId.length < 32) {
+      await Future.delayed(const Duration(milliseconds: 300));
+      return;
+    }
 
     setState(() => _isLoadingEquipment = true);
 
@@ -209,12 +218,17 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       if (!mounted) return;
       if (subscriptionsFailed) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không thể tải gói đã đăng ký. Bạn vẫn có thể đặt lịch thông thường.')),
+          const SnackBar(
+            content: Text(
+              'Không thể tải gói đã đăng ký. Bạn vẫn có thể đặt lịch thông thường.',
+            ),
+          ),
         );
       }
 
       final apiSlots = results[0] as List<ProviderSpaceAvailabilityResponseDTO>;
-      final apiSubs = results[1] as List<PhotographerPackageSubscriptionResponseDTO>;
+      final apiSubs =
+          results[1] as List<PhotographerPackageSubscriptionResponseDTO>;
       final equipPage =
           results[2] as PagedResponseDTO<PhotographerEquipmentResponseDTO>?;
 
@@ -232,7 +246,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       setState(() {
         _liveAvailableSlots = converted;
       });
-      if (widget.item.availableSlots.isEmpty && converted.isNotEmpty) {
+      if (isInitial &&
+          widget.item.availableSlots.isEmpty &&
+          converted.isNotEmpty) {
         _initSelectedDateFromSource(converted);
       }
 
@@ -240,12 +256,15 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
         _applyLiveEquipmentList(equipPage.items);
       }
 
-      // Now if there is an active selected slot, refresh equipment filtered by availabilityId
       final currentSlots = _timeSlots;
+      if (_selectedTimeSlotIndex >= currentSlots.length) {
+        setState(() {
+          _selectedTimeSlotIndex = 0;
+        });
+      }
       if (currentSlots.isNotEmpty) {
-        final safeIdx = _selectedTimeSlotIndex < currentSlots.length
-            ? _selectedTimeSlotIndex
-            : 0;
+        final safeIdx =
+            _selectedTimeSlotIndex < currentSlots.length ? _selectedTimeSlotIndex : 0;
         final currentAvailId =
             currentSlots[safeIdx]['availabilityId']?.toString() ?? '';
         if (currentAvailId.length >= 32) {
@@ -273,7 +292,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       if (mounted) {
         setState(() => _liveAvailableSlots = []);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Không thể tải dữ liệu đặt lịch. Vui lòng thử lại.')),
+          const SnackBar(
+            content: Text('Không thể tải dữ liệu đặt lịch. Vui lòng thử lại.'),
+          ),
         );
       }
     } finally {
@@ -316,10 +337,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
       _liveEquipment = items;
       _availableAddons = mapped;
       _hasLoadedLiveEquipment = true;
-      // Keep only selections that still exist in available equipment
       final validNames = mapped.map((m) => m['name'] as String).toSet();
       _selectedAddons.removeWhere((name) => !validNames.contains(name));
-      // Nếu mở luồng đặt chỗ từ một Thiết bị (BookingCategory.equipment), tự động tích chọn thiết bị đó
       if (widget.item.category == BookingCategory.equipment) {
         for (final m in mapped) {
           if (m['equipmentId']?.toString().toLowerCase() ==
@@ -335,7 +354,8 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   /// Gọi GET /api/photographer/spaces/{spaceId}/equipment?availabilityId={availabilityId}
   /// và GET /api/photographer/equipment/{equipmentId}/availability để đồng bộ thiết bị trống theo khung giờ
   Future<void> _refreshEquipmentForAvailabilitySlot(
-      String availabilityId) async {
+    String availabilityId,
+  ) async {
     final spaceId = _resolvedSpaceId;
     if (spaceId.length < 32 || availabilityId.length < 32) return;
     final generation = ++_equipmentRequestGeneration;
@@ -468,7 +488,9 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
   void _nextStep() {
     if (_isLoadingEquipment) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Đang tải dữ liệu đặt lịch, vui lòng chờ.')),
+        const SnackBar(
+          content: Text('Đang tải dữ liệu đặt lịch, vui lòng chờ.'),
+        ),
       );
       return;
     }
@@ -526,7 +548,7 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
     setState(() => _isSubmitting = true);
 
     final safeIndex =
-    _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
+        _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
     final slot = slots[safeIndex];
     final hours = slot['hours'] as int;
     final availabilityId = slot['availabilityId'] as String;
@@ -640,29 +662,30 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final slots = _timeSlots;
+    final selectedSlot = slots.isEmpty
+        ? null
+        : slots[_selectedTimeSlotIndex < slots.length
+            ? _selectedTimeSlotIndex
+            : 0];
+    final durationHours =
+        (selectedSlot?['durationHours'] as double?) ?? 1.0;
+    final basePrice = selectedSlot == null
+        ? 0.0
+        : _calculateBasePrice(selectedSlot, durationHours);
+    final totalPrice = basePrice + _calculateAddonPrice(durationHours);
+
     return Scaffold(
       backgroundColor: context.bgColor,
       appBar: AppBar(
+        backgroundColor: context.bgColor,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded),
+          icon: Icon(Icons.arrow_back_rounded, color: context.textColor),
           onPressed: _prevStep,
         ),
         title: const Text('Tiến trình Đặt chỗ'),
-        bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(40),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 10),
-            child: Row(
-              children: [
-                _buildStepIndicator(0, 'Ngày & Giờ'),
-                _buildStepDivider(),
-                _buildStepIndicator(1, 'Dịch vụ thêm'),
-                _buildStepDivider(),
-                _buildStepIndicator(2, 'Thanh toán'),
-              ],
-            ),
-          ),
-        ),
+        bottom: BookingFlowStepHeader(currentStep: _currentStep),
       ),
       body: Column(
         children: [
@@ -671,746 +694,82 @@ class _BookingFlowScreenState extends State<BookingFlowScreen> {
               controller: _pageController,
               physics: const NeverScrollableScrollPhysics(),
               children: [
-                _buildStep2DateTime(),
-                _buildStep1Addons(),
-                _buildStep3Checkout(),
-              ],
-            ),
-          ),
-          _buildBottomBar(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepIndicator(int step, String label) {
-    final isActive = _currentStep >= step;
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(
-              color: isActive ? AppColors.primary : context.inputColor,
-              shape: BoxShape.circle,
-            ),
-            child: Center(
-              child: isActive
-                  ? const Icon(Icons.check_rounded, size: 14, color: Colors.white)
-                  : Text(
-                '${step + 1}',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textHint,
+                BookingFlowDateTimeStep(
+                  selectedDate: _selectedDate,
+                  slots: slots,
+                  selectedTimeSlotIndex: _selectedTimeSlotIndex,
+                  onRefresh: _syncLiveSlotsSubscriptionsAndEquipment,
+                  onDateSelected: (picked) {
+                    setState(() {
+                      _selectedDate = picked;
+                      _selectedTimeSlotIndex = 0;
+                      _equipmentRequestGeneration++;
+                      _equipmentAvailabilityCounts.clear();
+                    });
+                    final nextSlots = _timeSlots;
+                    if (nextSlots.isNotEmpty) {
+                      final availId =
+                          nextSlots.first['availabilityId']?.toString() ?? '';
+                      if (availId.length >= 32) {
+                        _refreshEquipmentForAvailabilitySlot(availId);
+                      }
+                    }
+                  },
+                  onSlotSelected: (index) {
+                    setState(() => _selectedTimeSlotIndex = index);
+                    final availId =
+                        slots[index]['availabilityId']?.toString() ?? '';
+                    if (availId.length >= 32) {
+                      _refreshEquipmentForAvailabilitySlot(availId);
+                    }
+                  },
                 ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              color: isActive ? context.textColor : AppColors.textHint,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStepDivider() {
-    return Container(
-      width: 20,
-      height: 2,
-      color: context.inputColor,
-      margin: const EdgeInsets.only(bottom: 14),
-    );
-  }
-
-  Widget _buildStep1Addons() {
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Expanded(
-              child: Text(
-                'Trang thiết bị đi kèm',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: context.textColor,
+                BookingFlowAddonsStep(
+                  itemId: widget.item.id,
+                  isLoadingEquipment: _isLoadingEquipment,
+                  hasLoadedLiveEquipment: _hasLoadedLiveEquipment,
+                  liveEquipmentCount: _liveEquipment.length,
+                  availableAddons: _availableAddons,
+                  selectedAddons: _selectedAddons,
+                  equipmentAvailabilityCounts: _equipmentAvailabilityCounts,
+                  onRefresh: _syncLiveSlotsSubscriptionsAndEquipment,
+                  onToggleAddon: (name) {
+                    setState(() {
+                      if (_selectedAddons.contains(name)) {
+                        _selectedAddons.remove(name);
+                      } else {
+                        _selectedAddons.add(name);
+                      }
+                    });
+                  },
                 ),
-              ),
-            ),
-            if (_isLoadingEquipment)
-              const SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.primary,
-                ),
-              )
-            else if (_hasLoadedLiveEquipment && _liveEquipment.isNotEmpty)
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  '${_liveEquipment.length} thiết bị sẵn sàng',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
-                  ),
-                ),
-              ),
-          ],
-        ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
-        const SizedBox(height: 8),
-        Text(
-          'Chọn thêm các trang thiết bị của không gian này để đính kèm trực tiếp vào đơn đặt chỗ.',
-          style: TextStyle(
-            fontSize: 14,
-            color: context.textSecColor,
-            height: 1.5,
-          ),
-        ).animate().fadeIn(delay: 100.ms),
-        const SizedBox(height: 24),
-        if (_hasLoadedLiveEquipment &&
-            _liveEquipment.isEmpty &&
-            widget.item.id.trim().length >= 32)
-          Container(
-            margin: const EdgeInsets.only(bottom: 16),
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: context.inputColor,
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline_rounded,
-                    color: AppColors.primary, size: 18),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    'Không có thiết bị khả dụng cho không gian hoặc khung giờ này.',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: context.textSecColor,
-                    ),
-                  ),
+                BookingFlowCheckoutStep(
+                  itemName: widget.item.name,
+                  selectedDate: _selectedDate,
+                  selectedSlot: selectedSlot,
+                  basePrice: basePrice,
+                  totalPrice: totalPrice,
+                  selectedAddons: _selectedAddons,
+                  availableAddons: _availableAddons,
+                  matchingSubscriptions: _matchingSubscriptions,
+                  selectedSubscription: _selectedSubscription,
+                  onRefresh: _syncLiveSlotsSubscriptionsAndEquipment,
+                  onSubscriptionToggled: (val) {
+                    setState(() {
+                      _selectedSubscription =
+                          val ? _matchingSubscriptions.first : null;
+                    });
+                  },
                 ),
               ],
             ),
           ),
-        ..._availableAddons.map((addon) {
-          final isSelected = _selectedAddons.contains(addon['name']);
-          final category = addon['category']?.toString() ?? '';
-          final variant = addon['variant']?.toString() ?? '';
-          final description = addon['description']?.toString() ?? '';
-          final quantityTotal = (addon['quantityTotal'] as num?)?.toInt();
-          final availabilityCount =
-              _equipmentAvailabilityCounts[addon['equipmentId']];
-          final isPerHour = addon['isPerHour'] == true;
-          final priceStr = NumberFormat.currency(locale: 'vi', symbol: 'đ')
-              .format(addon['price']);
-
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                if (isSelected) {
-                  _selectedAddons.remove(addon['name']);
-                } else {
-                  _selectedAddons.add(addon['name']);
-                }
-              });
-            },
-            child: AnimatedContainer(
-              duration: 200.ms,
-              margin: const EdgeInsets.only(bottom: 12),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? AppColors.primary.withValues(alpha: 0.05)
-                    : context.cardColor,
-                border: Border.all(
-                  color: isSelected ? AppColors.primary : context.borderColor,
-                  width: isSelected ? 2 : 1,
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? AppColors.primary.withValues(alpha: 0.12)
-                          : context.inputColor,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(
-                      addon['icon'],
-                      color: isSelected
-                          ? AppColors.primary
-                          : context.textSecColor,
-                      size: 24,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          addon['name'],
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.bold,
-                            color: context.textColor,
-                          ),
-                        ),
-                        if (availabilityCount != null &&
-                            availabilityCount > 0) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            '$availabilityCount slot trống',
-                            style: TextStyle(
-                              fontSize: 10,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.green.shade700,
-                            ),
-                          ),
-                        ],
-                        if (category.isNotEmpty || variant.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Wrap(
-                            spacing: 6,
-                            runSpacing: 4,
-                            children: [
-                              if (category.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: context.inputColor,
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    category,
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: context.textSecColor,
-                                    ),
-                                  ),
-                                ),
-                              if (variant.isNotEmpty)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 8, vertical: 2),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary
-                                        .withValues(alpha: 0.08),
-                                    borderRadius: BorderRadius.circular(6),
-                                  ),
-                                  child: Text(
-                                    variant,
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.primary,
-                                    ),
-                                  ),
-                                ),
-                              if (quantityTotal != null && quantityTotal > 0)
-                                Text(
-                                  '• SL: $quantityTotal',
-                                  style: TextStyle(
-                                    fontSize: 11,
-                                    color: context.textSecColor,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ],
-                        if (description.isNotEmpty) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            description,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: context.textSecColor,
-                              height: 1.35,
-                            ),
-                          ),
-                        ],
-                        const SizedBox(height: 6),
-                        Text(
-                          isPerHour ? '+$priceStr / giờ' : '+$priceStr',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Container(
-                    width: 24,
-                    height: 24,
-                    margin: const EdgeInsets.only(top: 4),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color:
-                          isSelected ? AppColors.primary : Colors.transparent,
-                      border: Border.all(
-                        color:
-                            isSelected ? AppColors.primary : context.borderColor,
-                        width: 2,
-                      ),
-                    ),
-                    child: isSelected
-                        ? const Icon(Icons.check, size: 16, color: Colors.white)
-                        : null,
-                  ),
-                ],
-              ),
-            ),
-          );
-        }).toList().animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
-      ],
-    );
-  }
-
-  Widget _buildStep2DateTime() {
-    final slots = _timeSlots;
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Text(
-          'Thời gian đặt chỗ',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: context.textColor,
-          ),
-        ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
-        const SizedBox(height: 24),
-        Text(
-          'Chọn Ngày',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-            color: context.textColor,
-          ),
-        ),
-        const SizedBox(height: 12),
-        InkWell(
-          onTap: () async {
-            final picked = await showDatePicker(
-              context: context,
-              initialDate: _selectedDate,
-              firstDate: DateTime(2024),
-              lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
-              builder: (context, child) {
-                return Theme(
-                  data: Theme.of(context).copyWith(
-                    colorScheme: ColorScheme.light(
-                      primary: AppColors.primary,
-                      onPrimary: Colors.white,
-                      onSurface: context.textColor,
-                    ),
-                  ),
-                  child: child!,
-                );
-              },
-            );
-            if (picked != null) {
-              setState(() {
-                _selectedDate = picked;
-                _selectedTimeSlotIndex = 0;
-                _equipmentRequestGeneration++;
-                _equipmentAvailabilityCounts.clear();
-              });
-              final nextSlots = _timeSlots;
-              if (nextSlots.isNotEmpty) {
-                final availId =
-                    nextSlots.first['availabilityId']?.toString() ?? '';
-                if (availId.length >= 32) {
-                  _refreshEquipmentForAvailabilitySlot(availId);
-                }
-              }
-            }
-          },
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
-            decoration: BoxDecoration(
-              color: context.inputColor,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year}',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: context.textColor,
-                  ),
-                ),
-                const Icon(Icons.calendar_month_rounded, color: AppColors.primary),
-              ],
-            ),
-          ),
-        ).animate().fadeIn(delay: 100.ms),
-        const SizedBox(height: 28),
-        Text(
-          'Chọn Khung Giờ',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 15,
-            color: context.textColor,
-          ),
-        ),
-        const SizedBox(height: 12),
-        if (slots.isEmpty)
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 16),
-            width: double.infinity,
-            decoration: BoxDecoration(
-              color: context.cardColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: context.borderColor),
-            ),
-            child: Center(
-              child: Text(
-                'Không có khung giờ trống cho ngày này',
-                style: TextStyle(
-                  color: context.textSecColor,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          ).animate().fadeIn(delay: 200.ms)
-        else
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: List.generate(slots.length, (index) {
-              final slot = slots[index];
-              final isSelected = _selectedTimeSlotIndex == index;
-              return GestureDetector(
-                onTap: () {
-                  setState(() => _selectedTimeSlotIndex = index);
-                  final availId = slot['availabilityId']?.toString() ?? '';
-                  if (availId.length >= 32) {
-                    _refreshEquipmentForAvailabilitySlot(availId);
-                  }
-                },
-                child: AnimatedContainer(
-                  duration: 200.ms,
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: isSelected ? AppColors.primary : context.cardColor,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isSelected ? AppColors.primary : context.borderColor,
-                    ),
-                    boxShadow: isSelected
-                        ? [
-                      BoxShadow(
-                        color: AppColors.primary.withValues(alpha: 0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
-                      ),
-                    ]
-                        : [],
-                  ),
-                  child: Text(
-                    '${slot['slot']} (${slot['hours']}h)',
-                    style: TextStyle(
-                      color: isSelected ? Colors.white : context.textColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ).animate().fadeIn(delay: 200.ms),
-      ],
-    );
-  }
-
-  Widget _buildStep3Checkout() {
-    final slots = _timeSlots;
-    if (slots.isEmpty) {
-      return Center(
-        child: Text(
-          'Không có khung giờ trống cho ngày đã chọn',
-          style: TextStyle(color: context.textSecColor, fontSize: 16),
-        ),
-      );
-    }
-    final safeIndex =
-    _selectedTimeSlotIndex < slots.length ? _selectedTimeSlotIndex : 0;
-    final slot = slots[safeIndex];
-    final hours = slot['hours'] as int;
-    final durationHours = slot['durationHours'] as double;
-    final basePrice = _calculateBasePrice(slot, durationHours);
-    final addonPrice = _calculateAddonPrice(durationHours);
-    final totalPrice = basePrice + addonPrice;
-
-    return ListView(
-      padding: const EdgeInsets.all(24),
-      children: [
-        Text(
-          'Tổng quan Đơn đặt',
-          style: TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w800,
-            color: context.textColor,
-          ),
-        ).animate().fadeIn(),
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: context.cardColor,
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: context.borderColor),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.item.name,
-                style: TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                  color: context.textColor,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time_rounded,
-                    size: 16,
-                    color: context.textSecColor,
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    '${_selectedDate.day}/${_selectedDate.month}/${_selectedDate.year} • ${slot['slot']}',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: context.textSecColor,
-                    ),
-                  ),
-                ],
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 16),
-                child: Divider(height: 1),
-              ),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Phí thuê cơ bản',
-                    style: TextStyle(color: context.textSecColor),
-                  ),
-                  Text(
-                    NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                        .format(basePrice),
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: context.textColor,
-                    ),
-                  ),
-                ],
-              ),
-              if (_selectedAddons.isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  'Thiết bị đi kèm:',
-                  style: TextStyle(color: context.textSecColor),
-                ),
-                const SizedBox(height: 8),
-                ..._selectedAddons.map((name) {
-                  final addon =
-                      _availableAddons.firstWhere((a) => a['name'] == name);
-                  final unitPrice = (addon['price'] as num).toDouble();
-                  final isPerHour = addon['isPerHour'] == true;
-                  final lineTotal =
-                      isPerHour ? unitPrice * durationHours : unitPrice;
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 4, left: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Expanded(
-                          child: Text(
-                            isPerHour ? '• $name (x${hours}h)' : '• $name',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: context.textSecColor,
-                            ),
-                          ),
-                        ),
-                        Text(
-                          NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                              .format(lineTotal),
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.bold,
-                            color: context.textColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            ],
-          ),
-        ).animate().fadeIn(delay: 100.ms).slideY(begin: 0.1),
-        if (_matchingSubscriptions.isNotEmpty) ...[
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.green.shade300),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(Icons.card_membership_rounded,
-                        color: Colors.green.shade700, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Bạn có Gói Subscription áp dụng cho phòng này',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13,
-                          color: Colors.green.shade900,
-                        ),
-                      ),
-                    ),
-                    Switch(
-                      value: _selectedSubscription != null,
-                      activeThumbColor: Colors.green.shade700,
-                      onChanged: (val) {
-                        setState(() {
-                          _selectedSubscription =
-                              val ? _matchingSubscriptions.first : null;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-                if (_selectedSubscription != null)
-                  Text(
-                    'Đang áp dụng: ${_selectedSubscription!.packageName} (Còn ${_selectedSubscription!.remainingUsesThisPeriod} lượt dùng • Miễn đặt cọc)',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.green.shade800,
-                    ),
-                  ),
-              ],
-            ),
+          BookingFlowBottomBar(
+            currentStep: _currentStep,
+            isSubmitting: _isSubmitting,
+            onNextPressed: _nextStep,
           ),
         ],
-        const SizedBox(height: 24),
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            gradient: AppColors.primaryGradient,
-            borderRadius: BorderRadius.circular(20),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.primary.withValues(alpha: 0.3),
-                blurRadius: 16,
-                offset: const Offset(0, 8),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                _selectedSubscription != null
-                    ? 'Sử dụng Gói Subscription'
-                    : 'Tổng thanh toán',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                ),
-              ),
-              Text(
-                _selectedSubscription != null
-                    ? '0đ (-1 lượt)'
-                    : NumberFormat.currency(locale: 'vi', symbol: 'đ')
-                        .format(totalPrice),
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w900,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ).animate().fadeIn(delay: 200.ms).slideY(begin: 0.1),
-      ],
-    );
-  }
-
-  Widget _buildBottomBar() {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        color: context.cardColor,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.05),
-            blurRadius: 20,
-            offset: const Offset(0, -5),
-          ),
-        ],
-      ),
-      child: SafeArea(
-        child: PrimaryButton(
-          text: _currentStep < 2 ? 'Tiếp tục' : 'Xác nhận & Sang thanh toán',
-          isLoading: _isSubmitting,
-          onPressed: _nextStep,
-        ),
       ),
     );
   }

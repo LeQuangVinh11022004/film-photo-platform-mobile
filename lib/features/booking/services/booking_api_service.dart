@@ -221,6 +221,34 @@ class BookingApiService {
     }
   }
 
+  /// Lấy danh sách Hóa chất của một Darkroom (/api/photographer/darkrooms/{darkroomId}/chemicals)
+  Future<List<DarkroomChemicalResponseDTO>> getDarkroomChemicals(
+    String darkroomId,
+  ) async {
+    try {
+      final response = await _apiClient.get(
+        '/api/photographer/darkrooms/$darkroomId/chemicals',
+      );
+      if (response.statusCode == 200) {
+        final decoded = jsonDecode(response.body);
+        final jsonList = _extractJsonList(decoded);
+        return jsonList
+            .whereType<Map<String, dynamic>>()
+            .map(DarkroomChemicalResponseDTO.fromJson)
+            .toList();
+      }
+      if (kDebugMode) {
+        print(
+          'Failed to get darkroom chemicals (${response.statusCode}): ${response.body}',
+        );
+      }
+      return [];
+    } catch (e) {
+      if (kDebugMode) print('getDarkroomChemicals API Error: $e');
+      return [];
+    }
+  }
+
   /// Gom toàn bộ thiết bị từ các Studio/Darkroom đã tải (gọi /spaces/{id}/equipment, đọc hết các trang).
   /// Thiết bị trùng equipmentId giữa các không gian chỉ xuất hiện một lần.
   Future<List<BookingItem>> getAllEquipmentItems(List<BookingItem> spaces) async {
@@ -582,37 +610,112 @@ class BookingApiService {
 
   /// Hủy đơn đặt phòng (Photographer)
   Future<Map<String, dynamic>> cancelBooking(String bookingId) async {
+    final endpoint = '/api/photographer/bookings/$bookingId/cancel';
+    if (kDebugMode) {
+      debugPrint('[CANCEL_BOOKING_API] Request PATCH $endpoint');
+    }
     try {
-      final response = await _apiClient.patch(
-        '/api/photographer/bookings/$bookingId/cancel',
-      );
+      final response = await _apiClient.patch(endpoint);
+
+      if (kDebugMode) {
+        debugPrint(
+          '[CANCEL_BOOKING_API] Response status=${response.statusCode} | body=${response.body}',
+        );
+      }
 
       if (response.statusCode == 200) {
-        final json = jsonDecode(response.body) as Map<String, dynamic>;
-        final cancellation = BookingCancellationResponseDTO.fromJson(json);
-        if (cancellation.bookingId.toLowerCase() != bookingId.toLowerCase() ||
-            cancellation.status.toUpperCase() != 'CANCELLED' ||
-            json['refundAmount'] is! num ||
-            json['refundStatus'] is! String ||
-            json['packageUseRestored'] is! bool) {
+        final decoded = jsonDecode(response.body);
+        if (decoded is! Map<String, dynamic>) {
+          if (kDebugMode) {
+            debugPrint(
+              '[CANCEL_BOOKING_API] BE 200 body is not JSON object: ${response.body}',
+            );
+          }
           return {
             'success': false,
-            'message': 'Máy chủ trả về thông tin hủy lịch không hợp lệ. Vui lòng kiểm tra lại lịch đặt.',
+            'source': 'BE',
+            'statusCode': response.statusCode,
+            'rawBody': response.body,
+            'message': 'Máy chủ trả về dữ liệu hủy lịch không đúng định dạng.',
+          };
+        }
+
+        final cancellation = BookingCancellationResponseDTO.fromJson(decoded);
+        if (cancellation.bookingId.toLowerCase() != bookingId.toLowerCase() ||
+            cancellation.status.toUpperCase() != 'CANCELLED' ||
+            decoded['refundAmount'] is! num ||
+            decoded['refundStatus'] is! String ||
+            decoded['packageUseRestored'] is! bool) {
+          if (kDebugMode) {
+            debugPrint(
+              '[CANCEL_BOOKING_API] BE 200 payload validation failed | '
+              'expectedBookingId=$bookingId, actualBookingId=${cancellation.bookingId}, '
+              'status=${cancellation.status}, refundAmount=${decoded['refundAmount']}, '
+              'refundStatus=${decoded['refundStatus']}, packageUseRestored=${decoded['packageUseRestored']}',
+            );
+          }
+          return {
+            'success': false,
+            'source': 'BE',
+            'statusCode': response.statusCode,
+            'rawBody': response.body,
+            'message':
+                'Máy chủ trả về thông tin hủy lịch không hợp lệ. Vui lòng kiểm tra lại lịch đặt.',
           };
         }
         return {'success': true, 'cancellation': cancellation};
       }
+
       var message = 'Không thể hủy lịch đặt (Mã lỗi: ${response.statusCode}).';
       if (response.body.isNotEmpty) {
-        final decoded = jsonDecode(response.body);
-        if (decoded is Map<String, dynamic> && decoded['message'] != null) {
-          message = decoded['message'].toString();
+        try {
+          final decoded = jsonDecode(response.body);
+          if (decoded is Map<String, dynamic>) {
+            final candidate = decoded['message'] ??
+                decoded['Message'] ??
+                decoded['detail'] ??
+                decoded['title'] ??
+                decoded['error'];
+            if (candidate != null && candidate.toString().trim().isNotEmpty) {
+              message = candidate.toString().trim();
+            } else if (decoded['errors'] != null) {
+              message = decoded['errors'].toString();
+            }
+          } else if (decoded is String && decoded.trim().isNotEmpty) {
+            message = decoded.trim();
+          }
+        } catch (parseErr) {
+          if (kDebugMode) {
+            debugPrint(
+              '[CANCEL_BOOKING_API] Non-JSON error body (status=${response.statusCode}): $parseErr | raw=${response.body}',
+            );
+          }
+          message = response.body.trim();
         }
       }
-      return {'success': false, 'message': message};
-    } catch (e) {
-      if (kDebugMode) print('cancelBooking API Error: $e');
-      return {'success': false, 'message': 'Không thể kết nối để hủy lịch đặt.'};
+
+      if (kDebugMode) {
+        debugPrint(
+          '[CANCEL_BOOKING_API] BE Error | status=${response.statusCode} | message=$message | rawBody=${response.body}',
+        );
+      }
+      return {
+        'success': false,
+        'source': 'BE',
+        'statusCode': response.statusCode,
+        'rawBody': response.body,
+        'message': message,
+      };
+    } catch (e, stackTrace) {
+      if (kDebugMode) {
+        debugPrint('[CANCEL_BOOKING_API] FE Exception: $e\n$stackTrace');
+      }
+      return {
+        'success': false,
+        'source': 'FE',
+        'error': e.toString(),
+        'message': 'Lỗi phía ứng dụng khi hủy lịch đặt: $e',
+      };
     }
   }
 }
