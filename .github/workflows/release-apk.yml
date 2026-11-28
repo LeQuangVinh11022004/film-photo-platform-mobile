@@ -57,31 +57,39 @@ jobs:
       # 3c. Tận dụng Android NDK có sẵn trên ubuntu-latest để KHÔNG tốn ~2-3 phút tải & giải nén NDK 28.2 mỗi lần build
       - name: Use Pre-installed Android NDK
         run: |
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           if [ -n "$ANDROID_NDK_LATEST_HOME" ] && [ -d "$ANDROID_NDK_LATEST_HOME" ]; then
             NDK_VER=$(basename "$ANDROID_NDK_LATEST_HOME")
-          elif [ -d "$ANDROID_HOME/ndk" ]; then
-            NDK_VER=$(ls -1 "$ANDROID_HOME/ndk" | sort -V | tail -n 1)
+          elif [ -d "$SDK_DIR/ndk" ]; then
+            NDK_VER=$(ls -1 "$SDK_DIR/ndk" | sort -V | tail -n 1)
           fi
           if [ -n "$NDK_VER" ]; then
             echo "ANDROID_NDK_VERSION=${NDK_VER}" >> "$GITHUB_ENV"
-            echo "Using pre-installed Android NDK: ${NDK_VER}"
+            echo "Using pre-installed Android NDK: ${NDK_VER} (from ${SDK_DIR}/ndk)"
           else
-            echo "No pre-installed NDK found, falling back to flutter.ndkVersion"
+            echo "No pre-installed NDK found in ${SDK_DIR}/ndk, falling back to flutter.ndkVersion"
           fi
 
       # 4. Tải các gói phụ thuộc
       - name: Install Dependencies
         run: flutter pub get
 
-      # 4b. Giải mã file Keystore (Chữ ký ứng dụng) từ GitHub Secrets
-      # Lưu ý: Để cài đè (update) lên bản cũ mà không phải gỡ app, BẮT BUỘC phải ký cùng 1 Keystore cố định
-      - name: Decode Keystore
+      # 4b. Giải mã & kiểm tra file Keystore (Chữ ký ứng dụng) từ GitHub Secrets
+      # Kiểm tra ngay bằng keytool để nếu sai mật khẩu/base64 thì báo lỗi trong 1 giây thay vì chờ build 5 phút
+      - name: Decode & Verify Keystore
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         run: |
           if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 --decode > android/app/upload-keystore.jks
-            ls -l android/app/upload-keystore.jks
+            printf '%s' "$KEYSTORE_BASE64" | tr -d '[:space:]' | base64 --decode > android/app/upload-keystore.jks
+            ls -lh android/app/upload-keystore.jks
+            if ! keytool -list -keystore android/app/upload-keystore.jks -storepass "$KEYSTORE_PASSWORD" -alias "$KEY_ALIAS" >/dev/null 2>&1; then
+              echo "::error::Keystore verification FAILED! Hãy kiểm tra lại 4 GitHub Secrets: KEYSTORE_BASE64 (copy từ keystore-base64.txt mới nhất), KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD."
+              exit 1
+            fi
+            echo "Keystore verified OK (alias matched)."
           else
             echo "::warning::KEYSTORE_BASE64 is empty! APK will be signed with ephemeral debug key and CANNOT update over previous installs."
           fi

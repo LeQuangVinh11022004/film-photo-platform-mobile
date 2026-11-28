@@ -53,14 +53,15 @@ jobs:
 
       - name: Use Pre-installed Android NDK
         run: |
+          SDK_DIR="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
           if [ -n "$ANDROID_NDK_LATEST_HOME" ] && [ -d "$ANDROID_NDK_LATEST_HOME" ]; then
             NDK_VER=$(basename "$ANDROID_NDK_LATEST_HOME")
-          elif [ -d "$ANDROID_HOME/ndk" ]; then
-            NDK_VER=$(ls -1 "$ANDROID_HOME/ndk" | sort -V | tail -n 1)
+          elif [ -d "$SDK_DIR/ndk" ]; then
+            NDK_VER=$(ls -1 "$SDK_DIR/ndk" | sort -V | tail -n 1)
           fi
           if [ -n "$NDK_VER" ]; then
             echo "ANDROID_NDK_VERSION=${NDK_VER}" >> "$GITHUB_ENV"
-            echo "Using pre-installed Android NDK: ${NDK_VER}"
+            echo "Using pre-installed Android NDK: ${NDK_VER} (from ${SDK_DIR}/ndk)"
           fi
 
       - name: Install Dependencies
