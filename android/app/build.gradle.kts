@@ -37,6 +37,11 @@ android {
 
     buildTypes {
         release {
+            // Tắt R8 minify & shrinkResources giúp cắt giảm ~1-2 phút build release trên CI
+            // và ổn định hơn (không bị R8 xóa nhầm class), APK chỉ tăng nhẹ vài MB.
+            isMinifyEnabled = false
+            isShrinkResources = false
+
             // Tự động dùng Release Keystore nếu có trên GitHub Actions, ngược lại dùng debug
             val keystorePath = System.getenv("KEYSTORE_PATH")
             if (!keystorePath.isNullOrEmpty()) {
